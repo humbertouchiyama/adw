@@ -476,7 +476,8 @@ diff touches any trap domain from adw-core §3's D1 negative list (`repo-profile
 prefixes plus the grep proxies, as pinned there), the depth promise is broken — halt `blocked`, PR body:
 `depth escalation — diff touched <path>; re-run /adw-init at plan`. "Looks trivial" is
 unfalsifiable at triage; the diff is not. A misclassified unit costs a bounce, never a
-shipped trap. A diff exceeding the ≤4-source-file bound WITHOUT touching a trap domain
+shipped trap. Count **production** files only, as adw-core §3 does. A diff exceeding the
+≤4-production-file bound WITHOUT touching a trap domain
 does not bounce — it carries `· ⚠ depth envelope: N source files (spec promised ≤4)` on
 its run-report PR line (size is a proxy; the trap list is the risk).
 

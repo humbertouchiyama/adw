@@ -48,9 +48,25 @@ cp .claude/adw/cache/install/stubs/*.md .claude/commands/
 echo '.claude/adw/cache/' >> .gitignore
 ```
 
+**If `.claude/commands/` already holds real command files, diff before you overwrite.** The `cp`
+above replaces them. A repo that had customised one of these — a `code-review.md` carrying its own
+convention rules, say — loses that content silently. AXCMedApp's was 297 lines of Kotlin rules; they
+had to be rehomed into its `audit.sh` and `repo-profile §16` before the stub could land.
+
 Then write `.claude/repo-profile.md`. Start from `docs/repo-profile-EXAMPLE.md` and replace every
 value; the section numbers are anchors and must not be renumbered. A contract file that cites a
 section your profile does not answer will stop the run, which is the intended failure.
+
+### The loader is a copy, and copies drift
+
+`fetch.sh` and the stubs are the one part of ADW that is **not** fetched — they are tracked files in
+your repo mirroring `install/` here. So they drift exactly the way the contract used to. AXCMedApp
+ran a revision-old loader for a day: its stubs did not know exit 2 existed, so an unverified cache
+would have run as verified.
+
+`fetch.sh` now compares itself and your stubs against the freshly-fetched `install/` on every
+successful fetch and prints one line when they differ. It never rewrites them — diff first, then
+copy. This is a report, not a gate: it is the honest residual of keeping a bootstrap out-of-band.
 
 ## How a run resolves the contract
 

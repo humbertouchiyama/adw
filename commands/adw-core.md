@@ -156,7 +156,7 @@ Spec at every depth. Critical passes are FRESH subagents with an adversarial pro
 carried to the handoff `needs you` line — never buried in the artifact it reviewed.
 
 **D1 criteria — all four, mechanically checkable at triage:** root cause reproduced with
-file:line evidence · expected diff ≤4 source files · **the
+file:line evidence · expected diff ≤4 **production** source files, tests excluded · **the
 `verify` has a home** — a co-located test file exists **OR** the verify is a
 self-contained mechanical assertion (grep, a type check, a CSS-rule match) that goes red on
 revert · the surface touches NONE of the **trap domains `repo-profile §11` declares**. Any
@@ -186,13 +186,21 @@ are what the list keeps getting wrong:
   back from the real database. Depth buys a spec and a refute agent; neither runs the
   query. Cover a trap with a gate that executes, not with a rung on this ladder.
 
-The verify-home criterion reads OR, and the file bound is ≤4 rather than ≤2 in one
-directory, because a full-stack unit is normally shared schema + handler + consumer + test
-and the old bound could not express that (design §3.6; run-7 cut zero D0/D1 units out of
-six). The criterion exists so the `verify` has a home, not so a *file type* does;
-red-on-revert is the property that matters, and the build-side mutation gate
-(adw-build §3.4) already measures exactly it. A grep verify does NOT buy relief from the
-file bound or the trap-domain list.
+The verify-home criterion reads OR, and the file bound is ≤4 rather than ≤2 in one directory,
+because a full-stack unit is normally shared schema + handler + consumer and the old bound could
+not express that (design §3.6; run-7 cut zero D0/D1 units out of six). The criterion exists so the
+`verify` has a home, not so a *file type* does; red-on-revert is the property that matters, and the
+build-side mutation gate (adw-build §3.4) already measures exactly it. A grep verify does NOT buy
+relief from the file bound or the trap-domain list.
+
+**The bound counts production files. Test files do not count against it.** The bound caps blast
+radius, and a test file is not blast radius — it is where the verify lives, which the criterion
+immediately above already requires, and whether it actually reds is measured separately by §3.4's
+mutation gate. Counting it both obliges a test and charges for it, which is how a unit of three
+production files with a co-located test each lands at six and can never be D1. That is not
+hypothetical: `tour-flow-attribution` u1 was three production files and two tests, and the five
+put it out of reach of a depth its risk profile fit. A repo whose test files are not obvious from
+their names should say so in `repo-profile §2`.
 
 **D0 (express) — status: ACTIVE · earned by PR #788 + PR #807, both mutation-clean.**
 For a single-unit intent meeting every D1 criterion: the triage agent itself drafts the

@@ -19,6 +19,28 @@ LOCK="$DIR/.fetch.lock"
 
 stamp() { git -C "$CACHE" log -1 --format='%h' 2>/dev/null; }
 
+# The loader is the one part of ADW that is still a COPY. This script and the stubs in
+# .claude/commands/ are tracked files mirroring install/ upstream, so they drift exactly the way
+# the contract used to — and nothing else in the system will ever tell you. AXCMedApp ran a
+# revision-old loader for a day: its stubs did not know exit 2 existed, so an unverified cache
+# would have run as verified, and a human code review is what caught it.
+# Report only. Never rewrite a tracked file behind the author's back.
+loader_drift() {
+  up="$CACHE/install"; cmds="$(cd "$DIR/.." 2>/dev/null && pwd)/commands"; drift=""
+  [ -d "$up" ] || return 0
+  cmp -s "$DIR/fetch.sh" "$up/fetch.sh" 2>/dev/null || drift="fetch.sh"
+  for s in "$up"/stubs/*.md; do
+    [ -f "$s" ] || continue
+    n=$(basename "$s")
+    [ -f "$cmds/$n" ] || continue
+    cmp -s "$cmds/$n" "$s" 2>/dev/null || drift="$drift commands/$n"
+  done
+  [ -n "$drift" ] || return 0
+  echo "adw: the LOADER is behind $REPO —$drift" >&2
+  echo "adw: these are copies, not fetched, so nothing else reports this. Diff before overwriting:" >&2
+  echo "adw:   cp '$up/fetch.sh' '$DIR/fetch.sh' && cp '$up'/stubs/*.md '$cmds'/" >&2
+}
+
 # Serialize concurrent runs in the same repo: two sessions resetting one cache can
 # leave a reader mid-checkout. mkdir is atomic on every filesystem that matters.
 for _ in $(seq 1 60); do
@@ -41,6 +63,7 @@ if [ -d "$CACHE/.git" ]; then
   git -C "$CACHE" remote set-url origin "$REPO" 2>/dev/null
   if git -C "$CACHE" fetch --quiet --depth 1 origin "$REF" 2>/dev/null \
      && git -C "$CACHE" reset --hard --quiet FETCH_HEAD; then
+    loader_drift
     echo "adw contract $(stamp)  ($REF, fetched)"
     exit 0
   fi
@@ -50,6 +73,7 @@ if [ -d "$CACHE/.git" ]; then
 fi
 
 if git clone --quiet --depth 1 --branch "$REF" "$REPO" "$CACHE" 2>/dev/null; then
+  loader_drift
   echo "adw contract $(stamp)  ($REF, cloned)"
   exit 0
 fi
