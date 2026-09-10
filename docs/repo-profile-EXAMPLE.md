@@ -65,7 +65,7 @@ conventions and this file wins on commands.
 | **legacy specs dir** (read-only — adw-core §1) | `docs/superpowers/specs/` |
 | **legacy plans dir** (read-only — adw-core §1) | `docs/superpowers/plans/` |
 | **artifact exclusion pathspec** | `':!docs/adw/**' ':!docs/superpowers/**'` — excludes specs+plans from a code diff |
-| **ADW design doc** | `docs/adw/00-design.md` |
+| **ADW design doc** | `.claude/adw/cache/docs/00-design.md` — fetched with the contract; cited as `design §N` |
 | **source roots** (a path under one of these is production code) | `src/` `api/` `packages/` `scripts/` `tests/` |
 | **subproject roots** (a spec may cite a path relative to one of these) | `api/` `functions/` `packages/shared/` |
 | **code extensions** | `.ts` `.tsx` `.sql` `.css` `.json` |

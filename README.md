@@ -24,11 +24,17 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 
 ## The split
 
-Everything in `commands/` is repo-agnostic. Every value that could differ between two
+Nothing in `commands/` **reads** a repo-specific value. Every value that could differ between two
 repositories — paths, branch names, gate commands, trap domains, review emphasis — lives in a
 `repo-profile.md` **in the consuming repo**, cited from the contract as `repo-profile §N` against
-frozen anchors §1–§18. The test for whether a sentence belongs here is simple: could it be true in
-a repo with a different stack? If not, it names a value, and the value belongs in the profile.
+frozen anchors §1–§18. The test for whether a value belongs here is simple: could this sentence be
+true in a repo with a different stack? If not, it names a value, and the value belongs in the
+profile.
+
+`commands/` does still carry **provenance**: rules are justified by citing the Plantoes-app PRs and
+intents that produced them (`PR #751`, `team-active-seat-model`, and so on). Those are evidence for
+why a rule exists, not values a run consumes, so they do not break portability — but they are noise
+in another repo, and moving them into `docs/00-design.md` is an open cleanup.
 
 ## Installing it in a repo
 
@@ -48,16 +54,21 @@ section your profile does not answer will stop the run, which is the intended fa
 
 ## How a run resolves the contract
 
-The stub in `.claude/commands/` is six lines. It runs `fetch.sh`, which clones or updates
+The stub in `.claude/commands/` is a short loader. It runs `fetch.sh`, which clones or updates
 `.claude/adw/cache/` (gitignored), and then tells the agent to read the real file out of that
-cache. **The fetch happens before the contract is read**, so running a stale contract is not a
-state a run can reach. A run pins one commit sha at Phase 0 and finishes on it; the cache is not
-re-fetched mid-run.
+cache. **The fetch happens before the contract is read.** A run pins one commit sha at Phase 0 and
+finishes on it; the cache is not re-fetched mid-run.
+
+`fetch.sh` exits **0** when it fetched, **2** when the fetch failed and it fell back to an existing
+cache of unknown age, and **1** when there is no usable contract at all. The stub branches on all
+three: exit 2 proceeds but must carry `⚠ contract from cache, not verified against origin` onto
+every surface the run prints; exit 1 stops. `ADW_REPO` and `ADW_REF` are honoured on every run, not
+only the first clone.
 
 The previous design copied these files into each repo and compared them against `origin` at
 Phase 0. That check ran *after* the text had loaded, could not correct itself, and shipped inside
 the file that might be stale. Two runs executed a superseded contract with it in place. Fetching
-first retires the class instead of reporting on it.
+first moves the question to a point where the answer still changes what happens.
 
 ## Changing the contract
 

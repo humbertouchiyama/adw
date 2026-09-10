@@ -671,13 +671,21 @@ is pinned once at `/adw-init` Phase 0 or `/adw-build` Phase 0 and printed on the
 `note contract` line (§7). A run that starts on one contract version finishes on it; the cache is
 not re-fetched mid-run.
 
-**There is no freshness check any more, and its absence is the point.** Until the extraction each
-repo carried its own copy of these files and a check compared them against `origin`. That check ran
-*after* the skill text was already loaded, said in its own words that it "cannot self-correct",
-printed a note and ran anyway — and it shipped inside the very file that might be stale. Runs 6 and
-7 executed a superseded contract with that check in place (design §10 v2.8). Fetching before
-reading makes the failure structurally impossible instead of merely reported. Nothing replaced the
-check because nothing needs to.
+**There is no freshness check any more.** Until the extraction each repo carried its own copy of
+these files and a check compared them against `origin`. That check ran *after* the skill text was
+already loaded, said in its own words that it "cannot self-correct", printed a note and ran anyway
+— and it shipped inside the very file that might be stale. Runs 6 and 7 executed a superseded
+contract with that check in place (design §10 v2.8). Fetching before reading moves the question to
+a point where it can still be answered.
+
+**One residual case, and it is reported at the point of loading.** If the network fails and a cache
+already exists, `fetch.sh` reuses that cache and **exits 2**, printing `CACHED — NOT VERIFIED`.
+The run may proceed, but the loader stub requires it to carry
+`⚠ contract from cache, not verified against origin (<sha>)` on the run report, the approval
+surface and the PR evidence block — and never to print that sha as if it were verified. This is
+narrower than the old check in the way that matters: it fires before a single rule has been read,
+and it names an unverified contract rather than a stale one it cannot do anything about. A hard
+failure with no cache at all is **exit 1**, and the run stops.
 
 **What is still per-repo.** `repo-profile.md`, authored in the consuming repo and never fetched.
 Every file above cites it as `repo-profile §N` with frozen anchors §1–§18. A contract file that
