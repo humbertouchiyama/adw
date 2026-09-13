@@ -614,11 +614,17 @@ Why: on five runs measured 2026-09-10..12 (Plantoes-app `docs/adw/run-log.md`) t
 was **60–91% of each run's price-weighted cost**, against 26% in August. Its subagents had moved
 to sonnet under this table; the session had not. ~75% of that cost is cache reads — a ~300k
 window re-read on every one of 95–347 turns at the Opus rate — and none of what the session does
-between dispatches is authoring: it classifies a red, adjudicates a returned finding, edits a
-PR body, counts cycles. The one job that wants the top tier for judgment is dispatched (the
-Adjudicate row), so the session itself needs it for nothing. The Drive row is the other half of
-the same measurement: 42–62% of the orchestrator's turns were the review stretch it ran by hand
-(adw-build §3.6).
+between dispatches is authoring: it classifies a red, triages a returned finding against a
+written bar, edits a PR body, counts cycles — Find and Look-up jobs by this table's own
+classification. The Drive row is the other half of the same measurement: on the four runs
+with a per-turn attribution, 31–62% of the orchestrator's turns were the review stretch it ran
+by hand (adw-build §3.6).
+
+**Tier order and fallback.** `haiku < sonnet < opus`; any other model name the prompt reports
+(`fable`, `mythos`, a name this table has never seen) counts as **above sonnet** — the safe
+reading, since the ⚠ costs one line and a silent Opus-class session costs the run. If the
+prompt carries no such line, `ORCH_TIER` is `unknown`, which also prints the ⚠: an unrecorded
+tier is the failure this field exists to close, not a pass.
 
 **Every dispatch declares `model:`. An omitted `model:` is a defect, not a default.** An
 unpinned dispatch inherits the session's tier — so the omission is invisible in the prompt and
@@ -637,7 +643,7 @@ important the unit is:
 | **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file | `sonnet` |
 | **Author** — write a spec, a plan, or production code | **keyed on the unit's `depth:`** — `opus` at D3, `sonnet` at D0–D2 |
 | **Drive** — run `/pr-ready <N> apply` end to end for one PR (tier, review cycles, the post-review re-pass, evidence, verdict, cleanup) and return its machine line | `sonnet` |
-| **Adjudicate** — a contested finding (the remediation agent disputes it, two lenses disagree, `review-core.md` §3.1's bar does not dispose of it), a semantic conflict at chain close | `opus`, **dispatched** as a bounded question with both positions in the brief — the session no longer carries this tier, so an adjudication done inline is a sonnet adjudication |
+| **Adjudicate** — triage a returned finding against `review-core.md` §3.1's bar (`code-review.md` Phase 6) | the tier of the session running `/code-review` — the §3.6 driver, `sonnet`. It is a check against a written bar, a Find job. A finding the bar does not dispose of clears the escalation gate and goes to the **human** as `blocked` with a default; no tier is dispatched to decide it, and no rule in `code-review.md` or `review-core.md` dispatches one |
 
 Write the tier out even where it equals the session's; **an omitted `model:` is a defect
 regardless of which tier it would have inherited.** A *fix cycle* is not a new dispatch —

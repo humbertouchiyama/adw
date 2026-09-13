@@ -443,6 +443,9 @@ it saves and trades a `Bash` call bounded at 600 000 ms for an `Agent` call boun
 nothing (§3). This governs the orchestrator's own reads; subagent-internal spend is ~4.3×
 larger, which **adw-core §8** rules on by tier, not by volume (design §10 v2.15 — and when
 measuring any of this, dedup by `message.id`; summing per transcript record multi-counts).
+Those percentages describe what **enters** the window per turn; the discipline below is priced
+on **re-reading** the accumulated window every turn. Both hold at once: a small read costs
+little to add and then costs its size on every later turn of the run.
 
 **Orchestrator discipline — dispatch, classify, count, record. Nothing else.** Three things
 this session never does, each measured on five runs 2026-09-10..12 (Plantoes-app
@@ -455,9 +458,13 @@ this session never does, each measured on five runs 2026-09-10..12 (Plantoes-app
 - **It never reads the diff to second-guess a returned finding.** A finding names its file and
   line; if a fact is missing, a `model: haiku` look-up returns it in ~2 KB. `sed`/`grep` over
   the worktree from this session is the reading-discipline failure above, one level up.
+  **Phase 4's composition read is the deliberate exception** — the `git show --cc` /
+  `git merge-file` replay of a hand-resolved merge is the orchestrator's own act and is read
+  by the one who did it (the #853 rule there); this bullet scopes per-PR findings only.
 - **It never runs `/code-review` or `/pr-ready` in its own window.** 3.6 dispatches a driver.
-  The stretch from the 3.4 dispatch to the verdict was 42–62% of orchestrator cost, and the
-  three review contracts it loads (~100k bytes) then rode along on every later turn.
+  The stretch from the 3.4 dispatch to the verdict was 31–62% of orchestrator cost on the
+  four runs with a per-turn attribution, and the three review contracts it loads (~100k
+  bytes) then rode along on every later turn.
 
 **Every `Agent` call this loop makes declares `model:` — adw-core §8 owns the table.** Do
 not restate it here and do not reason about the tier per dispatch: look it up. The rule
@@ -750,10 +757,25 @@ unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside
 **Layer 2 only** (`/pr-ready` §7 — suppress Layer 1 in the brief): the `ready|blocked` machine
 line with `verified <sha7>`, the review cycle count and tier, the per-gate table and mutation
 row from the re-pass, the §5 review-evidence count, the §8 cleanup line, and on `blocked` the
-question with its default. The driver runs `/pr-ready` §2, §3, §5, §6, §4, §7 and §8 in the main
-checkout; `/code-review`, its lanes and §4's relay verifier all nest under the driver's window —
-a subagent can invoke skills and dispatch agents, and every one of those dispatches is pinned
-by adw-core §8 as it would be here.
+question with its default. **Plus the boundary log**, one row per boundary the driver crossed
+(each review cycle's end, the §4 re-pass's end): `date +%s` at the crossing,
+`git rev-parse origin/<unit-branch>` after it, the gate exit-code vector, and `gh pr view
+--json state`. The orchestrator evaluates §3's conditions 5 and 6 over those rows **on return**
+— the boundaries are recorded inside the driver and judged outside it, never lost — and fills
+the evidence block's `review` / `reverify` durations from the stamps. Inside the driver the
+live bounds are `/pr-ready` §3's 2-cycle cap and `review-core.md` §7's stops; a driver that
+returns without the log has not returned, and the PR is `blocked` with
+`default: re-run /adw-build <slug>`. The driver runs `/pr-ready` §2, §3, §5, §6, §4, §7 and §8
+in the main checkout; `/code-review`, its lanes and §4's relay verifier all nest under the
+driver's window — a subagent can invoke skills and dispatch agents (`Skill` and `Agent` calls
+from inside subagents are routine in the measured transcripts, `docs/adw/run-log.md`
+2026-09-13), and every one of those dispatches is pinned by adw-core §8 as it would be here.
+`review-core.md` §2's `TaskCreate` ledger has **never** been used from a subagent in those
+transcripts — the brief tells the driver to keep the phase ledger as a printed checklist
+instead, and a driver that cannot invoke a skill at all returns that as its first line so the
+orchestrator falls back to running §3.6 inline for that PR, with `note review #NNN — driver
+could not run /pr-ready` on the run report. The first run under this contract is the
+end-to-end proof; until then the nesting is measured, not proven.
 
 `/pr-ready` owns the mechanism (and, through it, `repo-profile §7`'s gate-file list and `§9`'s
 CI coverage): tier scoring from the code-only diff, the 2-cycle cap, the `since:<sha>` delta
@@ -762,8 +784,9 @@ unconverged → not-`ready` rule, the fetched review-evidence gate (with the `su
 UTC-normalisation facts it depends on), the `$VSHA` void rule, and the post-review re-pass.
 One copy; do not restate, and do not run any of it here.
 
-**Why a driver.** On five runs (2026-09-10..12, Plantoes-app `docs/adw/run-log.md`) the stretch
-from the 3.4 dispatch to the verdict was 42–62% of orchestrator cost: the session read
+**Why a driver.** On the four runs with a per-turn attribution (2026-09-10..12, Plantoes-app
+`docs/adw/run-log.md`) the stretch from the 3.4 dispatch to the verdict was 31–62% of
+orchestrator cost: the session read
 `code-review.md`, `review-core.md` and `pr-ready.md` (~100k bytes) into a window that then
 carried them on every later turn, dispatched the lanes, `sed`-read the diff to re-check
 returned findings, ran gates by hand 18–63 times and edited bodies — each turn re-reading
