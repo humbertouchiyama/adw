@@ -533,3 +533,10 @@ value across every `PASS` of a unit (§1), and pass `v1` runs before a number ex
 its pipeline-control layer on top (mutation check, progress conditions, chain state, run-report/PR-body
 surfaces). When a rule in this file changes, that is the caller to re-read — and the only
 copy of these rules that should exist is this one.
+
+**§3.6 does not run this file in its own session.** It dispatches a `model: sonnet` driver
+(adw-core §8's Drive row) whose brief is this command with `apply` and the three overrides, and
+it consumes §7's Layer 2 only — Layer 1 is suppressed in the brief. Run that way, §3's
+`/code-review` invocation, the lanes it dispatches and §4's relay verifier all nest under the
+driver: a subagent can invoke skills and dispatch agents. §3.4 still reaches §4 directly for the
+pre-PR `v1` pass, where there is no review to drive. Measured reason in adw-build §3.6.

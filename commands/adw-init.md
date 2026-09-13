@@ -10,6 +10,9 @@ description: "ADW entry point: intent → triage → human-approved unit cut →
 > source (§9). **Then the consuming repo's `.claude/repo-profile.md`**, which holds every repo-specific
 > path, branch, gate and trap domain this file cites as `repo-profile §N`. Design rationale: the
 > design doc `repo-profile §2` names, §3. This file owns only the init-specific flow.
+> Phase 0 also records the session's own tier as `ORCH_TIER` (adw-core §8 — read from this
+> session's system prompt); above sonnet it prints on the approval surface as a `⚠` line and
+> `/adw-build` carries it into every PR body.
 >
 > **This file lives in the `adw` repository and is fetched, not copied** (adw-core §9). It is
 > repo-agnostic: every value that could differ between repos is in `repo-profile.md`.
