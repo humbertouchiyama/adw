@@ -317,6 +317,7 @@ cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · 
   u6  spec     <unit title>                [amend — <delta>; extend mode, no new PR]
 
 ⚠ spec criteria covered by no unit: <list | none>   ← ALWAYS prints, `none` included
+⚠ orchestrator on <tier> — 60–91% of run cost is this window; restart with claude --model sonnet   ← only when above sonnet (§8)
 ⚠ <one line each: gate-visibility gap (design §2.2 rollout rule), shared-file hazard,
    uncharted territory>                    ← these print only when they exist
 
@@ -446,6 +447,7 @@ note     contract <short-sha>               ← unconditional, always the first 
 note     review #NNN — <what ran instead of /code-review>   ← only when a PR skipped it
 note     window <N>k — compact before resuming             ← only when ≥400k
 note     tier <uNN> <word> author=<tier> impl=<tier>       ← only for units built below opus (§8)
+note     orchestrator <tier> — restart the next run with claude --model sonnet   ← only when the session ran above sonnet (§8)
 note     level <uNN>+<uNN> built concurrently              ← only when a DAG level ran >1 unit
 note     <further run-level caveats — one line each, only when present>
 
@@ -516,6 +518,10 @@ next run's analysis needs:
 - **`note level <uNN>+<uNN> built concurrently`**, once per DAG level that ran more than one
   unit (Phase 1). Names what actually overlapped, so a gate flake or a merge conflict at
   chain close can be attributed to concurrency instead of re-diagnosed from scratch.
+- **`note orchestrator <tier>`**, when `ORCH_TIER` (§8) is above sonnet. The session's tier
+  is the largest single cost term in a run and the only one no dispatch line records — it is
+  visible in the bill and nowhere else. The evidence block carries it per PR; this line is the
+  run-level copy the owner reads before starting the next run.
 
 Nothing else is printed.
 
@@ -595,10 +601,36 @@ file or directory a human has to maintain. A PR body is neither. Do not write a 
 
 ## 8. Dispatch tier (every `Agent` call, no exceptions)
 
+**The orchestrator session runs `sonnet`.** Start an unattended run with
+`claude --model sonnet`, an interactive one with `/model sonnet` before `/adw-init`. Phase 0 of
+both commands reads the session's own tier from its system prompt (the line
+`You are powered by the model named …`) and records it as `ORCH_TIER`, substituted as a literal
+wherever it prints: the approval surface's `⚠ orchestrator on <tier>` line when above sonnet,
+the evidence block's `tier` line always (adw-build §3.4), and the run report's
+`note orchestrator` line when above sonnet (§7). Measure, never refuse — a run that started
+on Opus finishes on it; the ⚠ exists so the next one does not.
+
+Why: on five runs measured 2026-09-10..12 (Plantoes-app `docs/adw/run-log.md`) the orchestrator
+was **60–91% of each run's price-weighted cost**, against 26% in August. Its subagents had moved
+to sonnet under this table; the session had not. ~75% of that cost is cache reads — a ~300k
+window re-read on every one of 95–347 turns at the Opus rate — and none of what the session does
+between dispatches is authoring: it classifies a red, triages a returned finding against a
+written bar, edits a PR body, counts cycles — Find and Look-up jobs by this table's own
+classification. The Drive row is the other half of the same measurement: on the four runs
+with a per-turn attribution, 31–62% of the orchestrator's turns were the review stretch it ran
+by hand (adw-build §3.6).
+
+**Tier order and fallback.** `haiku < sonnet < opus`; any other model name the prompt reports
+(`fable`, `mythos`, a name this table has never seen) counts as **above sonnet** — the safe
+reading, since the ⚠ costs one line and a silent Opus-class session costs the run. If the
+prompt carries no such line, `ORCH_TIER` is `unknown`, which also prints the ⚠: an unrecorded
+tier is the failure this field exists to close, not a pass.
+
 **Every dispatch declares `model:`. An omitted `model:` is a defect, not a default.** An
-unpinned dispatch inherits the session's tier, and the orchestrator runs Opus — so the
-omission is invisible in the prompt, invisible in the result, and multiplies that agent's
-cost by ~5.
+unpinned dispatch inherits the session's tier — so the omission is invisible in the prompt and
+in the result, and whatever the session happens to run on becomes that agent's tier by
+accident. On an Opus session that is a ~5× multiplier; on a sonnet session it silently
+demotes a D3 author.
 
 Classify by **what the agent is asked to produce**, never by who dispatches it or how
 important the unit is:
@@ -610,7 +642,8 @@ important the unit is:
 | **Look up** — read a file or a history and answer a bounded question | `haiku` |
 | **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file | `sonnet` |
 | **Author** — write a spec, a plan, or production code | **keyed on the unit's `depth:`** — `opus` at D3, `sonnet` at D0–D2 |
-| **Adjudicate** — decide a finding's severity, resolve a conflict, close a chain | `opus` |
+| **Drive** — run `/pr-ready <N> apply` end to end for one PR (tier, review cycles, the post-review re-pass, evidence, verdict, cleanup) and return its machine line | `sonnet` |
+| **Adjudicate** — triage a returned finding against `review-core.md` §3.1's bar (`code-review.md` Phase 6) | the tier of the session running `/code-review` — the §3.6 driver, `sonnet`. It is a check against a written bar, a Find job. A finding the bar does not dispose of clears the escalation gate and goes to the **human** as `blocked` with a default; no tier is dispatched to decide it, and no rule in `code-review.md` or `review-core.md` dispatches one |
 
 Write the tier out even where it equals the session's; **an omitted `model:` is a defect
 regardless of which tier it would have inherited.** A *fix cycle* is not a new dispatch —
