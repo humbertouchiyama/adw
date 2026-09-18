@@ -6,7 +6,7 @@ description: "Code review PR against project conventions. Usage: /code-review <P
 
 > **Phase 1 reads [`review-core.md`](review-core.md) and
 > the consuming repo's `.claude/repo-profile.md` first.** This skill owns only its *unique* signal
-> — arg parsing, the classification and scoring **procedure**, cloud-plugin invocation + gating,
+> — arg parsing, the classification and scoring **procedure**, the review lanes,
 > triage routing, the output contract. All shared machinery (setup/worktree, ledger, adjudication,
 > verification, escalation, calibration, safety stops) lives in `review-core.md`; every repo-specific
 > **value** — layer table, score rows, review emphasis, severity classes, rule tables, doc routing —
@@ -21,8 +21,8 @@ description: "Code review PR against project conventions. Usage: /code-review <P
 |---|---|
 | (none) | auto-triage → light, full or panel (Phase 3) |
 | `light` | force 1-agent path |
-| `full` | force Anthropic plugin + project checks |
-| `panel` | force the widest path — 3 parallel angled lanes (4a-panel) + the plugin + project checks, and the gated refutation pass (review-core §9). This is the human's "look harder at this one" lever; the auto-triage reaches it at score `>= 12` on its own |
+| `full` | force the 4a lane + project checks, with the refutation pass on its `Blocking` findings (review-core §9) |
+| `panel` | force the widest path — 3 parallel angled lanes (4a-panel) + project checks, and the refutation pass over every lane claim (review-core §9). This is the human's "look harder at this one" lever; the auto-triage reaches it at score `>= 12` on its own |
 | `apply` | terminal action becomes "fix → verify → **commit → push** → ask-merge" instead of "post review comment". **`apply` IS the commit+push consent** (code-review declares §8 auto-ship): §4 green → push to the PR branch, no further gate. Re-runs push again as new commits. **Merge stays gated on the word "merge"**; §7 stops still fall back to comment-only. |
 | `interactive` | explicit signal that a human is watching → escalations surface via `AskUserQuestion` instead of the report/terminal gate (**review-core §5**). Never inferred from `apply`. |
 | `since:<sha>` | scope the review to what changed **after** `<sha>` instead of the whole PR (Phase 2). For a re-review after fixes: `/pr-ready` §3 passes cycle 1's head SHA so cycle 2 grades only the fix. Caller-supplied only — a run never narrows its own scope. |
@@ -44,7 +44,7 @@ Each phase produces a typed output the next phase consumes. `apply` selects whic
 1 Setup       → {pr, $WT, mode, apply, interactive, ledger}   (review-core §1, §2)
 2 Scope       → {changedFiles[], stats, layers[]}
 3 Path        → "light" | "full" | "panel"
-4 Review      → findings[] {…, severity, originalSeverity}   (light: 1 lane / panel: 3 angled lanes / + gated plugin + 4.5 parse)
+4 Review      → findings[] {…, severity, originalSeverity}   (light, full: 1 lane / panel: 3 angled lanes)
 5 Project     → findings[] (appended)
 6 Triage      → {toFix[], escalate[], conventionEdits[]}   (adjudication: review-core §3; calibration: §6)
 7 Terminal    → comment posted | fixes committed + pushed + ask-merge (apply)   (§1.3, §4, §5, §7, §8)
@@ -72,7 +72,7 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   dispatches a driver is a loop.
 - **Otherwise — a human or an orchestrator typed `/code-review <args>` in this session** →
   **dispatch one driver and stop.** Launch a single Agent (`subagent_type: general-purpose`,
-  `model: sonnet`) with:
+  `model: sonnet`, `run_in_background: false`) with:
 
   > You are the review driver for `/code-review <the full argument string, verbatim>`.
   > Read `.claude/adw/cache/commands/code-review.md`, `.claude/adw/cache/commands/review-core.md`
@@ -81,6 +81,7 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   > verbatim, and nothing else: no preamble, no summary of your own, no recap of what you read.
   > The contract was fetched at `<CONTRACT_SHA>` with `fetch.sh` exit `<0|2>`; on exit 2 the report
   > must carry `⚠ contract from cache, not verified against origin (<sha>)`.
+  > Every `Agent` call you make passes `run_in_background: false` (adw-core §8).
   > End the report with one `Phases:` line — `Phases: 1-8 complete`, or naming every phase that did
   > not run and why (`Phases: 1-8 complete except 5.3 skipped — PR body empty`).
 
@@ -135,7 +136,7 @@ mergeability, `gh pr merge` — which need none of that state, and the report sa
    ```bash
    gh pr view <PR_NUMBER> --json headRefName,baseRefName,title,body,number,url,state,isDraft,headRefOid
    ```
-   Eligibility gate — exit with terminal note if `state != OPEN` or `isDraft == true`. If a prior `### Code review` comment exists (`gh pr view <N> --json comments`) AND its body contains the current `headRefOid` short SHA → exit "already reviewed at this SHA"; otherwise warn-only (re-running on a new SHA is legitimate).
+   Eligibility gate — exit with terminal note if `state != OPEN` or `isDraft == true`. If a prior `### Code review` comment exists (`gh pr view <N> --json comments`) AND its body contains the current `headRefOid` short SHA → exit "already reviewed at this SHA"; otherwise warn-only (re-running on a new SHA is legitimate). **A `since:` pass skips this check**: `/pr-ready` §3's closure check runs at the head cycle 2 just pushed, and cycle 2's `— remediation` comment names that SHA.
 
 4. Store `headRefName`, `baseRefName`, `title`, `body`, `url`. Set `WT=.claude/worktrees/pr-<PR_NUMBER>`.
 
@@ -164,11 +165,10 @@ git -C "$WT" diff $SCOPE_BASE...HEAD --stat | tail -1
 
 **With `since:<sha>` — the delta only.** `$SCOPE_BASE` becomes `<sha>`, so the review grades
 what changed *after* that commit instead of re-grading the whole PR. Everything downstream that computes from the diff
-(layers, path score, the 4a agent's diff command, Phase 5's changed-file list) reads
-`$SCOPE_BASE`. The **one** thing that cannot is the 4b cloud plugin — its only argument is
-a PR number and it always grades `base...HEAD` — so a `since:` pass takes the 4a light path
-regardless of tier (4b states the branch). Anything added downstream must be checked
-against `$SCOPE_BASE` explicitly; "reads the diff" is not the same as "can be scoped".
+(layers, path score, the 4a agent's diff command, Phase 5's changed-file list and audit scope)
+reads `$SCOPE_BASE`. A `since:` pass takes the single 4a lane regardless of tier (4a states the
+branch). Anything added downstream must be checked against `$SCOPE_BASE` explicitly; "reads the
+diff" is not the same as "can be scoped".
 
 Two rules make the narrowing safe:
 
@@ -222,15 +222,15 @@ thing that changes shape.
 > **A `full` score does NOT imply reviewable code exists.** A docs / `.claude` / `.agent`-only PR
 > can score into `full` on `.claude` + size points alone (`.claude/commands/` `+3` **plus**
 > `>500 lines` `+2` = 5) while `layers[]` stays empty. (`.claude/commands/` `+3` on its own is
-> `< 5` → light; it takes the size rows to reach `full`.) Phase 4 gates the plugin on `layers[]`,
-> not on `path`.
+> `< 5` → light; it takes the size rows to reach `full`.) Such a diff is still read by the 4a
+> lane, which judges prose against the standards docs.
 
 > **Every profile has one class that no gate reads, and `§14` scores it above the bar unaided.**
 > Which class that is differs per repo — `§14` names it and says why. The invariant: a file class
 > whose defects are invisible to every compiler, linter and audit must not depend on the diff also
 > happening to be large to earn a full review, because that class is typically a handful of lines.
-> Its matching `§13` layer row is not optional — without a layer, `layers[]` stays empty, Phase 4b
-> skips the plugin as "docs/prose-only diff, no app code to grade", and the score buys nothing.
+> Its matching `§13` layer row is not optional — without a layer, `layers[]` stays empty and the
+> class is graded as prose, so the score buys nothing.
 
 Log decision:
 ```
@@ -239,8 +239,7 @@ Triage: score=<N> → <light|full|panel>
 ```
 
 **Output**: `path = "light" | "full" | "panel"`, and **`panelRan = false`** — initialised here, on
-every path, because Phase 4b and Phase 6.0 both read it unconditionally and only 4a-panel ever sets
-it true.
+every path, because Phase 6.0 reads it unconditionally and only 4a-panel ever sets it true.
 
 ---
 
@@ -250,20 +249,18 @@ Both branches produce a single typed output:
 `findings[] = [{file, line, description, severity, originalSeverity}]`.
 
 `originalSeverity` is set equal to `severity` when the finding is created and **never rewritten**.
-Only `severity` moves — a `repo-profile §15` upgrade at 4.5, a review-core §9 `OVERSTATED`
+Only `severity` moves — a `repo-profile §15` upgrade at triage, a review-core §9 `OVERSTATED`
 downgrade. `review-core §6.6` reads `originalSeverity`, so a finding that was ever `Blocking` keeps
 its protection from calibration suppression no matter what later reclassified it.
 
-### 4a — Light path (1 lane)
+### 4a — Single lane (`light`, `full`, and every `since:` pass)
 
 **On `path == "panel"` and no `since:`, go to 4a-panel below** — its three lanes run **instead of**
-this single lane and **alongside** 4b's plugin, which still fires. Nothing else changes. Under
-`full` this single lane does not run at all unless 4b falls back to it, so `panel` adds three lanes
-rather than replacing one. Under `since:` this lane runs whatever the tier says (4b's delta
-bullet): a delta is small by construction and three lanes over it is three agents reading the same
-small thing.
+this single lane. `light` and `full` both run this lane. **Under `since:` this lane runs whatever
+the tier says**: a delta is small by construction, and three lanes over it is three agents reading
+the same small thing.
 
-Launch 1 Agent (`subagent_type: general-purpose`, `model: sonnet`):
+Launch 1 Agent (`subagent_type: general-purpose`, `model: sonnet`, `run_in_background: false`):
 
 > Review PR #<number> on `<headRefName>` (base: `<baseRefName>`).
 > Worktree: `$WT`.
@@ -275,19 +272,19 @@ Launch 1 Agent (`subagent_type: general-purpose`, `model: sonnet`):
 > 2. Read every standards doc `repo-profile §2` names, from the worktree root.
 > 3. Check: bugs, logic errors, convention violations, and every emphasis item §15 listed.
 > 3b. **Composition check — read whole files, not only hunks.** `<paste §15's composition-check paragraph verbatim>` Defects *between* hunks are invisible to a hunk-scoped read.
+> 3c. **Stale comments.** A comment next to changed code must still describe it. A doc comment that now contradicts the code it sits on is a `Warning`.
 > 4. Ignore: pre-existing code, style nitpicks, missing tests in code that has none today. **Do NOT assume any gate will catch something on your behalf — establish what actually ran before you skip anything.** `repo-profile §9` is the CI coverage table: it says which events trigger a hosted run, which gates that run executes, and which §6-obligated gates it never touches. In a repo with no CI, or on a PR whose shape §9 excludes, `gh pr checks` reports **no checks — absent, not red**, and re-deriving type or lint errors is the only evidence that will exist. Where a run does exist, confirm it actually executed: `gh run view <id> --json jobs` — a gated-off job reports `skipped` with an empty `steps` array, which looks like a failure and is neither.
 > 5. Return findings as a single fenced JSON block (` ```json `): `[{"file": "...", "line": 42, "description": "...", "severity": "Blocking"}]`. Severity ∈ `Blocking|Warning` — apply `repo-profile §15`'s Blocking severity classes, the silent-data-corruption entries included. No prose outside the block — only the JSON array.
 > 6. Empty list → return `` ```json\n[]\n``` ``.
 
 The parent skill extracts the fenced JSON block via `awk '/^```json$/,/^```$/'` (or equivalent) and parses it into `findings[]`.
 
-Light path **does not post a PR comment**. Comment (if any) is posted by Phase 7.
+The lane **does not post a PR comment**. Comment (if any) is posted by Phase 7.
 
 ### 4a-panel — Panel path (3 lanes, parallel)
 
-Used when `path == "panel"` and no `since:` (Phase 3). It **adds** three lanes alongside 4b's plugin;
-it does not replace anything under `full`, where 4a never ran. Set `panelRan = true` before
-dispatching, so 4b's fallback can see it.
+Used when `path == "panel"` and no `since:` (Phase 3). Its three lanes replace the single 4a lane.
+Set `panelRan = true` before dispatching, so Phase 6.0 can see it.
 
 **A panel is only as deep as what it is obliged to check.** A lane asked to "hunt failures" produces a
 category sweep unless something tells it *which* failure to hunt. Two inputs do that, and the first is
@@ -323,8 +320,11 @@ because Y" returns Y and reads as confirmation, while the lane's independent wor
 
 #### Step 3 — Dispatch
 
-**Launch 3 Agents in ONE message** (`subagent_type: general-purpose`, `model: sonnet`) so they run
-in parallel.
+**Launch 3 Agents in ONE message** (`subagent_type: general-purpose`, `model: sonnet`,
+`run_in_background: false`) so they run in parallel **and the driver blocks until all three
+return**. Background lanes inside a driver never deliver their completion notice to it: measured
+drivers spent 154–282 turns (65–77% of their cost) polling with `echo` for lanes that had already
+finished. Foreground dispatch in one message is still parallel.
 
 | Angle | Owns | Reads |
 |---|---|---|
@@ -370,6 +370,7 @@ Hand each agent this prompt, substituting its own row:
 > 2. Read the standards docs `repo-profile §2` names, from the worktree root.
 > 3. **Hunt a reachable failing input.** For each risk, name an input or sequence a real user or
 >    client can produce, and follow it to the consequence. A risk you cannot reach is not a finding.
+>    A comment next to changed code that no longer describes it is a `Warning`.
 > 4. **Do NOT assume a gate covers anything.** `repo-profile §9` is the CI table; "no checks" is
 >    absent, not green.
 >
@@ -412,70 +413,30 @@ bounded` / `should not ship as is`. B — `sound` / `has a gap` / `unsafe`. C �
 
 The panel **does not post a PR comment** — Phase 7 does.
 
-### 4b — Full path
+### 4b — No third-party plugin (removed)
 
-**Plugin gate (WS3).** The cloud plugin grades **app code** — on prose/docs it is pure noise. Fire it **only if `layers[]` is non-empty** (reviewable code present, Phase 2) **and `since:` was not given**:
+Every path is graded by owned lanes: `light` and `full` by the single 4a lane, `panel` by the three
+4a-panel lanes. `full` differs from `light` only in Phase 6.0 — its `Blocking` findings are attacked
+by the refutation pass before anything is applied.
 
-- **`layers[]` empty** (docs / prose / skill-only diff that nonetheless scored `full` on size/`.claude` points, or was forced `full`) → **skip the plugin, and run the 4a light lane instead**, set `pluginRan = false`, and log: `Full path, plugin skipped: no app code — diff graded by the 4a lane.` Phase 5 project checks still run; Phase 7 must not assume a plugin comment exists.
+> **Why the `code-review:code-review` plugin was removed.** Measured over the 10 PRs after the panel
+> landed: it produced 7 findings, all comment-length or docs-catalog nits, and **zero** of the real
+> defects — every one of those came from the owned lanes or the refuter. It cost 9+N agents per run
+> on top of the lanes, it could not be scoped to a `since:` delta, a clean run posted nothing and so
+> read as "unavailable", its `### Code review` header collided with this file's own comments, and
+> its source was unpinned, so an upstream edit changed this pipeline with no diff in any repo. Its
+> three checks worth keeping now live here: the comment-length and analytics-catalog rules moved to
+> the consuming repo's audit gate, and "stale comments" is item 3c of both lane prompts. Its
+> confidence cutoff is replaced by the refutation pass, which rebuilds each chain instead of scoring
+> it.
 
-  > **Why not `findings = []`.** The plugin is right to skip prose — it grades app code and adds only
-  > noise to a markdown file. But skipping the plugin is not the same as skipping the review, and
-  > treating them as one inverted coverage on exactly the files with the widest blast radius: a
-  > *small* contract edit scores below `full` and takes the light path, whose diff agent has no
-  > `layers[]` gate, so it was read; a *large* one scored into `full` on the size rows and was read by
-  > nothing. The bigger the change to what every future agent run obeys, the less of it was reviewed.
-  > The 4a lane reads files and judges them against the standards docs, which is what a prose diff
-  > needs.
-- **`since:` given** (a delta pass — `/pr-ready` §3 cycle 2) → **skip the plugin and take the 4a light path instead**, set `pluginRan = false`, and log: `Full path, plugin skipped: delta pass (since:<sha>) — plugin cannot be scoped.` The plugin's only argument is a PR number: it always grades `base...HEAD`, so firing it here would re-review the whole PR and reinstate the non-convergence `since:` exists to remove — silently, because the tier says `full` and a plugin comment would duly appear. The light agent takes `$SCOPE_BASE` and is the correct instrument for a delta, which is small by construction. **`since:` also collapses `panel` to the single 4a lane** for the same reason: three angled lanes over a delta of a few hundred lines is three agents reading the same small thing.
-- **`layers[]` non-empty and no `since:`** → invoke `Skill` tool `code-review:code-review` with args `<PR_NUMBER>`, set `pluginRan = true`. The plugin runs its multi-agent review and posts its own PR comment. Then run **4.5 — Parse plugin findings**.
-- **The invocation is unavailable, errors, or returns without a new `### Code review` comment
-  appearing** → set `pluginRan = false` and log
-  `Full path, plugin unavailable — falling back to <4a | already-run panel>`. Then, **only if
-  `panelRan == false`**, run the 4a lane so the diff is still graded by something; when
-  `panelRan == true` the three lanes have already graded it and a second dispatch is six sonnet
-  agents for one diff, masked by the dedupe — the layer-cover rule above is what makes that safe,
-  since every layer has already reached a reading lane. Carry `plugin unavailable — diff graded by <N> local
-  lane(s)` into Phase 7's `👍 OK` bucket.
-
-> **Availability is established, never asserted.** The check is mechanical and it is the *attempt* —
-> invoke, then re-read the PR's comments (4.5's `gh pr view` call) and see whether a new one landed.
-> A run may not state that the plugin is absent, installed, or working without having tried it this
-> run. This matters because the failure is silent in exactly the wrong direction: without the
-> fallback bullet a missing plugin lands in the `layers[] non-empty` branch, `findings` stays empty
-> because nothing graded the diff, and Phase 7 still prints the tier as `full`. The report then
-> claims a multi-agent review that never happened. Observed on a real 7,000-line PR, three cycles
-> running.
-
-### 4.5 — Parse plugin findings (only when `pluginRan`)
-
-```bash
-gh pr view <PR_NUMBER> --json comments \
-  --jq '.comments | map(select(.body | startswith("### Code review"))) | .[-1].body'
-```
-
-Parse the comment body (format is stable):
-- Lead: `Found N issue(s):` — singular for N=1, plural otherwise (or `No issues found.`)
-- Each issue: numbered list item `N. <description>` + blank line + permalink `https://github.com/.../blob/<sha>/<file>#L<a>-L<b>`.
-- Emit each item as `{file, line, description, severity}` (line = `lineStart` from the permalink range; range end discarded).
-- Default `severity: "Warning"`. Upgrade to `"Blocking"` per **`repo-profile §15`**'s Blocking
-  severity classes — that list is the repo's, and it is not restated here.
-
-  > Every profile's list closes with its own **silent data corruption** entries — the class that
-  > reaches no crash reporter and no gate. Only `Blocking` is protected from calibration suppression
-  > (`review-core.md` §6.6) and from unilateral rejection by the fixer, so a severity list that omits
-  > a repo's worst historical class silently de-prioritises exactly what review exists to catch. If
-  > you find such a class missing from `§15`, that is a convention finding (Phase 6.2), not a
-  > reason to grade it `Warning` here.
-
-Plugin posted "No issues found" → `findings: []`.
-
-**Output (both branches)**: `findings[]` + `pluginRan` (bool).
+**Output**: `findings[]`.
 
 ---
 
 ## Phase 5 — Project-specific checks
 
-Plugin / light agent covers general quality. This phase appends project-specific findings to the same array.
+The Phase 4 lanes cover general quality. This phase appends project-specific findings to the same array.
 
 ### 5.1 — Audit gate
 
@@ -493,12 +454,11 @@ gate that does not exist.
 
 ### 5.2 — Convention checks (single sub-agent)
 
-Spawn 1 Haiku agent. Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
+Spawn 1 Haiku agent (`run_in_background: false`). Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
 verbatim** — the repo's rule tables. The agent runs each check against changed files only and
 returns findings `{file, line, description, severity}` where severity ∈ `Blocking|Warning`.
 
-Append to `findings[]`. **Dedupe across all sources** (audit first, then light agent + plugin parse
-+ this phase): drop later entries where `(file, line, rule-class)` collides with an earlier entry.
+Append to `findings[]`. **Dedupe across all sources** (audit first, then the Phase 4 lanes + this phase): drop later entries where `(file, line, rule-class)` collides with an earlier entry.
 **Audit goes first, and on a collision the HIGHER severity wins** — audit findings are always
 `Blocking`, so a light-agent `Warning` on the same line would otherwise suppress a `Blocking`
 silently. Rule-class for Phase 5 entries = the rule number from `§16`; for upstream entries, infer
@@ -510,9 +470,13 @@ finding you grade on the spot.
 
 ### 5.3 — Structural checks (sub-agent verification, not grep)
 
-Spawn 1 Sonnet agent to verify cross-file and syntactic rules that a grep cannot express.
+Spawn 1 Sonnet agent (`run_in_background: false`) to verify cross-file and syntactic rules that a
+grep cannot express. **Under `since:`, dispatch it in the same message as the 4a lane** — the two
+are independent, so the driver waits once, not twice.
 
-**Intent coherence** (always — hand the agent the PR `title` + `body` from Phase 1, **and** the
+**Intent coherence** (every full-PR pass; **skipped under `since:`**, where the commits are the
+review's own `fix(review):` remediation and the PR body was already read against the PR in cycle 1 —
+the skip prints as `Phases: … 5.3 intent coherence skipped — since: delta`) — hand the agent the PR `title` + `body` from Phase 1, **and** the
 output of `git -C "$WT" log $SCOPE_BASE..HEAD --oneline` and `git -C "$WT" diff $SCOPE_BASE...HEAD --stat`):
 - Does the diff actually do what the PR says? Flag only a real mismatch: the stated goal is
   half-implemented (promises X, ships part of X), the diff carries stray changes unrelated to the
@@ -565,7 +529,10 @@ requests*, not of a stack — it reads the PR body against its own diff and need
 
 **Run it when `panelRan == true`** — computed, never judged, and gated on the *lanes having run*
 rather than on `path`, because a `since:` delta collapses `panel` to one lane without clearing
-`path` and must not pay for a refuter. Follow **review-core §9**: dispatch **one agent on the top tier in `adw-core §8`'s tier
+`path` and must not pay for a refuter. **Also run it when `path == "full"`, no `since:`, and at
+least one `Blocking` exists** — positive claims only (review-core §9's `full` row); this is the
+false-positive filter a `full` run has, since a false `Blocking` costs a whole fix-verify-push
+cycle. Follow **review-core §9**: dispatch **one agent on the top tier in `adw-core §8`'s tier
 table — never the driver's own tier** (two when `Blocking` > 4) with the bare claims — never the
 lanes' reasoning — apply the verdicts (`REFUTED` → not applied, still reported; `OVERSTATED` →
 re-severitise while keeping the original severity pinned for §6.6; `CONFIRMED` → unchanged), and
@@ -574,7 +541,7 @@ negative**, which is a violation a lane claimed was absent and is graded by `rep
 any other finding, not filed under coverage. **A downgrade rewrites `severity` only**; §6.6 keeps
 reading `originalSeverity`. With no `Blocking`, the claims
 are the lanes' verdicts and their `holds` / `not reachable here` checks (§9). Log one line per
-verdict. `panelRan == false` → skip silently.
+verdict. Neither condition holds → skip silently.
 
 Findings array is now complete. **Read `.agent/review-calibration.md` from the main-repo working tree (review-core §6.1/§6.3 — resolve `$MAIN_REPO`, never `$WT`) before triaging** — when a finding matches a recorded class, bias the adjudication accordingly and note `per calibration: …` in the log. The hard guard binds (§6.6): an `apply`-direction calibration line never suppresses a `Blocking` finding or a blast-radius class.
 
@@ -658,7 +625,7 @@ Phase 7 always runs.
 - **The report IS the final message.** Not a block embedded in a summary — the header is the first line the user sees and the `Next:` line is the last. No preamble ("I've finished reviewing PR #742…"), no recap of what you did, no closing offer ("let me know if you'd like…"). Prose wrapped around the buckets is the verbosity, even when the buckets themselves are tight.
 - **One line per item.** No sub-bullets, no nested detail, no evidence dumps. An item needing a paragraph to justify gets its paragraph in the PR comment or the triage log; the report gets its one line.
 - **~15 lines total.** Longer than a screen has failed regardless of structure.
-- **No diagnostics** — path/score, plugin state, layers, phase narration, findings counts, and the rejected list stay in the triage log. Never in the report.
+- **No diagnostics** — path/score, layers, phase narration, findings counts, and the rejected list stay in the triage log. Never in the report.
 - Every bucket prints its header even when empty (`— none`; *Your decision*: `— none`).
 - The `Next:` line is the final line of the report; nothing follows it. **Two** things are allowed between the last bucket and the `Next:` line, each one plain line: a calibration line recorded this run (§6.4 requires the echo) — `Calibration recorded: <line> — delete if wrong` — and, when the run was dispatched into a driver (Phase 0), the `Phases:` line that replaces the ledger — `Phases: 1-8 complete`, or naming every phase that did not run and why. Nothing else.
 
@@ -729,7 +696,7 @@ Document the stop reason in the Remediation comment **and** in the report's `Nex
 
 Inputs: `toFix[]`, `escalate[]`, `conventionEdits[]` (all surfaced in the comment — neither push nor merge runs). **Escalations follow review-core §5** (default: the "Your decision" block below; `interactive`: `AskUserQuestion`).
 
-**Light path** — post review comment (the §Output-contract buckets; review-only ⟹ first bucket is **🔧 To fix**):
+Post the review comment (the §Output-contract buckets; review-only ⟹ first bucket is **🔧 To fix**):
 ```bash
 gh pr comment <PR_NUMBER> --body "$(cat <<'EOF'
 ### Code review
@@ -755,19 +722,8 @@ EOF
 
 No findings → collapse to the OK + empty-decision buckets: `### Code review` / `**👍 OK** — no issues. Checked <the same list as above>.` / `**⏳ Your decision** — none.`
 
-**Full path** — branch on `pluginRan` (Phase 4b):
-- **`pluginRan == true`** — plugin already commented. Post a follow-up **only if** Phase 5 found additional project-specific issues OR a convention update is being suggested OR there are escalations — same buckets, dropping any that are empty:
-  ```
-  ### Code review (project supplement)
-
-  **🔧 To fix** (<n>) — <additional Phase 5 findings; re-run with `apply`>
-  **⏳ Your decision** (<n>) — <escalations (plain sentence + recommended default) + convention Insert drafts>
-  **⏳ Coverage** — <unrun obligated gates · unanswered §16.4 checks · refuted Blockings — not counted in (<n>)>
-
-  Generated with [Claude Code](https://claude.ai/code)
-  ```
-  Phase 5 clean + no convention updates + no escalations → no comment (plugin's review stands).
-- **`pluginRan == false`** (docs/prose-only diff that scored `full`, plugin skipped in 4b) — **there is no plugin comment.** Post the project-checks comment as the **primary** review (the Light-path template above), noting `Plugin skipped: no app code to grade.` Do not reference a nonexistent plugin comment.
+**Every path** posts this one template — `light`, `full` and `panel` alike. There is no second
+reviewer comment to supplement or defer to.
 
 ### Terminal report (both branches)
 

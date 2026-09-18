@@ -58,7 +58,7 @@ Then:
   a clean `approve` comes back through this file's Phase 0 by the normal route.
 
 **Skill tier (design §4.9):** this loop and every artifact it consumes may reference
-plugin skills (`superpowers:*`, `code-review:code-review`), tracked commands
+plugin skills (`superpowers:*`), tracked commands
 (`.claude/commands/*.md`) and tracked skill dirs ONLY. Repo-local symlinked skills
 (`.claude/skills/*` → `.agents/`) do not exist in worktrees — do not add such a
 reference in a future edit of this file.
@@ -356,8 +356,9 @@ Any one fires → finish the phase in flight, then abort →
 
 1. **No cycle beyond the caps.** Fix cycle **4 never starts** — cycle 3 runs, and its
    exhaustion is `failed` (§3.2). Review cycle **3 never starts** — cycle 2 runs, and its
-   verdict stands as `/pr-ready` §3 returns it, which is **`blocked`**, not `failed`
-   (§3.4 verdict routing). The caps permit the cycle they name; this condition stops the
+   verdict stands as `/pr-ready` §3 returns it: `ready` when its report-only closure check
+   finds nothing to apply, otherwise **`blocked`**, not `failed` (§3.4 verdict routing). The
+   closure check is not a cycle — it cannot push, so it crosses no boundary. The caps permit the cycle they name; this condition stops the
    one after it.
 2. **Repeated error signature.** The red at cycle N carries the same
    `(gate command, first failing test id or `TSxxxx`, NORMALISED assertion message)` as
@@ -816,7 +817,7 @@ consent — and adds:
   progress conditions — never by elapsed time. The single first review always runs
   regardless: it is a completion, not a loop. Code-only tier scoring still earns its keep,
   now on cost rather than on a deadline — a contract artifact alone can cross the >500-line
-  `full` bar and buy a 6-agent pass over documents nobody needed re-reviewed.
+  `full` bar and buy a multi-agent pass over documents nobody needed re-reviewed.
 - **Every review-driven fix lands as its own commit prefixed `fix(review):`** — no
   exceptions for copy, docs, or plan-card touch-ups. Phase 0 step 7 uses that prefix as the
   review-cycle tripwire, so an unprefixed remediation commit is remediation the next session

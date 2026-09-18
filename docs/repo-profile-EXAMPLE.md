@@ -445,7 +445,7 @@ are shipping broken code to production and stopping every release, and both land
 over. +5 crosses the `full` bar unaided so the tier never depends on the diff also happening to be
 large — a deploy-workflow change is typically a handful of lines. Scored 0 before 2026-09-03: PR
 #1134 rewrote the production deploy job and took the light path. The matching §13 layer row lands
-with it and is not optional — without a layer, `layers[]` stays empty and the plugin is skipped.
+with it and is not optional — without a layer, `layers[]` stays empty and the class is graded as prose.
 
 ## §15 — Review emphasis
 

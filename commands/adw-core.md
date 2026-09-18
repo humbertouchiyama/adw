@@ -626,6 +626,14 @@ reading, since the ⚠ costs one line and a silent Opus-class session costs the 
 prompt carries no such line, `ORCH_TIER` is `unknown`, which also prints the ⚠: an unrecorded
 tier is the failure this field exists to close, not a pass.
 
+**Every dispatch made from inside a subagent — a driver, a verifier, a lane — passes
+`run_in_background: false`.** A background completion notice goes to the top-level session, never to
+the subagent that dispatched it, so the subagent can only poll. Measured on five review drivers
+(Plantoes-app `docs/adw/run-log.md`, 2026-09-18): 154–282 turns of `echo "monitoring…"`, 65–77% of
+each driver's cost, spent waiting for lanes that had already returned. Several foreground `Agent`
+calls in one message still run in parallel; the dispatcher just blocks until all of them return.
+Only the top-level orchestrator may dispatch in the background.
+
 **Every dispatch declares `model:`. An omitted `model:` is a defect, not a default.** An
 unpinned dispatch inherits the session's tier — so the omission is invisible in the prompt and
 in the result, and whatever the session happens to run on becomes that agent's tier by
