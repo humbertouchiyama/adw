@@ -12,7 +12,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 
 `.claude/commands/*.md` are prompt templates with **no auto-include**, so the mechanism is an explicit Phase-1 `Read`, not silent transclusion. Each skill quotes the one-line rule for a behavior and links here (`→ review-core §N`) for the detail.
 
-**Section anchors are frozen** — the two skills cite `review-core §1`…`§7` by number. Do not renumber. Add new sections at the end.
+**Section anchors are frozen** — the two skills cite `review-core §1`…`§9` by number. Do not renumber. Add new sections at the end.
 
 | § | Section | Owns |
 |---|---|---|
@@ -24,6 +24,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 | §6 | Calibration loop | `.agent/review-calibration.md` — the skills learn from overrides |
 | §7 | Blast-radius safety stops | union stop-list; when to fall back to comment-only |
 | §8 | Local ship policy | commit/push/merge consent; apply≠merge; stage-only default vs declared auto-ship |
+| §9 | Refutation pass | attack findings before acting; CONFIRMED/OVERSTATED/REFUTED; gated on the wide path alone — attacks negatives when there is no Blocking |
 
 ---
 
@@ -96,7 +97,10 @@ Removal failure → warn in terminal, don't block. **File mode: nothing to clean
 
 ## §2 — Phase ledger contract
 
-**Mandatory.** At Phase 1, create one `TaskCreate` per phase the skill declares. Mark each `in_progress` before starting, `completed` immediately after. The ledger is the contract that **the run is incomplete until every task is `completed`** — forgetting a phase requires forgetting to update its task, which is visible to the user. Each skill lists its own phase set.
+**Mandatory for whoever runs the phases.** A skill that dispatches its pipeline into a driver
+(code-review Phase 0) creates no ledger in the caller — it runs no phases — and the driver's own
+ledger is invisible to the human, so that skill states what carries the result out instead. At
+Phase 1, create one `TaskCreate` per phase the skill declares. Mark each `in_progress` before starting, `completed` immediately after. The ledger is the contract that **the run is incomplete until every task is `completed`** — forgetting a phase requires forgetting to update its task, which is visible to the user. Each skill lists its own phase set.
 
 ---
 
@@ -158,6 +162,13 @@ Four properties hold in every repo, whatever those sections declare:
   `verification: N/A — docs-only` and passes; it must never fabricate a green line for gates that
   never ran. `repo-profile §2` declares which paths are non-code, and `§6` declares which layers do
   **not** fall under that exemption despite carrying no compiler.
+- **A gate the diff obligated and that could not run is a REPORTED GAP, not a green and not a
+  footnote.** Where `repo-profile §6` obligates a gate and the environment cannot run it (no
+  daemon, no database, no browser), say which gate, why, and what it covers — in the surface the
+  human reads for *decisions*, never in the one they read for *reassurance*. The distinction is not
+  cosmetic: an unrun obligated gate filed under "reviewed and green" is the honest report of a real
+  gap rendered unreadable by placement, and it has survived three review cycles on one PR that way.
+  Each skill states where that line goes in its own output contract.
 
 ---
 
@@ -218,6 +229,15 @@ The skill **infers** the override from the user's reply and appends the line **i
 
 An auto-drafted **`apply`-direction** line (escalate→apply, "stop escalating") may bias only **non-blast-radius** classes and **never suppresses a `Blocking` finding** — those always escalate/apply-and-verify regardless of calibration. Auditability alone is not prevention (a skimmed report hides a suppression), so this is a rule, not just a log line. See §7 for blast-radius paths.
 
+**`Blocking` here means `originalSeverity`, not the live `severity`.** Every finding carries
+`originalSeverity`, set once when the finding is created and never rewritten; only `severity` moves.
+A finding that entered §9's refutation pass as `Blocking` and left it `OVERSTATED → Warning` still
+reads `originalSeverity: "Blocking"` and is still protected here. Without that field the two
+mechanisms compose into a suppression path — one `OVERSTATED` verdict plus one apply-direction
+calibration line disposes of a finding the profile classified as silent data corruption, with each
+step defensible alone. This guard is the reason the field exists; a pin stated only in §9 depends on
+the same agent recalling §9 at the moment of suppression, a hundred lines later.
+
 ---
 
 ## §7 — Blast-radius safety stops
@@ -265,3 +285,111 @@ An apply flag authorizes **editing the worktree**. Whether it also authorizes co
 - **Merge needs explicit merge consent, always:** the word "merge" / "merge it" in the terminal gate, or selecting the Merge option under `interactive`. Nothing weaker counts — not `apply`, not "do it", not "go ahead".
 
 No apply flag ever implies merge. Every Phase-7 commit/push/merge step is read **through this section**.
+
+---
+
+## §9 — Refutation pass (attack the findings before acting on them)
+
+**§3 routes a finding. It never asks whether the finding is true.** That gap has a price in both
+directions: a false `Blocking` costs a whole fix-verify-push cycle, and a report the human learns to
+discount costs the channel. Adjudication cannot close it — a reviewer re-reading its own claim
+agrees with itself.
+
+**When it runs.** A skill invokes this **whenever the run took its widest review path** — for
+code-review, `panelRan == true`. Computed, not judged, and deliberately **not** conditioned on
+findings existing.
+
+> **Why not "only when there is a `Blocking` to attack".** That gate is empty in exactly the case
+> this pass exists for. The pass has two jobs — killing false claims *and* finding what the lanes
+> missed — and on the run it was written from the second produced **7 of 7** new confirmed defects.
+> Cheap lanes returning zero `Blocking` on a very large diff is not evidence the diff is clean; it is
+> the original failure reproduced, and a findings-gated refuter goes quiet precisely then. Gate it on
+> the path, which is already the expensive tier, not on the lanes having succeeded.
+
+**With no `Blocking` to attack, it attacks the negatives instead** — and they are always present,
+because the panel is required to produce them. The claims handed over become: each lane's `VERDICT:`
+line, and every structural check a lane returned as `holds` or `not reachable here`. "This is safe"
+and "that check does not apply here" are claims like any other, and the same three verdicts apply.
+A lane returning `unsafe` / `should not ship as is` / `should be better` **with an empty findings
+array** is an internal contradiction and is always attacked first.
+
+**How it runs.** Dispatch **one** agent on the **top tier in `adw-core §8`'s tier table** (two when
+`Blocking` > 4, splitting the claims between them). Name that tier explicitly in the dispatch —
+**never "the strongest available", and never inherit the caller's.** A cheap driver reads
+"available" as its own tier and silently removes the one step this contract says must not follow the
+cheap-tier policy, which is also the safety net for lane depth that has never been measured. This is the one step in the pipeline that is not checklist work:
+it must rebuild a causal chain from code and decide whether it holds, so it does **not** follow the
+cheap-tier policy the lanes do. Tier the step, not the pipeline.
+
+> You are a REFUTATION reviewer on PR #<N>. Your cwd is the review worktree at the PR head.
+> Base is `<baseRefName>`.
+>
+> The claims below came from a prior pass. **Your job is not to agree — it is to kill each one.** A
+> claim survives only if you can name the exact `file:line`, the exact code path, and a concrete
+> reachable input that produces the stated consequence. If any link is missing, guarded elsewhere,
+> unreachable, or the consequence is smaller than stated, say so.
+>
+> For each claim output exactly one of — there is no fourth option:
+> - `CONFIRMED` — you reproduced the chain by reading code. Give the `file:line` chain and the input.
+> - `OVERSTATED` — the mechanism is real, the consequence smaller. State the real consequence.
+> - `REFUTED` — the chain breaks. Name the guard, the line, or why it is unreachable.
+>
+> Read **whole files**. Read the **tests** — a test that pins the behaviour as intended changes the
+> verdict from "bug" to "deliberate, argue it in review". Read the **spec or plan** if one covers
+> this surface — a behaviour the spec mandates is a product decision, not a defect, and you must say
+> so. Check `git log` / `git show` where history decides it.
+>
+> CLAIMS — attack every one. Some assert a defect; some assert its absence. Both are claims.
+> <for each Blocking finding: `POSITIVE | <file:line> | <the stated consequence, one sentence>`>
+> <for each lane verdict: `NEGATIVE | <lane/angle> | verdict "<the verdict line>"`>
+> <for each structural check a lane answered `holds` or `not reachable here`:
+>    `NEGATIVE | <check name> | <the lane's stated reason>`>
+
+**Hand it the claim, never the argument.** Each claim reaches the refuter as `file:line` plus the
+one-sentence consequence — **not** the originating lane's reasoning, evidence chain, confidence or
+severity rationale. A refuter given the argument grades the argument; a refuter given a bare claim
+has to rebuild the chain itself, which is the only thing that can actually falsify it. This is the
+same failure as a lane prompt that contains its own answers: it returns agreement and reads as
+verification.
+
+**Polarity: what a verdict MEANS depends on what the claim asserted.** The three words describe what
+happened to the chain, not whether the news is good. Read the table by claim type:
+
+| | `CONFIRMED` | `OVERSTATED` | `REFUTED` |
+|---|---|---|---|
+| **POSITIVE** claim (a defect is asserted) | the defect is real | real, smaller consequence | no defect — the chain breaks |
+| **NEGATIVE** claim (safety or non-applicability is asserted) | the assurance holds | the assurance holds only partly — **emit a `Warning`** | **the assurance is false — emit a finding**, at the severity `repo-profile §15` assigns it, `Blocking` if it names a class |
+
+**A refuted NEGATIVE is a discovery, not a coverage note.** Killing a lane's `holds` *is* finding the
+violation that lane missed — it must reach `findings[]` and Phase 6's triage like any other finding,
+never the report's coverage block. Without this row the polarity inverts silently: the pass does its
+most valuable work and files the result where nobody acts on it. The generic "new findings are real
+findings" paragraph below is not enough, because a refuted negative does not look new — it looks like
+a verdict on something already listed.
+
+**What the verdicts do** (positive claims):
+
+- `REFUTED` → the finding does not reach *apply* and is not carried as a live finding — **but a
+  refuted `Blocking` is never silently dropped.** Each one prints in the report as one line:
+  `refuted: <file:line> <one-clause claim> — <the named guard, its line, or why it is unreachable>`.
+  This contract already states why (§6.6): *"Auditability alone is not prevention (a skimmed report
+  hides a suppression), so this is a rule, not just a log line."* A pass that can delete a
+  `Blocking` from the human's view on its own authority is a suppression channel, whatever the
+  quality of its reasoning. Refuted `Warning`s may stay in the log.
+- `OVERSTATED` → **re-severitise first, then adjudicate** (§3). A downgraded `Blocking` takes the
+  Warning path for *routing* — but **§6.6 stays bound to the finding's original severity**: a
+  finding that entered this pass as `Blocking` can never afterwards be suppressed by an
+  apply-direction calibration line, and never bypasses the blast-radius guard. Without that pin the
+  two mechanisms compose into a suppression path — one `OVERSTATED` verdict plus one calibration
+  line silently disposes of a finding the profile classified as silent data corruption, which is the
+  exact outcome §6.6 exists to make impossible. Carry the original severity alongside the new one.
+- `CONFIRMED` → proceeds to §3 unchanged, now carrying the refuter's chain as its evidence.
+
+**New findings surfaced during the attack are real findings.** A refuter reading whole files to kill
+one claim routinely finds something else; that goes into `findings[]` and is adjudicated normally. It
+is not out of scope because nobody asked for it — on the run this section was written from, the
+attack killed 5 claims and produced 7 new confirmed defects.
+
+**This pass never suppresses on its own authority.** A `REFUTED` verdict must name the guard, the
+line, or the unreachability. "I could not reproduce it" is not a refutation — it is `CONFIRMED` with
+weaker evidence, and it stays.
