@@ -299,9 +299,10 @@ Take **every `repo-profile §16.4` check** and test its trigger against the diff
 its own trigger ("for a replace-array endpoint", "for a model-output write path", …). Every check
 whose trigger matches is **assigned to the lane that owns the matching files** (per `§19`) and pasted
 into that lane's prompt verbatim. **A matched check is an obligation, not a hint**: the lane must
-return a verdict on it. On `panel`, Phase 5.3 then runs intent coherence only — the §16.4 checks have
-moved into the lanes, where each gets an owner reading whole files instead of one agent sharing its
-attention across all of them.
+return a verdict on it. **Phase 5.3 still runs the full `§16.4` list on every tier, `panel` included —
+that is the floor and it never narrows (see 5.3).** This assignment is the added depth on top of it:
+each matched check also gets an owner reading whole files, instead of one agent sharing its attention
+across all of them.
 
 This step is what turns a `§15` severity class into a detection. A severity line only upgrades a
 finding that something already produced; with no detector behind it, it has nothing to upgrade.

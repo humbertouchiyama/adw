@@ -24,7 +24,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 | §6 | Calibration loop | `.agent/review-calibration.md` — the skills learn from overrides |
 | §7 | Blast-radius safety stops | union stop-list; when to fall back to comment-only |
 | §8 | Local ship policy | commit/push/merge consent; apply≠merge; stage-only default vs declared auto-ship |
-| §9 | Refutation pass | attack findings before acting; CONFIRMED/OVERSTATED/REFUTED; gated on a wide path + a Blocking |
+| §9 | Refutation pass | attack findings before acting; CONFIRMED/OVERSTATED/REFUTED; gated on the wide path alone — attacks negatives when there is no Blocking |
 
 ---
 
