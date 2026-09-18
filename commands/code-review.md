@@ -72,7 +72,7 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   dispatches a driver is a loop.
 - **Otherwise — a human or an orchestrator typed `/code-review <args>` in this session** →
   **dispatch one driver and stop.** Launch a single Agent (`subagent_type: general-purpose`,
-  `model: sonnet`, `run_in_background: false`) with:
+  `model: sonnet`) with:
 
   > You are the review driver for `/code-review <the full argument string, verbatim>`.
   > Read `.claude/adw/cache/commands/code-review.md`, `.claude/adw/cache/commands/review-core.md`
@@ -81,7 +81,7 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   > verbatim, and nothing else: no preamble, no summary of your own, no recap of what you read.
   > The contract was fetched at `<CONTRACT_SHA>` with `fetch.sh` exit `<0|2>`; on exit 2 the report
   > must carry `⚠ contract from cache, not verified against origin (<sha>)`.
-  > Every `Agent` call you make passes `run_in_background: false` (adw-core §8).
+  > Wait for every agent you dispatch by `review-core.md` §10 (one blocking call), never by polling.
   > End the report with one `Phases:` line — `Phases: 1-8 complete`, or naming every phase that did
   > not run and why (`Phases: 1-8 complete except 5.3 skipped — PR body empty`).
 
@@ -260,7 +260,7 @@ this single lane. `light` and `full` both run this lane. **Under `since:` this l
 the tier says**: a delta is small by construction, and three lanes over it is three agents reading
 the same small thing.
 
-Launch 1 Agent (`subagent_type: general-purpose`, `model: sonnet`, `run_in_background: false`):
+Launch 1 Agent (`subagent_type: general-purpose`, `model: sonnet`); wait by `review-core.md` §10:
 
 > Review PR #<number> on `<headRefName>` (base: `<baseRefName>`).
 > Worktree: `$WT`.
@@ -320,11 +320,11 @@ because Y" returns Y and reads as confirmation, while the lane's independent wor
 
 #### Step 3 — Dispatch
 
-**Launch 3 Agents in ONE message** (`subagent_type: general-purpose`, `model: sonnet`,
-`run_in_background: false`) so they run in parallel **and the driver blocks until all three
-return**. Background lanes inside a driver never deliver their completion notice to it: measured
-drivers spent 154–282 turns (65–77% of their cost) polling with `echo` for lanes that had already
-finished. Foreground dispatch in one message is still parallel.
+**Launch 3 Agents in ONE message** (`subagent_type: general-purpose`, `model: sonnet`) so they run
+in parallel, then wait for all three with **one** blocking call by `review-core.md` §10 — each brief
+ends with "write your final report to `<OUT>/<lane>.md`", and the wait is one Bash call with
+`timeout: 600000`: `until [ "$(find "<OUT>" -name '*.md' | wc -l)" -ge 3 ]; do sleep 5; done`.
+Never poll: measured drivers spent 154–282 turns (65–77% of their cost) on `echo` while lanes ran.
 
 | Angle | Owns | Reads |
 |---|---|---|
@@ -454,7 +454,7 @@ gate that does not exist.
 
 ### 5.2 — Convention checks (single sub-agent)
 
-Spawn 1 Haiku agent (`run_in_background: false`). Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
+Spawn 1 Haiku agent (wait by `review-core.md` §10). Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
 verbatim** — the repo's rule tables. The agent runs each check against changed files only and
 returns findings `{file, line, description, severity}` where severity ∈ `Blocking|Warning`.
 
@@ -470,7 +470,7 @@ finding you grade on the spot.
 
 ### 5.3 — Structural checks (sub-agent verification, not grep)
 
-Spawn 1 Sonnet agent (`run_in_background: false`) to verify cross-file and syntactic rules that a
+Spawn 1 Sonnet agent (wait by `review-core.md` §10) to verify cross-file and syntactic rules that a
 grep cannot express. **Under `since:`, dispatch it in the same message as the 4a lane** — the two
 are independent, so the driver waits once, not twice.
 

@@ -23,6 +23,34 @@ Examples: `/pr-ready 838` · `/pr-ready 838 apply` · `/pr-ready 839 apply inter
 
 **This command never merges.** Merge needs the explicit word, every time (`review-core.md` §8).
 
+## Who runs this — dispatch before reading further
+
+**Stop reading here and decide whether you are the driver.** Everything below §1 pulls
+`review-core.md`, `repo-profile.md` and `code-review.md` into the window that runs it (~125k bytes on
+top of this file), and every later turn re-reads them. Measured on standalone `/pr-ready` sessions
+(Plantoes-app run-log, 2026-09-18): the caller read all four files before `/code-review` dispatched
+its driver, which cost $5–7 per review on the caller's tier, about as much as every review lane
+combined.
+
+- **You were dispatched as a subagent whose brief names this command** (`/adw-build` §3.6, or an
+  explicit "run `/pr-ready` as a driver") → **you are the driver.** Continue at §1 and run every
+  phase here. Do not dispatch another driver.
+- **`interactive` is set** → run inline, from §1. A subagent has no path to `AskUserQuestion`.
+- **Otherwise — a human or an orchestrator typed `/pr-ready <args>` in this session** → **dispatch
+  one driver and stop.** Do not read `review-core.md`, `repo-profile.md` or `code-review.md` first.
+  Launch a single Agent (`subagent_type: general-purpose`, `model: sonnet`) with:
+
+  > You are the driver for `/pr-ready <the full argument string, verbatim>`. Read
+  > `.claude/adw/cache/commands/pr-ready.md` in full and run §1–§8 yourself; you are the driver — do
+  > not dispatch another. Wait for every agent you dispatch by `review-core.md` §10 (report files +
+  > one blocking wait call), never by polling. The contract was fetched at `<CONTRACT_SHA>` with
+  > `fetch.sh` exit `<0|2>`; on exit 2 the report must carry `⚠ contract from cache, not verified
+  > against origin (<sha>)`. Return **only** §7's Layer 1 report followed by its Layer 2 machine
+  > line, verbatim.
+
+  The caller prints the driver's report as its own final message, unchanged, and re-checks none of
+  it.
+
 ---
 
 ## When to reach for this — and when `/code-review` is the better tool
@@ -337,8 +365,8 @@ Then dispatch a **fresh verifier subagent** that re-runs every gate
 - **Pin it to `model: sonnet`.** The verifier re-executes and relays; it never judges. An
   unpinned dispatch inherits the session's most expensive tier for a job that is exit
   codes and output tails.
-- **`run_in_background: false`.** This pass usually runs inside a driver, where a background
-  completion never arrives (adw-core §8).
+- **Wait by `review-core.md` §10.** This pass usually runs inside a driver, which must
+  not poll.
 - **A subagent, never inline.** Inline mixes the verdict into a transcript that also holds
   the author's and the reviewer's claims — the first step toward interpreting instead of
   relaying.

@@ -477,7 +477,7 @@ narrower pin rules had already been written and neither generalised.
 
 One implementer subagent per PR, working in the provisioned worktree, **pinned by the
 unit's `depth:` per adw-core §8** — `model: opus` at D3, `model: sonnet` at D0–D2. Its brief
-carries the same `run_in_background: false` line as 3.6's driver brief. A
+carries the same adw-core §8 wait line as 3.6's driver brief. A
 grouped sub-PR takes the tier of its deepest unit. D3 → follow the plan file; D2 → follow
 the spec's `## Implementation` section (adw-core §3); D0/D1 → implement from the spec.
 Units sharing a sub-PR: **one commit each, dependency order**. Keep the SAME implementer across fix cycles via SendMessage — the ORCHESTRATOR
@@ -754,7 +754,7 @@ semantic-conflict risk.
 ### 3.6 Review loop — dispatched, never run in this session
 
 **Dispatch ONE `model: sonnet` review driver per PR** (adw-core §8's Drive row). Its brief
-carries `every Agent call you make passes run_in_background: false (adw-core §8)`, and:
+carries "wait for every agent you dispatch by `review-core.md` §10, never by polling", and:
 run `/pr-ready <N> apply` with `BASE`, `PASS=v2` and `REF` set to 3.4's values, carrying the
 unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and return
 **Layer 2 only** (`/pr-ready` §7 — suppress Layer 1 in the brief): the `ready|blocked` machine
