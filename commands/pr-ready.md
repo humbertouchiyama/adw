@@ -188,9 +188,9 @@ fix for that is to review the push, not to refuse the PR. The closure check is
   a third review cycle (`/adw-build` §3 condition 1 counts cycles that can push);
 - **forced `light`, one lane**, scoped to what cycle 2's fixes changed — the smallest surface the
   loop ever grades;
-- **converged** unless it returns a `Blocking`, or a `Warning` on a line cycle 2's delta changed —
-  the `+` side of `git -C "$WT" diff -U0 <the since: SHA>...HEAD`, read from each `@@ … +<start>,<count> @@`
-  header (`<count>` omitted means 1).
+- **converged** unless it returns a `Blocking`, or a `Warning` marked `on delta line` — the closure
+  check marks those itself, in its own worktree, before its cleanup (code-review 6.1). This section
+  reads the marks from its report and computes nothing.
   A `Warning` elsewhere in a touched file is a fresh sample of code cycle 1 already graded —
   exactly the variance this section says cannot converge — so it is reported, never counted;
 - **not converged** → run §4 anyway (the last push must still be gate-verified), then report

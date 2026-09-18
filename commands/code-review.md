@@ -559,6 +559,12 @@ Findings array is now complete. **Read `.agent/review-calibration.md` from the m
 
 **The decide-or-escalate pass IS review-core §3, applied over the triage output** (not a separate step): before any finding stays an escalation, run it through the **§3.1 bar** — fail either gate, or fall to either resolution rule, and it is a `toFix` (applied in `apply` mode subject to the §7 stops; surfaced as a recommended fix in review-only mode) or a `reject`. Most "your call" items resolve to `toFix`.
 
+**Under `since:`, mark every finding `on delta line` or not**, before Phase 8 removes `$WT`: a
+finding is on a delta line when its `line` falls in the `+` side of
+`git -C "$WT" diff -U0 $SCOPE_BASE...HEAD -- <file>`, read from each `@@ … +<start>,<count> @@`
+header (`<count>` omitted means 1). Print the mark on the finding's report line. `/pr-ready` §3's
+closure check decides convergence from these marks and has no worktree to recompute them.
+
 **Specifically, these are NOT escalations — decide them:** which of two correct fixes is cleaner (pick one, note the other in the commit); whether a Warning is worth fixing (apply if small, reject if not); whether a convention you can read in one of `repo-profile §2`'s standards docs applies (read it); whether to fix something cheap and reversible (fix it, and say `— say "revert <x>" to undo`); whether a nice-to-have belongs here (reject: "out of scope — file it").
 
 **Never present findings as a chooser/menu** — an `AskUserQuestion` "which should I fix?" or a numbered "pick one" list IS handing the user a raw list (§3). Adjudicate each finding yourself. A pure-Warning / zero-Blocking result normally means *apply the real ones, reject the rest* — not *ask which to apply*. Escalate ONLY genuine product/UX/business/operational calls, and only via the §5 surface (`AskUserQuestion` solely under `interactive`).
@@ -636,7 +642,7 @@ Phase 7 always runs.
 
 1. **Apply fixes** in `$WT`. **If `toFix` is empty** (a clean PR run with `apply`): skip steps 1–5 (an empty index would make `git commit` error), and go straight to the merge gate (steps 6–7); if any §7 blast-radius path or unresolved escalation is in play, fall back to the review-comment path (7b) instead. For each `toFix`: edit, then re-run the relevant Phase 5 detection to confirm the violation is gone. If a fix balloons in scope, re-adjudicate it to *escalate* and note why.
 
-2. **Verify → review-core §4** (smart verification — branches on `layers[]`). Run from inside the worktree; each gate must pass with zero errors before push. **A docs / `.claude` / `.agent`-only remediation reports `verification: N/A — docs-only` (§4) — never a fabricated green.** Any failure → safety stop (§7).
+2. **Verify → review-core §4** (smart verification — branches on `layers[]`). Stage the touched files first (`git -C "$WT" add <files>`) — the audit's staged mode reads only the index; step 4 commits exactly that set. Run from inside the worktree; each gate must pass with zero errors before push. **A docs / `.claude` / `.agent`-only remediation reports `verification: N/A — docs-only` (§4) — never a fabricated green.** Any failure → safety stop (§7).
 
 3. **Browser smoke (UI changes only) → review-core §4.** If `toFix` touched `src/`, click the affected flow, or (when no browser is available) declare the skip and add "human visual QA required" to the merge gate — never let the missing browser block the apply/commit/push.
 

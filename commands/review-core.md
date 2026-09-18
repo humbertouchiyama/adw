@@ -148,7 +148,8 @@ Verification **branches on the layers actually changed** (from the skill's scope
 **`repo-profile §6` is the layer map and `repo-profile §5` is the command for each gate.** Read them;
 do not restate either here. `§5` also declares the review-side invocation of any audit-style gate:
 a commit-range diff against the PR base for committed work, and a staged-mode run for a remediation
-not yet committed.
+not yet committed — **stage the remediated files before running it**, or the index is empty and the
+gate inspects nothing.
 
 Four properties hold in every repo, whatever those sections declare:
 
