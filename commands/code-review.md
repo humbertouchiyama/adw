@@ -44,7 +44,7 @@ Each phase produces a typed output the next phase consumes. `apply` selects whic
 1 Setup       → {pr, $WT, mode, apply, interactive, ledger}   (review-core §1, §2)
 2 Scope       → {changedFiles[], stats, layers[]}
 3 Path        → "light" | "full" | "panel"
-4 Review      → findings[]                        (light: 1 lane / panel: 3 angled lanes / + gated plugin + 4.5 parse)
+4 Review      → findings[] {…, severity, originalSeverity}   (light: 1 lane / panel: 3 angled lanes / + gated plugin + 4.5 parse)
 5 Project     → findings[] (appended)
 6 Triage      → {toFix[], escalate[], conventionEdits[]}   (adjudication: review-core §3; calibration: §6)
 7 Terminal    → comment posted | fixes committed + pushed + ask-merge (apply)   (§1.3, §4, §5, §7, §8)
@@ -142,7 +142,7 @@ mergeability, `gh pr merge` — which need none of that state, and the report sa
 5. **Worktree + symlink deps → follow review-core §1.1–§1.2** (idempotent add / reset, `git -C "$WT"`, never `cd`).
 
 6. **Phase ledger → follow review-core §2.** Create one TaskCreate per phase below; mark `in_progress` before, `completed` after:
-   - `Phase 1 — Setup`  *(Phase 0 is the dispatch decision and precedes the ledger)*
+   - `Phase 1 — Setup`  *(Phase 0 precedes the ledger. **The driver creates it; a caller that dispatched one does not** — it runs no phases. review-core §2's "mandatory" binds whoever runs Phases 1–8, and the driver's `Phases:` line is what carries the result out to the human, since a ledger inside a subagent reaches nobody.)*
    - `Phase 2 — Scope`
    - `Phase 3 — Path`
    - `Phase 4 — Review`
@@ -238,18 +238,28 @@ Triage: score=<N> → <light|full|panel>
   <point breakdown>
 ```
 
-**Output**: `path = "light" | "full" | "panel"`.
+**Output**: `path = "light" | "full" | "panel"`, and **`panelRan = false`** — initialised here, on
+every path, because Phase 4b and Phase 6.0 both read it unconditionally and only 4a-panel ever sets
+it true.
 
 ---
 
 ## Phase 4 — Review
 
-Both branches produce a single typed output: `findings[] = [{file, line, description, severity}]`.
+Both branches produce a single typed output:
+`findings[] = [{file, line, description, severity, originalSeverity}]`.
+
+`originalSeverity` is set equal to `severity` when the finding is created and **never rewritten**.
+Only `severity` moves — a `repo-profile §15` upgrade at 4.5, a review-core §9 `OVERSTATED`
+downgrade. `review-core §6.6` reads `originalSeverity`, so a finding that was ever `Blocking` keeps
+its protection from calibration suppression no matter what later reclassified it.
 
 ### 4a — Light path (1 lane)
 
-**On `path == "panel"` and no `since:`, skip to 4a-panel below** — it replaces this single lane, and
-every other phase is unchanged. Under `since:` this lane runs whatever the tier says (4b's delta
+**On `path == "panel"` and no `since:`, go to 4a-panel below** — its three lanes run **instead of**
+this single lane and **alongside** 4b's plugin, which still fires. Nothing else changes. Under
+`full` this single lane does not run at all unless 4b falls back to it, so `panel` adds three lanes
+rather than replacing one. Under `since:` this lane runs whatever the tier says (4b's delta
 bullet): a delta is small by construction and three lanes over it is three agents reading the same
 small thing.
 
@@ -321,6 +331,15 @@ in parallel.
 | **B — authorization, persistence, concurrency** | the `layers[]` entries `repo-profile §19` maps to this angle | those files plus the convention docs `§2` names |
 | **C — architecture, coupling, scope** | the whole diff, `git -C "$WT" log $SCOPE_BASE..HEAD --oneline`, and the PR `title` + `body` | structure, not hunks |
 
+**Every `layers[]` entry must reach a lane that READS it.** Angle C reads structure, not hunks, so it
+is not a reading owner. Compute the assignment, then check the cover: **any layer claimed by neither
+A nor B goes to A**, whatever its size. Without that rule a frontend layer in a mixed diff is owned by
+nobody who reads it, and `§15`'s frontend items (`ui_standards`, TanStack keys, SSE cleanup) reach no
+lane — silently, because each lane's own scope looks complete. Same reason `§15`'s emphasis list is
+pasted **whole** into every lane instead of filtered to "the items that apply to your layers": that
+filter is a judgement made before anyone has read the code, and it drops precisely the items whose
+layer was mis-assigned.
+
 **`repo-profile §19` owns the layer→angle map and this repo's per-angle file patterns** — the table
 above deliberately names no layers, because a copy here would be a drift pair with the profile and
 no gate on either side. Where a repo carries no `§19`, derive: angle A takes the largest-added-lines
@@ -337,7 +356,7 @@ Hand each agent this prompt, substituting its own row:
 > `<the other two angles, named>`; follow a call chain into their files when you need to, but do not
 > review them. **Do not re-run grep-shaped or lint-shaped checks** — a separate pass greps the diff
 > for those. Everything that needs *reading and reasoning* on your files is yours, including:
-> `<paste repo-profile §15's "weight above style polish" items that apply to the layers you own>`.
+> `<paste repo-profile §15's "weight above style polish" list IN FULL — do not pre-filter it>`.
 >
 > **Structural checks assigned to you — each needs a verdict:**
 > `<paste each matched §16.4 check verbatim, or "none matched">`
@@ -383,6 +402,12 @@ bounded` / `should not ship as is`. B — `sound` / `has a gap` / `unsafe`. C �
 - Keep every lane's `VERDICT:` line and every `not reachable here` verdict — **review-core §9 attacks
   them**. A verdict nothing reads is decoration.
 - Angle C's `SCOPE:` block becomes one `Warning` naming the unaccounted regions, or nothing.
+- **Record the matching itself**, and carry it into Phase 7's `👍 OK` bucket as
+  `§16.4: <N> of <M> checks matched and assigned, <K> answered`. Without it a driver that matched
+  **zero** checks — because Step 1 was skipped, or the triggers were read carelessly — produces a
+  report byte-identical to a diff that legitimately matched none, and the step that the whole panel
+  design rests on cannot red. The unanswered-verdict line below only covers checks already assigned,
+  so it cannot see a match that never happened. Same reason the `§19 absent` line exists.
 
 The panel **does not post a PR comment** — Phase 7 does.
 
@@ -407,7 +432,8 @@ The panel **does not post a PR comment** — Phase 7 does.
   `Full path, plugin unavailable — falling back to <4a | already-run panel>`. Then, **only if
   `panelRan == false`**, run the 4a lane so the diff is still graded by something; when
   `panelRan == true` the three lanes have already graded it and a second dispatch is six sonnet
-  agents for one diff, masked by the dedupe. Carry `plugin unavailable — diff graded by <N> local
+  agents for one diff, masked by the dedupe — the layer-cover rule above is what makes that safe,
+  since every layer has already reached a reading lane. Carry `plugin unavailable — diff graded by <N> local
   lane(s)` into Phase 7's `👍 OK` bucket.
 
 > **Availability is established, never asserted.** The check is mechanical and it is the *attempt* —
@@ -509,9 +535,20 @@ output of `git -C "$WT" log $SCOPE_BASE..HEAD --oneline` and `git -C "$WT" diff 
 > the same question with a mechanical answer. Observed: a 17-commit PR whose ~2,300-word body never
 > mentioned 14 of them, including the largest single addition in the diff.
 
-**Everything else: hand the agent `repo-profile §16.4` verbatim.** That section is the repo's list
-of per-trigger structural checks ("for a new endpoint…", "for a new migration…"), and it is not
-restated here. Run the entries whose trigger the diff matches; report the rest as not applicable.
+**Everything else: hand the agent `repo-profile §16.4` verbatim — on EVERY tier, `panel` included.**
+That section is the repo's list of per-trigger structural checks ("for a new endpoint…", "for a new
+migration…"), and it is not restated here. Run the entries whose trigger the diff matches; report the
+rest as not applicable.
+
+> **`panel` does not move this step, it doubles it — deliberately.** 4a-panel Step 1 also matches
+> `§16.4` triggers and assigns each match to the lane that owns those files, so on a panel run a
+> matched check is answered twice: once by a lane reading whole files (depth), once here (floor).
+> **This phase is the floor and it never narrows.** 4a-panel's matching is a judgement about which
+> lane owns which files, and a judged match that misses leaves the check unrun — which would make
+> `panel` *narrower* than `full` for `§16.4`, the inverse of the strict-superset property Phase 3
+> claims. The duplicate costs one Sonnet pass; dropping the floor costs the detection the whole
+> panel design rests on. If the two disagree, the finding stands: report both and dedupe on
+> `(file, line, rule-class)` with the higher severity winning.
 
 Intent coherence stays in this file rather than in the profile because it is a property of *pull
 requests*, not of a stack — it reads the PR body against its own diff and needs no repo knowledge.
@@ -527,11 +564,14 @@ requests*, not of a stack — it reads the PR body against its own diff and need
 
 **Run it when `panelRan == true`** — computed, never judged, and gated on the *lanes having run*
 rather than on `path`, because a `since:` delta collapses `panel` to one lane without clearing
-`path` and must not pay for a refuter. Follow **review-core §9**: dispatch **one agent on the
-strongest tier available to this run** (two when `Blocking` > 4) with the bare claims — never the
+`path` and must not pay for a refuter. Follow **review-core §9**: dispatch **one agent on the top tier in `adw-core §8`'s tier
+table — never the driver's own tier** (two when `Blocking` > 4) with the bare claims — never the
 lanes' reasoning — apply the verdicts (`REFUTED` → not applied, still reported; `OVERSTATED` →
 re-severitise while keeping the original severity pinned for §6.6; `CONFIRMED` → unchanged), and
-fold any new findings it surfaced into `findings[]` before triaging. With no `Blocking`, the claims
+fold any new findings it surfaced into `findings[]` before triaging — including every **refuted
+negative**, which is a violation a lane claimed was absent and is graded by `repo-profile §15` like
+any other finding, not filed under coverage. **A downgrade rewrites `severity` only**; §6.6 keeps
+reading `originalSeverity`. With no `Blocking`, the claims
 are the lanes' verdicts and their `holds` / `not reachable here` checks (§9). Log one line per
 verdict. `panelRan == false` → skip silently.
 
@@ -619,7 +659,7 @@ Phase 7 always runs.
 - **~15 lines total.** Longer than a screen has failed regardless of structure.
 - **No diagnostics** — path/score, plugin state, layers, phase narration, findings counts, and the rejected list stay in the triage log. Never in the report.
 - Every bucket prints its header even when empty (`— none`; *Your decision*: `— none`).
-- The `Next:` line is the final line of the report; nothing follows it. The ONE thing allowed between the last bucket and the `Next:` line: a calibration line recorded this run (§6.4 requires the echo) as a single plain line — `Calibration recorded: <line> — delete if wrong` — nothing else.
+- The `Next:` line is the final line of the report; nothing follows it. **Two** things are allowed between the last bucket and the `Next:` line, each one plain line: a calibration line recorded this run (§6.4 requires the echo) — `Calibration recorded: <line> — delete if wrong` — and, when the run was dispatched into a driver (Phase 0), the `Phases:` line that replaces the ledger — `Phases: 1-8 complete`, or naming every phase that did not run and why. Nothing else.
 
 ### 7a — `apply` set
 
@@ -654,9 +694,13 @@ Phase 7 always runs.
    - CI: <job green | job RED | not requested — why, per repo-profile §9>
 
    **⏳ Your decision** (<M>) — cleared the §3.1 bar; everything engineering-clear is in Done
-   - <gate> not run: <why> — obligated by repo-profile §6 for this diff
    - file:line — one plain sentence of what to decide + recommended default
    - `[Insert → <target file>]` <one-line rule> — convention draft, needs your sign-off (not auto-landed)
+
+   **⏳ Coverage** — mechanically generated, NOT counted in <M>
+   - <gate> not run: <why> — obligated by repo-profile §6 for this diff
+   - <§16.4 check> assigned to lane <X>, no verdict returned
+   - refuted: <file:line> <claim> — <named guard / why unreachable>
    ```
    Then, **only if** a calibration line was recorded this run (§6.4), append one final line to that comment body: `Calibration recorded: <echoed line> — delete from .agent/review-calibration.md if wrong.` — omit it entirely otherwise.
 
@@ -700,6 +744,9 @@ gh pr comment <PR_NUMBER> --body "$(cat <<'EOF'
 - file:line — one plain sentence of what to decide + recommended default
 - `[Insert → <target file>]` <one-line rule> (convention, needs sign-off)  ·  `[Reject]` <pattern> — <failed criterion>
 
+**⏳ Coverage** — mechanically generated, not counted in (<n>)
+- <gate> not run: <why> — obligated by repo-profile §6  ·  <§16.4 check> unanswered  ·  refuted: <file:line> — <guard>
+
 Generated with [Claude Code](https://claude.ai/code)
 EOF
 )"
@@ -714,6 +761,7 @@ No findings → collapse to the OK + empty-decision buckets: `### Code review` /
 
   **🔧 To fix** (<n>) — <additional Phase 5 findings; re-run with `apply`>
   **⏳ Your decision** (<n>) — <escalations (plain sentence + recommended default) + convention Insert drafts>
+  **⏳ Coverage** — <unrun obligated gates · unanswered §16.4 checks · refuted Blockings — not counted in (<n>)>
 
   Generated with [Claude Code](https://claude.ai/code)
   ```
@@ -744,6 +792,7 @@ PR #<N>: <title> (<url>)
 - refuted: <file:line> <claim> — <named guard / why unreachable>
    |   — none
 
+Phases: 1-8 complete
 Next: <the ONE thing the user does now — or "nothing" + why>
 ```
 Worked example (the common case — clean apply run):
@@ -762,7 +811,12 @@ PR #742: <title> (https://github.com/…/742)
 
 Next: say "merge" to ship — 2 fixes pushed, gates green; visual QA not run (no browser), eyeball the <flow> first.
 ```
-If — and only if — a calibration line was recorded this run (§6.4), print ONE plain line between the last bucket and the `Next:` line: `Calibration recorded: <line> — delete if wrong.` The `Next:` line stays the final line; nothing follows it.
+Between the last bucket and the `Next:` line, print — each as ONE plain line, in this order, omitting either when it does not apply:
+```
+Phases: 1-8 complete                                  ← driver runs only (Phase 0); name any phase that did not run and why
+Calibration recorded: <line> — delete if wrong        ← only if §6.4 recorded one this run
+```
+The `Next:` line stays the final line; nothing follows it.
 
 ---
 

@@ -97,7 +97,10 @@ Removal failure → warn in terminal, don't block. **File mode: nothing to clean
 
 ## §2 — Phase ledger contract
 
-**Mandatory.** At Phase 1, create one `TaskCreate` per phase the skill declares. Mark each `in_progress` before starting, `completed` immediately after. The ledger is the contract that **the run is incomplete until every task is `completed`** — forgetting a phase requires forgetting to update its task, which is visible to the user. Each skill lists its own phase set.
+**Mandatory for whoever runs the phases.** A skill that dispatches its pipeline into a driver
+(code-review Phase 0) creates no ledger in the caller — it runs no phases — and the driver's own
+ledger is invisible to the human, so that skill states what carries the result out instead. At
+Phase 1, create one `TaskCreate` per phase the skill declares. Mark each `in_progress` before starting, `completed` immediately after. The ledger is the contract that **the run is incomplete until every task is `completed`** — forgetting a phase requires forgetting to update its task, which is visible to the user. Each skill lists its own phase set.
 
 ---
 
@@ -226,6 +229,15 @@ The skill **infers** the override from the user's reply and appends the line **i
 
 An auto-drafted **`apply`-direction** line (escalate→apply, "stop escalating") may bias only **non-blast-radius** classes and **never suppresses a `Blocking` finding** — those always escalate/apply-and-verify regardless of calibration. Auditability alone is not prevention (a skimmed report hides a suppression), so this is a rule, not just a log line. See §7 for blast-radius paths.
 
+**`Blocking` here means `originalSeverity`, not the live `severity`.** Every finding carries
+`originalSeverity`, set once when the finding is created and never rewritten; only `severity` moves.
+A finding that entered §9's refutation pass as `Blocking` and left it `OVERSTATED → Warning` still
+reads `originalSeverity: "Blocking"` and is still protected here. Without that field the two
+mechanisms compose into a suppression path — one `OVERSTATED` verdict plus one apply-direction
+calibration line disposes of a finding the profile classified as silent data corruption, with each
+step defensible alone. This guard is the reason the field exists; a pin stated only in §9 depends on
+the same agent recalling §9 at the moment of suppression, a hundred lines later.
+
 ---
 
 ## §7 — Blast-radius safety stops
@@ -301,8 +313,11 @@ and "that check does not apply here" are claims like any other, and the same thr
 A lane returning `unsafe` / `should not ship as is` / `should be better` **with an empty findings
 array** is an internal contradiction and is always attacked first.
 
-**How it runs.** Dispatch **one** agent on the **strongest available tier** (two when `Blocking` > 4,
-splitting the claims between them). This is the one step in the pipeline that is not checklist work:
+**How it runs.** Dispatch **one** agent on the **top tier in `adw-core §8`'s tier table** (two when
+`Blocking` > 4, splitting the claims between them). Name that tier explicitly in the dispatch —
+**never "the strongest available", and never inherit the caller's.** A cheap driver reads
+"available" as its own tier and silently removes the one step this contract says must not follow the
+cheap-tier policy, which is also the safety net for lane depth that has never been measured. This is the one step in the pipeline that is not checklist work:
 it must rebuild a causal chain from code and decide whether it holds, so it does **not** follow the
 cheap-tier policy the lanes do. Tier the step, not the pipeline.
 
@@ -324,8 +339,11 @@ cheap-tier policy the lanes do. Tier the step, not the pipeline.
 > this surface — a behaviour the spec mandates is a product decision, not a defect, and you must say
 > so. Check `git log` / `git show` where history decides it.
 >
-> CLAIMS:
-> <for each Blocking: its file:line, and the stated consequence in one sentence>
+> CLAIMS — attack every one. Some assert a defect; some assert its absence. Both are claims.
+> <for each Blocking finding: `POSITIVE | <file:line> | <the stated consequence, one sentence>`>
+> <for each lane verdict: `NEGATIVE | <lane/angle> | verdict "<the verdict line>"`>
+> <for each structural check a lane answered `holds` or `not reachable here`:
+>    `NEGATIVE | <check name> | <the lane's stated reason>`>
 
 **Hand it the claim, never the argument.** Each claim reaches the refuter as `file:line` plus the
 one-sentence consequence — **not** the originating lane's reasoning, evidence chain, confidence or
@@ -334,7 +352,22 @@ has to rebuild the chain itself, which is the only thing that can actually falsi
 same failure as a lane prompt that contains its own answers: it returns agreement and reads as
 verification.
 
-**What the verdicts do.**
+**Polarity: what a verdict MEANS depends on what the claim asserted.** The three words describe what
+happened to the chain, not whether the news is good. Read the table by claim type:
+
+| | `CONFIRMED` | `OVERSTATED` | `REFUTED` |
+|---|---|---|---|
+| **POSITIVE** claim (a defect is asserted) | the defect is real | real, smaller consequence | no defect — the chain breaks |
+| **NEGATIVE** claim (safety or non-applicability is asserted) | the assurance holds | the assurance holds only partly — **emit a `Warning`** | **the assurance is false — emit a finding**, at the severity `repo-profile §15` assigns it, `Blocking` if it names a class |
+
+**A refuted NEGATIVE is a discovery, not a coverage note.** Killing a lane's `holds` *is* finding the
+violation that lane missed — it must reach `findings[]` and Phase 6's triage like any other finding,
+never the report's coverage block. Without this row the polarity inverts silently: the pass does its
+most valuable work and files the result where nobody acts on it. The generic "new findings are real
+findings" paragraph below is not enough, because a refuted negative does not look new — it looks like
+a verdict on something already listed.
+
+**What the verdicts do** (positive claims):
 
 - `REFUTED` → the finding does not reach *apply* and is not carried as a live finding — **but a
   refuted `Blocking` is never silently dropped.** Each one prints in the report as one line:
