@@ -328,8 +328,8 @@ A lane returning `unsafe` / `should not ship as is` / `should be better` **with 
 array** is an internal contradiction and is always attacked first.
 
 **How it runs.** Dispatch **one** agent on the **top tier in `adw-core §8`'s tier table** (two when
-`Blocking` > 4, splitting the claims between them), with `run_in_background: false` — it runs
-inside a driver, where a background completion never arrives. Name that tier explicitly in the dispatch —
+`Blocking` > 4, splitting the claims between them), and wait for it by §10 — it runs
+inside a driver, which must not poll. Name that tier explicitly in the dispatch —
 **never "the strongest available", and never inherit the caller's.** A cheap driver reads
 "available" as its own tier and silently removes the one step this contract says must not follow the
 cheap-tier policy, which is also the safety net for lane depth that has never been measured. This is the one step in the pipeline that is not checklist work:
@@ -408,3 +408,29 @@ attack killed 5 claims and produced 7 new confirmed defects.
 **This pass never suppresses on its own authority.** A `REFUTED` verdict must name the guard, the
 line, or the unreachability. "I could not reproduce it" is not a refutation — it is `CONFIRMED` with
 weaker evidence, and it stays.
+
+## §10 — Waiting for dispatched agents (subagents only)
+
+**The `Agent` tool has no foreground mode.** Every dispatch returns `Async agent launched` at once,
+and `run_in_background: false` is ignored — on Plantoes-app on 2026-09-18, every dispatch that passed
+it launched async. The result comes back as a hand-back message, and a subagent receives it only
+when one of its own tool calls returns. It cannot end its turn to wait, because ending the turn *is*
+returning to its caller. Left alone it spins: measured review drivers spent 154–282 turns of
+`echo`/`true` on this, 65–77% of their cost (Plantoes-app `docs/adw/run-log.md`, 2026-09-18).
+
+So every dispatcher below the top level — a driver, a verifier, a lane — does this:
+
+1. Once per wave: `OUT="$(mktemp -d)"`. Substitute its value as a literal into every brief.
+2. Every brief ends with: *"As your LAST step, write your complete final report to `<OUT>/<name>.md`
+   with the Write tool, then hand back the same text."* `<name>` is unique per agent.
+3. Dispatch the whole wave in one message. Then make **one** Bash call with the tool parameter
+   `timeout: 600000`, where `<N>` is the number of agents in the wave:
+   ```bash
+   until [ "$(find "<OUT>" -name '*.md' | wc -l)" -ge <N> ]; do sleep 5; done; ls "<OUT>"
+   ```
+   Then Read each file. The file is the result; the hand-back carries the same text.
+4. If that call times out or is moved to the background, issue it once more. After the second
+   miss, use the files and hand-backs you have, and record every missing agent as
+   `NOT RUN — no report after 20 min`. Never wait with `echo`, `true`, a bare `sleep` or `Monitor`.
+
+A top-level session does not need this. It may end its turn, and the notification wakes it.
