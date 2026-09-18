@@ -165,8 +165,8 @@ git -C "$WT" diff $SCOPE_BASE...HEAD --stat | tail -1
 
 **With `since:<sha>` — the delta only.** `$SCOPE_BASE` becomes `<sha>`, so the review grades
 what changed *after* that commit instead of re-grading the whole PR. Everything downstream that computes from the diff
-(layers, path score, the 4a agent's diff command, Phase 5's changed-file list and audit scope)
-reads `$SCOPE_BASE`. A `since:` pass takes the single 4a lane regardless of tier (4a states the
+(layers, path score, the 4a agent's diff command, Phase 5's changed-file list) reads
+`$SCOPE_BASE`. The audit gate does not: it always diffs against the PR base (`repo-profile §5`). A `since:` pass takes the single 4a lane regardless of tier (4a states the
 branch). Anything added downstream must be checked against `$SCOPE_BASE` explicitly; "reads the
 diff" is not the same as "can be scoped".
 
@@ -474,9 +474,10 @@ Spawn 1 Sonnet agent (`run_in_background: false`) to verify cross-file and synta
 grep cannot express. **Under `since:`, dispatch it in the same message as the 4a lane** — the two
 are independent, so the driver waits once, not twice.
 
-**Intent coherence** (every full-PR pass; **skipped under `since:`**, where the commits are the
-review's own `fix(review):` remediation and the PR body was already read against the PR in cycle 1 —
-the skip prints as `Phases: … 5.3 intent coherence skipped — since: delta`) — hand the agent the PR `title` + `body` from Phase 1, **and** the
+**Intent coherence** (every pass, **except** a `since:` pass where every subject in
+`git -C "$WT" log $SCOPE_BASE..HEAD --format=%s` starts with `fix(review):` — computed, never judged:
+those commits are the review's own remediation, and the body was read against the PR in cycle 1.
+The skip prints as `Phases: … 5.3 intent coherence skipped — remediation-only delta`) — hand the agent the PR `title` + `body` from Phase 1, **and** the
 output of `git -C "$WT" log $SCOPE_BASE..HEAD --oneline` and `git -C "$WT" diff $SCOPE_BASE...HEAD --stat`):
 - Does the diff actually do what the PR says? Flag only a real mismatch: the stated goal is
   half-implemented (promises X, ships part of X), the diff carries stray changes unrelated to the
@@ -529,8 +530,8 @@ requests*, not of a stack — it reads the PR body against its own diff and need
 
 **Run it when `panelRan == true`** — computed, never judged, and gated on the *lanes having run*
 rather than on `path`, because a `since:` delta collapses `panel` to one lane without clearing
-`path` and must not pay for a refuter. **Also run it when `path == "full"`, no `since:`, and at
-least one `Blocking` exists** — positive claims only (review-core §9's `full` row); this is the
+`path` and must not pay for a refuter. **Also run it when `path == "full"`, no `since:`, and the 4a
+lane returned at least one `Blocking`** — positive claims only (review-core §9's `full` row); this is the
 false-positive filter a `full` run has, since a false `Blocking` costs a whole fix-verify-push
 cycle. Follow **review-core §9**: dispatch **one agent on the top tier in `adw-core §8`'s tier
 table — never the driver's own tier** (two when `Blocking` > 4) with the bare claims — never the

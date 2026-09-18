@@ -188,13 +188,14 @@ fix for that is to review the push, not to refuse the PR. The closure check is
   a third review cycle (`/adw-build` §3 condition 1 counts cycles that can push);
 - **forced `light`, one lane**, scoped to what cycle 2's fixes changed — the smallest surface the
   loop ever grades;
-- **zero findings it would apply → converged**: the PR proceeds to §4 exactly as a clean cycle 2
-  would;
-- **any finding it would apply → not converged**: run §4 anyway (the last push must still be
-  gate-verified), then report `blocked` listing those findings.
+- **converged** unless it returns a `Blocking`, or a `Warning` on a line cycle 2's delta changed.
+  A `Warning` elsewhere in a touched file is a fresh sample of code cycle 1 already graded —
+  exactly the variance this section says cannot converge — so it is reported, never counted;
+- **not converged** → run §4 anyway (the last push must still be gate-verified), then report
+  `blocked` listing the findings that counted.
 
-> **Why not stop at two.** Measured on 10 consecutive PRs: cycle 2 routinely applied a one-line fix
-> (a comment cycle 1's own fixer had written too long, a docs row), the old rule stamped the PR
+> **Why not stop at two.** Measured on #1270 (Plantoes-app run-log, 2026-09-18): cycle 2 applied a
+> one-line fix to a comment cycle 1's own fixer had written too long, the old rule stamped the PR
 > `blocked`, and the owner merged it by hand after a ~9h wait for a change nothing could have found
 > wrong. `blocked` was measuring that cycle 2 did its job, not that the PR was unstable. The closure
 > check keeps the property the cap exists for — the loop terminates — and lets the common case land
@@ -388,8 +389,7 @@ rather than assumed:
   is lexicographic, so unnormalised, a UTC−3 commit reads ~3h early and passes a review
   that predates the code.
 - Keyed on **timestamp, not comment shape**, deliberately: `/code-review` has branches
-  that post no project comment at all (the §3 closure check, an `apply` run with an empty
-  `toFix`), so a header match would block precisely the cleanest reviews.
+  that post no project comment at all (an `apply` run with an empty `toFix`), so a header match would block precisely the cleanest reviews.
 
 Dating on the code head rather than `$VSHA` is what keeps this consistent with §6: a
 docs-only amendment moves the head, no review post-dates it, and keyed on `$VSHA` the PR
@@ -410,9 +410,9 @@ branch after the state is earned — owner-feedback amendments included, whateve
 them — voids it:
 
 - re-run §4 against the new head with the next `PASS` id, **always**;
-- plus one `/code-review` cycle **when the delta touches production code**, passed
-  `since:<the VSHA literal>` — the amendment is the delta, and an unscoped cycle re-grades the
-  whole PR on its widest tier. Docs-only → re-verify alone.
+- plus one `/code-review` cycle **when the delta touches production code**. Docs-only →
+  re-verify alone. **Not `since:`-scoped**: an owner amendment can be any size, and a `since:`
+  pass collapses to one lane with no refuter.
 
 Until both pass, no surface may print `review clean` or `ready` for a head the review
 never saw.

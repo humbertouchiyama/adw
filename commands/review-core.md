@@ -300,11 +300,16 @@ agrees with itself.
 | Run | Claims attacked |
 |---|---|
 | the widest review path — for code-review, `panelRan == true` | every positive **and** every negative (below). **Not** conditioned on findings existing |
-| code-review `full`, no `since:`, at least one `Blocking` | the `Blocking` positives only. A single lane returns no verdict lines or check answers, so it has no negatives to hand over |
+| code-review `full`, no `since:`, the review lane returned at least one `Blocking` | that lane's `Blocking` positives only. A single lane returns no verdict lines or check answers, so it has no negatives to hand over |
 
 The `full` row exists because a false `Blocking` costs a whole fix-verify-push cycle, and `full`
 has no other false-positive filter since the third-party plugin and its confidence cutoff were
-removed (code-review 4b).
+removed (code-review 4b). A `full` run whose lane returns no `Blocking` is graded exactly as `light`.
+
+**Mechanical findings are never claims.** Audit failures and rule-table hits (code-review 5.1, 5.2)
+are `Blocking` by definition and have no reachable-input chain to rebuild, so a refuter would
+return `REFUTED` and the gate that raised them would red the §4 re-pass anyway. Hand over only
+findings a review lane produced, on every row.
 
 > **Why not "only when there is a `Blocking` to attack".** That gate is empty in exactly the case
 > this pass exists for. The pass has two jobs — killing false claims *and* finding what the lanes
