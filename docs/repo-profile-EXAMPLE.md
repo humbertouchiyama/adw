@@ -33,7 +33,7 @@ renumber. Add new sections at the end.
 | §12 | Running a single test | adw-core §2, adw-build §3.2 |
 | §13 | Review layers and their standards docs | code-review Phase 2 |
 | §14 | Risk scoring | code-review Phase 3 |
-| §15 | Review emphasis + Blocking severity classes | code-review Phase 4, 4.5 |
+| §15 | Review emphasis + Blocking severity classes | code-review Phase 4, review-core §9 |
 | §16 | Project rule tables | code-review Phase 5.2, 5.3 |
 | §17 | Convention doc routing | code-review Phase 6.2 |
 | §18 | Disposable state | cleanup Phase 3, 5 |
@@ -162,14 +162,14 @@ Two invocations, one script, and the argument depends on who is calling:
 
 | Caller | Invocation |
 |---|---|
-| `/adw-build` (a branch diff exists) | `( cd "$WT" && bash scripts/audit.sh --diff <BASE> )` |
-| `/code-review`, `/pr-ready` (a detached unstaged checkout) | `( cd "$WT" && bash scripts/audit.sh --all )` |
+| `/adw-build`; `/code-review` Phase 5.1; `/pr-ready` §4.3 (committed work at a head) | `( cd "$WT" && bash scripts/audit.sh --diff <BASE> )` — `<BASE>` is always the PR's merge target, never a `since:` SHA |
+| `/code-review` remediation verify (fixes not yet committed) | stage the touched files, then `( cd "$WT" && bash scripts/audit.sh )` — staged mode |
 
 `audit.sh` audits the **current directory**, not its own location. Invoking it by path
 (`bash "$WT/scripts/audit.sh"`) from elsewhere runs the PR's copy against the *calling* tree: no
 error, a healthy non-zero run count, a confident green over the wrong file set. Always the subshell.
-`--all` is required in the review case — without it the script audits only `git diff --cached`, and a
-detached unstaged checkout has nothing staged.
+Never `--all` in a review: it is slow, and a diff-scoped check has no "added lines" to grade in it.
+Staged mode audits only `git diff --cached`, so stage the remediation before running it.
 
 **Empty-scope rule (`--diff` only).** When `git diff --name-only <BASE>...HEAD` contains no
 `.ts`/`.tsx`/`.sql` file matching `AUDITED_PATHS` — `^(src/|api/src/|api/drizzle/migrations/|packages/)`,
@@ -445,7 +445,7 @@ are shipping broken code to production and stopping every release, and both land
 over. +5 crosses the `full` bar unaided so the tier never depends on the diff also happening to be
 large — a deploy-workflow change is typically a handful of lines. Scored 0 before 2026-09-03: PR
 #1134 rewrote the production deploy job and took the light path. The matching §13 layer row lands
-with it and is not optional — without a layer, `layers[]` stays empty and the plugin is skipped.
+with it and is not optional — without a layer, `layers[]` stays empty and the class is graded as prose.
 
 ## §15 — Review emphasis
 

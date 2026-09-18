@@ -146,8 +146,10 @@ Then, on what clears both gates, two resolution rules:
 Verification **branches on the layers actually changed** (from the skill's scope/classification phase), never a fixed suite. Never emit a fake green.
 
 **`repo-profile §6` is the layer map and `repo-profile §5` is the command for each gate.** Read them;
-do not restate either here. `§6` also declares the review-side invocation of any audit-style gate
-(the review worktree is a detached, unstaged checkout, so a diff-scoped audit would inspect nothing).
+do not restate either here. `§5` also declares the review-side invocation of any audit-style gate:
+a commit-range diff against the PR base for committed work, and a staged-mode run for a remediation
+not yet committed — **stage the remediated files before running it**, or the index is empty and the
+gate inspects nothing.
 
 Four properties hold in every repo, whatever those sections declare:
 
@@ -295,9 +297,21 @@ directions: a false `Blocking` costs a whole fix-verify-push cycle, and a report
 discount costs the channel. Adjudication cannot close it — a reviewer re-reading its own claim
 agrees with itself.
 
-**When it runs.** A skill invokes this **whenever the run took its widest review path** — for
-code-review, `panelRan == true`. Computed, not judged, and deliberately **not** conditioned on
-findings existing.
+**When it runs.** Two rows, both computed, never judged:
+
+| Run | Claims attacked |
+|---|---|
+| the widest review path — for code-review, `panelRan == true` | every positive **and** every negative (below). **Not** conditioned on findings existing |
+| code-review `full`, no `since:`, at least one non-audit `Blocking` | the non-audit `Blocking` positives only. A single lane returns no verdict lines or check answers, so it has no negatives to hand over |
+
+The `full` row exists because a false `Blocking` costs a whole fix-verify-push cycle, and `full`
+has no other false-positive filter since the third-party plugin and its confidence cutoff were
+removed (code-review 4b). A `full` run whose lane returns no `Blocking` is graded exactly as `light`.
+
+**Audit findings are never claims.** An audit-gate failure (code-review 5.1) is deterministic and
+has no reachable-input chain to rebuild: a refuter would return `REFUTED`, and the same gate would
+red the §4 re-pass anyway. Every other finding — lane, rule-table (5.2), structural (5.3) — is a
+claim on every row, because those come from an agent and can be wrong.
 
 > **Why not "only when there is a `Blocking` to attack".** That gate is empty in exactly the case
 > this pass exists for. The pass has two jobs — killing false claims *and* finding what the lanes
@@ -314,7 +328,8 @@ A lane returning `unsafe` / `should not ship as is` / `should be better` **with 
 array** is an internal contradiction and is always attacked first.
 
 **How it runs.** Dispatch **one** agent on the **top tier in `adw-core §8`'s tier table** (two when
-`Blocking` > 4, splitting the claims between them). Name that tier explicitly in the dispatch —
+`Blocking` > 4, splitting the claims between them), with `run_in_background: false` — it runs
+inside a driver, where a background completion never arrives. Name that tier explicitly in the dispatch —
 **never "the strongest available", and never inherit the caller's.** A cheap driver reads
 "available" as its own tier and silently removes the one step this contract says must not follow the
 cheap-tier policy, which is also the safety net for lane depth that has never been measured. This is the one step in the pipeline that is not checklist work:

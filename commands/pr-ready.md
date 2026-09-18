@@ -152,7 +152,7 @@ artifact whole, the spec including its `## Implementation` section; D0/D1 have n
 at all and rest on the approval gate plus the
 mutation gate (adw-core §3).
 Left in, a single committed plan can cross the >500-line `full` bar on its own
-and buy a 6-agent pass over documents nobody asked to review.
+and buy a multi-agent pass over documents nobody asked to review.
 
 **Compute all three ranges, never two.** Passing a tier to `/code-review` *forces* it and skips its
 Phase 3, so the tier computed here is the only one that ever runs on the ADW path. A `light | full`
@@ -163,7 +163,7 @@ produces large diffs.
 
 `/code-review <N> <tier>` — plus `apply` when the flag was given.
 
-**Max 2 cycles, and cycle 2 is scoped to the delta.** Hand it `since:<sha>` — the head SHA
+**Max 2 cycles that can push, and cycle 2 is scoped to the delta.** Hand it `since:<sha>` — the head SHA
 cycle 1 reviewed — so cycle 2 grades *what the fixes changed*, never the whole PR again.
 `code-review.md` Phase 2 owns the scoping and defaults to the full base diff; it narrows
 only when handed `since:`.
@@ -179,10 +179,29 @@ hunks: cycle 2 reads the complete current contents of every file the fix touched
 fix can break code it did not edit (the composition trap, `CLAUDE.md` — two locally-correct
 hunks ~30 lines apart, the second made unreachable by the first).
 
-**A second cycle that still yields applied findings means the PR has not converged**: it is
-**not** `ready`. Run §4 anyway (the last push must still be gate-verified), then report
-`blocked` listing the unconverged findings. An applied push that nothing re-reviewed has
-not earned `review clean`.
+**A second cycle that applied findings is followed by a closure check, never by `blocked`
+outright.** An applied push that nothing re-reviewed has not earned `review clean` — but the
+fix for that is to review the push, not to refuse the PR. The closure check is
+`/code-review <N> light since:<cycle 2's pushed head>` **without `apply`**:
+
+- **report-only, so it cannot push** — the loop terminates at it by construction, and it is not
+  a third review cycle (`/adw-build` §3 condition 1 counts cycles that can push);
+- **forced `light`, one lane**, scoped to what cycle 2's fixes changed — the smallest surface the
+  loop ever grades;
+- **converged** unless it returns a `Blocking`, or a `Warning` marked `on delta line` — the closure
+  check marks those itself, in its own worktree, before its cleanup (code-review 6.1). This section
+  reads the marks from its report and computes nothing.
+  A `Warning` elsewhere in a touched file is a fresh sample of code cycle 1 already graded —
+  exactly the variance this section says cannot converge — so it is reported, never counted;
+- **not converged** → run §4 anyway (the last push must still be gate-verified), then report
+  `blocked` listing the findings that counted.
+
+> **Why not stop at two.** Measured on #1270 (Plantoes-app run-log, 2026-09-18): cycle 2 applied a
+> one-line fix to a comment cycle 1's own fixer had written too long, the old rule stamped the PR
+> `blocked`, and the owner merged it by hand after a ~9h wait for a change nothing could have found
+> wrong. `blocked` was measuring that cycle 2 did its job, not that the PR was unstable. The closure
+> check keeps the property the cap exists for — the loop terminates — and lets the common case land
+> on its own.
 
 A finding clearing the escalation bar (`review-core.md` §3.1 — both gates, neither
 resolution rule disposes) → `blocked`, with the question and a recommended default.
@@ -318,6 +337,8 @@ Then dispatch a **fresh verifier subagent** that re-runs every gate
 - **Pin it to `model: sonnet`.** The verifier re-executes and relays; it never judges. An
   unpinned dispatch inherits the session's most expensive tier for a job that is exit
   codes and output tails.
+- **`run_in_background: false`.** This pass usually runs inside a driver, where a background
+  completion never arrives (adw-core §8).
 - **A subagent, never inline.** Inline mixes the verdict into a transcript that also holds
   the author's and the reviewer's claims — the first step toward interpreting instead of
   relaying.
@@ -370,8 +391,7 @@ rather than assumed:
   is lexicographic, so unnormalised, a UTC−3 commit reads ~3h early and passes a review
   that predates the code.
 - Keyed on **timestamp, not comment shape**, deliberately: `/code-review` has branches
-  that post no project comment at all (Phase 7 — plugin clean, no convention updates, no
-  escalations), so a header match would block precisely the cleanest reviews.
+  that post no project comment at all (an `apply` run with an empty `toFix`), so a header match would block precisely the cleanest reviews.
 
 Dating on the code head rather than `$VSHA` is what keeps this consistent with §6: a
 docs-only amendment moves the head, no review post-dates it, and keyed on `$VSHA` the PR
@@ -393,7 +413,8 @@ them — voids it:
 
 - re-run §4 against the new head with the next `PASS` id, **always**;
 - plus one `/code-review` cycle **when the delta touches production code**. Docs-only →
-  re-verify alone.
+  re-verify alone. **Not `since:`-scoped**: an owner amendment can be any size, and a `since:`
+  pass collapses to one lane with no refuter.
 
 Until both pass, no surface may print `review clean` or `ready` for a head the review
 never saw.
