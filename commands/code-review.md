@@ -136,7 +136,7 @@ mergeability, `gh pr merge` — which need none of that state, and the report sa
    ```bash
    gh pr view <PR_NUMBER> --json headRefName,baseRefName,title,body,number,url,state,isDraft,headRefOid
    ```
-   Eligibility gate — exit with terminal note if `state != OPEN` or `isDraft == true`. If a prior `### Code review` comment exists (`gh pr view <N> --json comments`) AND its body contains the current `headRefOid` short SHA → exit "already reviewed at this SHA"; otherwise warn-only (re-running on a new SHA is legitimate). **A `since:` pass skips this check**: `/pr-ready` §3's closure check runs at the head cycle 2 just pushed, and cycle 2's `— remediation` comment names that SHA.
+   Eligibility gate — exit with terminal note if `state != OPEN` or `isDraft == true`. If a prior `### Code review` comment exists (`gh pr view <N> --json comments`) AND its body contains the current `headRefOid` short SHA → exit "already reviewed at this SHA", **and print every `[Blocking]` still listed under that comment's `🔧 To fix` bucket** (not under `✅ Done`), verbatim, or `no open findings` when there are none. A silent exit reads as "reviewed and clean" when the comment it defers to may say the opposite — on Plantoes-app PR #1264 (2026-09-18) a `since:` pass left two `Blocking` unpushed under a blast-radius stop, and the next run would have exited here on that SHA with neither on screen. Otherwise warn-only (re-running on a new SHA is legitimate). **A `since:` pass skips this check**: `/pr-ready` §3's closure check runs at the head cycle 2 just pushed, and cycle 2's `— remediation` comment names that SHA.
 
 4. Store `headRefName`, `baseRefName`, `title`, `body`, `url`. Set `WT=.claude/worktrees/pr-<PR_NUMBER>`.
 

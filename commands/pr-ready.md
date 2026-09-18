@@ -163,6 +163,29 @@ produces large diffs.
 
 `/code-review <N> <tier>` — plus `apply` when the flag was given.
 
+**Before cycle 1: the open-findings check.** A review cycle carries nothing from the reviews
+before it, so a `Blocking` an earlier run found and could not push — a blast-radius stop, a failed
+gate, a run that ended — is invisible to this one. Collect every `[Blocking]` listed under
+`🔧 To fix` in the PR's earlier `### Code review` comments and not later reported under `✅ Done`.
+None → go straight to cycle 1.
+
+Otherwise dispatch **one** agent, report-only, against the pushed head, with
+`run_in_background: false`. Per finding it returns exactly one of:
+
+- `CLOSED` — the `file:line` of the guard or change that closes it at this head;
+- `OPEN` — the concrete input that still reproduces it.
+
+Each `OPEN` counts exactly like a non-converged finding below: §4 still runs, and the verdict is
+`blocked` listing it. Field case: Plantoes-app PR #1264 (2026-09-18) — two `Blocking` sat under an
+earlier comment's `🔧 To fix` while a fresh cycle 1 had no way to know they existed.
+
+**Earlier findings never enter a lane prompt.** They go to this agent and nowhere else. A lane
+told what an earlier pass found returns that finding and reads as confirmation, so its own work is
+unproven — the same rule as `repo-profile §19`'s "What does NOT go in a lane prompt" and
+review-core §9's "hand it the claim, never the argument". Cycle 1 stays blind to history; this
+check is the only place history is read. It is not the post-cycle-2 closure check below: that one
+grades what a fix changed, this one asks whether an old finding still holds.
+
 **Max 2 cycles that can push, and cycle 2 is scoped to the delta.** Hand it `since:<sha>` — the head SHA
 cycle 1 reviewed — so cycle 2 grades *what the fixes changed*, never the whole PR again.
 `code-review.md` Phase 2 owns the scoping and defaults to the full base diff; it narrows
@@ -381,6 +404,18 @@ store. Any live checkout of this repo works; a removed one does not.
 `0` → **not** `ready`; print `blocked` with
 `default: the review never posted against this head — run /code-review <N> <tier> apply,
 then re-run /pr-ready <N>`.
+
+**Then read what that review concluded.** Take the latest `### Code review` comment dated after
+`CODE_TS` and list every `[Blocking]` under its `🔧 To fix` bucket — found and not pushed, as
+distinct from `✅ Done`. Any one → **not** `ready`; print `blocked` naming each finding, with
+`default: fix <finding> on <headRefName>, then re-run /pr-ready <N>` — or, when a blast-radius stop
+held the fix back, the sentence §7 requires that authorizes it.
+
+The count above proves a review *exists*; it never asked what the review *said*. Field case:
+Plantoes-app PR #1264 (2026-09-18). A `since:` pass found two `Blocking` and could not push them —
+one fix sat on a blast-radius path, so review-core §7 held both — and posted them under
+`🔧 To fix`. That comment post-dated the code head, so the timestamp floor counted it as review
+evidence for a head whose own review said do not merge.
 
 Three mechanical facts this snippet depends on, each verified against `gh` and `git`
 rather than assumed:
