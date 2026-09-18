@@ -142,8 +142,8 @@ provenance; it does **not** discharge this rule.
 
 ### §2 Tier
 
-Compute `<tier>` (`light` | `full`) yourself from `/code-review`'s own Phase 3 scoring
-table, applied to the **code** diff only — score
+Compute `<tier>` (`light` | `full` | `panel`) yourself from `/code-review`'s own Phase 3 scoring
+table and its three ranges, applied to the **code** diff only — score
 `git diff --stat $BASE...origin/<headRefName> -- <repo-profile §2 artifact exclusion pathspec>`.
 
 Specs and plans under the profile's spec/plan dirs are covered at init, not by a code reviewer —
@@ -153,6 +153,11 @@ at all and rest on the approval gate plus the
 mutation gate (adw-core §3).
 Left in, a single committed plan can cross the >500-line `full` bar on its own
 and buy a 6-agent pass over documents nobody asked to review.
+
+**Compute all three ranges, never two.** Passing a tier to `/code-review` *forces* it and skips its
+Phase 3, so the tier computed here is the only one that ever runs on the ADW path. A `light | full`
+computation makes `panel` — the tier that exists for large diffs — unreachable on the pipeline that
+produces large diffs.
 
 ### §3 Review
 

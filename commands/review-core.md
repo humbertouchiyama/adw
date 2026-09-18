@@ -283,14 +283,23 @@ directions: a false `Blocking` costs a whole fix-verify-push cycle, and a report
 discount costs the channel. Adjudication cannot close it — a reviewer re-reading its own claim
 agrees with itself.
 
-**When it runs.** A skill invokes this when **both** hold, and never otherwise:
+**When it runs.** A skill invokes this **whenever the run took its widest review path** — for
+code-review, `panelRan == true`. Computed, not judged, and deliberately **not** conditioned on
+findings existing.
 
-1. the run took its widest review path (code-review: `path == "panel"`), **and**
-2. `findings[]` contains **at least one `Blocking`**.
+> **Why not "only when there is a `Blocking` to attack".** That gate is empty in exactly the case
+> this pass exists for. The pass has two jobs — killing false claims *and* finding what the lanes
+> missed — and on the run it was written from the second produced **7 of 7** new confirmed defects.
+> Cheap lanes returning zero `Blocking` on a very large diff is not evidence the diff is clean; it is
+> the original failure reproduced, and a findings-gated refuter goes quiet precisely then. Gate it on
+> the path, which is already the expensive tier, not on the lanes having succeeded.
 
-Both are computed, not judged. A run with no `Blocking` has nothing to attack, and a narrow path has
-not produced enough claims to be worth attacking — this pass is the expensive half of a wide review,
-not a standing tax on every run.
+**With no `Blocking` to attack, it attacks the negatives instead** — and they are always present,
+because the panel is required to produce them. The claims handed over become: each lane's `VERDICT:`
+line, and every structural check a lane returned as `holds` or `not reachable here`. "This is safe"
+and "that check does not apply here" are claims like any other, and the same three verdicts apply.
+A lane returning `unsafe` / `should not ship as is` / `should be better` **with an empty findings
+array** is an internal contradiction and is always attacked first.
 
 **How it runs.** Dispatch **one** agent on the **strongest available tier** (two when `Blocking` > 4,
 splitting the claims between them). This is the one step in the pipeline that is not checklist work:
@@ -327,10 +336,20 @@ verification.
 
 **What the verdicts do.**
 
-- `REFUTED` → the finding is **dropped**. It never reaches *apply*, and it is not reported as a
-  finding. Count it in the run log, not in the report.
-- `OVERSTATED` → **re-severitise first, then adjudicate** (§3). A downgraded `Blocking` is an
-  ordinary `Warning` and takes the Warning path; `Blocking` protections (§6.6) no longer apply.
+- `REFUTED` → the finding does not reach *apply* and is not carried as a live finding — **but a
+  refuted `Blocking` is never silently dropped.** Each one prints in the report as one line:
+  `refuted: <file:line> <one-clause claim> — <the named guard, its line, or why it is unreachable>`.
+  This contract already states why (§6.6): *"Auditability alone is not prevention (a skimmed report
+  hides a suppression), so this is a rule, not just a log line."* A pass that can delete a
+  `Blocking` from the human's view on its own authority is a suppression channel, whatever the
+  quality of its reasoning. Refuted `Warning`s may stay in the log.
+- `OVERSTATED` → **re-severitise first, then adjudicate** (§3). A downgraded `Blocking` takes the
+  Warning path for *routing* — but **§6.6 stays bound to the finding's original severity**: a
+  finding that entered this pass as `Blocking` can never afterwards be suppressed by an
+  apply-direction calibration line, and never bypasses the blast-radius guard. Without that pin the
+  two mechanisms compose into a suppression path — one `OVERSTATED` verdict plus one calibration
+  line silently disposes of a finding the profile classified as silent data corruption, which is the
+  exact outcome §6.6 exists to make impossible. Carry the original severity alongside the new one.
 - `CONFIRMED` → proceeds to §3 unchanged, now carrying the refuter's chain as its evidence.
 
 **New findings surfaced during the attack are real findings.** A refuter reading whole files to kill
