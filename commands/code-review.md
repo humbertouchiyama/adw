@@ -530,8 +530,8 @@ requests*, not of a stack — it reads the PR body against its own diff and need
 
 **Run it when `panelRan == true`** — computed, never judged, and gated on the *lanes having run*
 rather than on `path`, because a `since:` delta collapses `panel` to one lane without clearing
-`path` and must not pay for a refuter. **Also run it when `path == "full"`, no `since:`, and the 4a
-lane returned at least one `Blocking`** — positive claims only (review-core §9's `full` row); this is the
+`path` and must not pay for a refuter. **Also run it when `path == "full"`, no `since:`, and at least
+one `Blocking` did not come from the 5.1 audit gate** — positive claims only (review-core §9's `full` row); this is the
 false-positive filter a `full` run has, since a false `Blocking` costs a whole fix-verify-push
 cycle. Follow **review-core §9**: dispatch **one agent on the top tier in `adw-core §8`'s tier
 table — never the driver's own tier** (two when `Blocking` > 4) with the bare claims — never the
