@@ -524,7 +524,8 @@ its run-report PR line (size is a proxy; the trap list is the risk).
 for a port unit. The implementer's brief carries `repo-profile §20` and the spec's `## Screens`
 table, and this loop: if the table has `deferred` rows, first one gate-mode run of §20's Renders
 command and then its Score command on each of those rows (joined with `;`, never the fail-closed
-`verify`, which stops at its first miss) measures each into the table, committed on its own as
+`verify`, which stops at its first miss) measures each into the table (a row whose score is missing
+from the log stays `deferred`, never a guessed number), committed on its own as
 `docs(spec): baselines` after the spec-copy commit; then render
 every screen in one fast-mode build, score them all, fix every independent cause the images show,
 repeat until each screen passes, or §20's stop rule (which names a round cap) stops the loop; then
@@ -532,9 +533,11 @@ one gate-mode round, which is the grade. The implementer returns the number of r
 all fix cycles, for the evidence block. **Every gate-mode run of a port unit** — the baseline measurement, the grade round's `verify`,
 §3.2's mutation fallback (aggregate check) and §3.4's verifier run — goes through the gate-mode wait
 below (`<the verify command>` there is whichever command that run is). A screen still over its ceiling after the grade round halts `blocked` — `port not
-converged — <screen> <mismatch> over ceiling <c>; default: re-run /adw-init to extend this intent
-with a fix-up unit for <screen>`, an owner decision, not a fix cycle (that is the first screen the
-fail-closed `verify` missed; the log tail lists the rest). The
+converged — <every screen over its ceiling, with its mismatch and ceiling>; default: re-run
+/adw-init to extend this intent with a fix-up unit for those screens`, an owner decision, not a fix
+cycle. To name every such screen, run §20's Score command on each row once more, joined with `;`
+(the fail-closed `verify` stops at its first miss); a row whose score is missing from the log is
+unmeasured, and the halt says so instead of guessing a number. The
 envelope check swaps the file bound for §20's port surface: a production path outside it, or any
 trap domain, halts `blocked` — `shape escalation — diff touched <path>; re-cut the behaviour as a D2 unit`.
 
@@ -565,7 +568,7 @@ tree() { echo "$1"; for c in $(pgrep -P "$1"); do tree "$c"; done; }; kill $(tre
 
 and return `gate-mode build exceeded <n> min`: the orchestrator classifies it an environment fault
 (§3.3), not a red. Never poll with `echo` calls: a subagent that polls spends most of its cost doing
-it. The brief of every agent that runs a gate-mode `verify` — the implementer, the §3.4 verifier
+it. The brief of every agent that runs a gate-mode build — the implementer, the §3.4 verifier
 (its brief is the orchestrator's on the v1 pass and the §3.6 driver's on v2) and `/adw-init`'s port
 author — pastes these commands and §20's Gate mode row, and needs no other file for it.
 
