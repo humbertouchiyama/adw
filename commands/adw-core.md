@@ -223,9 +223,10 @@ its one pure reskin (two screens, D2) spent over two hours in a one-edit-per-bui
 no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get this path.
 
 - **Cut.** A screen with behaviour is two units: the port unit (the render) and a D2+ unit for
-  state, actions, navigation and data. The port unit always takes `after: [<behaviour unit>]`, so
-  the two chain and never share a sub-PR: §4's same-file rule does not group them, because `after:`
-  already orders their edits. A screen with no behaviour is a port unit alone.
+  state, actions, navigation and data. The port unit always takes `after: [<behaviour unit>]`.
+  A port unit never shares a sub-PR: its envelope is the port surface, which a neighbour's diff
+  would break. Where §4's rules would group it with any unit, chain them instead, adding `after:` on
+  that unit unless one of the two already orders them. A screen with no behaviour is a port unit alone.
 - **Depth.** Always `depth: D1` + `shape: port`, never D0 (D0 has no fan-out, and the fan-out is
   where baselines are rendered). Of the four D1 criteria, only the trap-domain one
   applies as written. The root-cause one does not apply (there is no bug). The ≤4-production-file
@@ -267,6 +268,8 @@ Units MUST share a sub-PR (or PR) when any holds:
 Units MAY be independent when each is independently correct, independently mergeable, and
 independently revertible — no shared files, no ordering hazard, **no consumption of another
 unit's output** (disjoint file lists do NOT prove independence).
+
+One exception: a port unit never shares a sub-PR (§3 Port shape); it chains instead.
 
 Default when it could go either way: **group**. A separate base-targeting PR is earned,
 never chosen — each costs the owner +1 review, +1 local preview, +1 merge consent.

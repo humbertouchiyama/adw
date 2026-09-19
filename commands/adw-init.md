@@ -118,7 +118,8 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    visual parity apart from behaviour and propose `shape: port` for the render-only units
 >    (adw-core §3 Port shape) — the one exception to item 1's vertical cut;
 > 3. packaging per adw-core §4, with `after` edges — remember: a unit that reads another
->    unit's output is NOT independent, no matter how disjoint the file lists look;
+>    unit's output is NOT independent, no matter how disjoint the file lists look. A port unit
+>    never shares a sub-PR (adw-core §3);
 > 4. a `verify` COMMAND per unit (adw-core §2 rules — never a prose sentence);
 > 5. spec criteria covered by no unit — mandatory, print `none` explicitly if none;
 > 6. **three separate lists, split by you, not by the renderer** — questions, hazards, fyi.
