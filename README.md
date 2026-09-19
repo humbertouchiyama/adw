@@ -21,7 +21,7 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 | `docs/00-design.md` | The design, and a frozen archive of every contract change up to the extraction. |
 | `docs/repo-profile-EXAMPLE.md` | A filled-in `repo-profile.md` from a real repository, to copy and edit. |
 | `install/` | The loader stubs and the fetch script a consuming repo drops in. |
-| `.claude/skills/reviewing-contract-prs/` | The skill that reviews a PR to this repo: an anchor checker, three review lanes, one refuter, one report. |
+| `.claude/skills/reviewing-contract-prs/` | The skill that reviews a PR to this repo: an anchor checker, three review lanes and one refuter on the first review, then one delta lane, one report. |
 
 ## The split
 
@@ -99,7 +99,7 @@ These files are prose contracts. No linter reads them; a script only resolves th
 citations. What has actually caught defects is a fresh subagent, read-only, prompted to **refute**
 the change rather than approve it. Passes like this have found blocking defects. Run one:
 `/reviewing-contract-prs <PR number>` runs the whole procedure: an anchor check, three review
-lanes, and a refuter that attacks their findings.
+lanes, and a refuter that attacks their findings. A later review of the same PR runs one delta lane.
 
 ## Provenance
 
