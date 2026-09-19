@@ -122,7 +122,8 @@ gate file to get green · let a subagent create its own worktree.
 4. Parse every spec header (adw-core §2). Any missing required field, duplicate unit id,
    an `intent:` value that does not equal the slug, an `after` cycle, a `base:`
    present on some units but not all (or with differing values), or a `shape: port` unit
-   whose depth is not D1 or whose repo profile has no §20 → refuse the whole
+   whose depth is not D1 or whose repo profile has no §20 with a Stop rule that names a maximum
+   number of rounds → refuse the whole
    run, print what to fix, stop. No partial builds on a broken manifest.
 5. **Base resolution:** `INTENT_BASE` = the intent's `base:` header value, default
    `repo-profile §3`'s default base; `git ls-remote --heads origin <INTENT_BASE>` must return it,
@@ -241,12 +242,14 @@ gate file to get green · let a subagent create its own worktree.
 - **Chains build by DAG level, not in a line.** `after:` (adw-core §2) is a graph the init
   phase already validated acyclic — schedule against it. Units whose `after:` sets are all
   satisfied are **siblings** and build concurrently, one worktree and one unit branch each,
-  all cut from `origin/adw/<slug>`. Two exclusions, checked before a level starts:
+  all cut from `origin/adw/<slug>`. Three exclusions, checked before a level starts:
   - **Migration siblings serialize**, where the repo has migrations at all. Two units that both
     author one share whatever ordering key the migration runner reads — a shared high-water mark
     that must not be raced. Build the lower unit id
     first; the other joins the next level. `team-active-seat-model`'s u4 says this in its own
     spec — its `after: [u1]` is a *migration* dependency, nothing in it reads u1's column.
+  - **Port siblings serialize** (adw-core §3): each render loop is a run of full builds, and two
+    at once contend for the machine. Build the lower unit id first; the other joins the next level.
   - **File-overlap siblings serialize.** `after:` declares a *logical* dependency; it does
     not promise disjoint files. Plans here are dense with `path:line` references, so
     intersect them:
@@ -515,9 +518,13 @@ its run-report PR line (size is a proxy; the trap list is the risk).
 **Port units (`shape: port`, adw-core §3).** This replaces the D0/D1 depth-envelope check above
 for a port unit. The implementer's brief carries `repo-profile §20` and the spec's `## Screens`
 table, and this loop: render every screen in one fast-mode build, score them all, fix every
-independent cause the images show, repeat until each screen passes or stops by §20's stop rule;
-then one gate-mode round, which is the grade. The envelope check swaps the file bound for §20's
-port surface: a production path outside it, or any trap
+independent cause the images show, repeat until each screen passes, or §20's stop rule or its round
+cap stops the loop; then one gate-mode round, which is the grade — it also measures every
+`deferred` baseline into the table. A gate-mode build can outlast the `Bash` timeout (600000 ms):
+run it as a background command and poll for its exit. A screen still over its ceiling after that
+round halts `blocked` — `port not converged — <screen> <mismatch> over ceiling <c>`, an owner
+decision, not a fix cycle. The envelope check swaps
+the file bound for §20's port surface: a production path outside it, or any trap
 domain, halts `blocked` — `shape escalation — diff touched <path>; re-cut the behaviour as a D2 unit`.
 
 ### 3.2 Gates (cheapest first, run in the worktree by the implementer)
@@ -553,8 +560,10 @@ Three properties hold in every repo, whatever that file declares:
   than design §2.2(5)'s line-scoped wording; for grouped same-file units it conflates
   the units' changes — accepted, the check asserts only that each verify CAN fail.)
   **A port unit runs this check, and the per-file sweep, with its `verify` in `repo-profile §20`'s
-  fast mode** — each run is then about a minute, not the gate mode's 5–10, so the sweep stays
-  affordable; §3.4's verifier still runs the `verify` once in gate mode.
+  fast mode**, so the sweep stays affordable. Run the fast-mode `verify` on the unneutralised code
+  first: if it is not green there, a red after neutralising proves nothing — run the whole check in
+  gate mode instead. §3.4's verifier repeats the check the same way and still runs the unit's
+  `verify` once in gate mode, as a background command polled to its exit like the implementer's.
   A verify still green against neutralised code is vacuous — feed it to the implementer
   as a genuine red (the test, not the code, is wrong; it counts as a fix cycle). Skip
   only for verify forms with no test to mutate (tsc/grep proofs — design §5.2's
@@ -675,6 +684,9 @@ pipeline knows:
   artifact   plan 260L / diff 71L = 3.66x
   ```
 
+  A port unit's block reads `depth D1 · shape port` and its `cycles` row adds `rounds N`, so the
+  TRIAL (adw-core §3) leaves a record.
+
   `owner-wait` is the decisive one: it is the single bit that distinguishes a 21-hour
   owner gate from a 21-hour stalled pipeline. Git already exposes the *gap* via commit
   timestamps; only the attribution is missing, and three retros failed on exactly that
@@ -760,7 +772,9 @@ semantic-conflict risk.
   diff.` · D0/D1 (no critical pass runs at these
   depths): `… = the unit's contract, authored at init and
   approval-approved — review surface is the code diff; verify discrimination is carried by
-  the mutation gate.` Never claim a critical pass a depth did not run. Without the line a
+  the mutation gate.` A port unit takes that line with "the mutation gate" replaced by "the
+  render score, and the mutation check ran in fast mode". Never claim a critical pass a depth did
+  not run. Without the line a
   reviewer treats already-reviewed contract text as findings fodder (design §10 v2.5).
 
 ### 3.6 Review loop — dispatched, never run in this session

@@ -190,6 +190,11 @@ and burning it on a mis-cut is the failure this gate exists to prevent.
 | **D2** | diagnose/brainstorm → spec+critical (spec carries `## Implementation`) | bug with design surface; small feature |
 | **D3** | brainstorm → design+critical → spec+critical → plan+critical | new behaviour, cross-cutting change, anything touching money/authz/migrations |
 
+**Port shape (TRIAL, 2026-09-19).** A unit whose acceptance is pixel parity with a design reference
+is graded by a render loop, not a critical pass: D1, `shape: port`, bounded by the repo profile's
+§20 instead of the ≤4-file rule (adw-core §3 Port shape). It is the one visual check a gate loop
+can now carry. Behaviour keeps the ladder above.
+
 **Spec is produced at every depth.** The spec is the contract `/adw-build` consumes and the
 durable record of the run — the manifest role, without a manifest file (§3.4). Design and
 plan are conditional; critical passes attach to whichever stages the depth includes.

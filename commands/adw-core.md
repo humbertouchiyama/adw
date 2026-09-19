@@ -113,7 +113,7 @@ Rules:
   hits proves a deletion. Where a real test can express it, emit the test. The first token must be
   on `repo-profile §5`'s allowlist, and `repo-profile §12`'s single-test traps bind the form.
 - `after` names only units of the same intent; the graph must be acyclic.
-- **`base:` is the one OPTIONAL field** — the branch the whole intent forks from and its
+- **`base:` is optional** (so is `shape:`, below) — the branch the whole intent forks from and its
   PRs target. Omitted = `repo-profile §3`'s default base. Intent-wide: every spec of one intent
   carries the same value or none (`/adw-build` refuses a mixed set), and the branch must exist on
   origin. It substitutes for the default base throughout `/adw-build` (chain open, unit branches,
@@ -123,7 +123,8 @@ Rules:
   branch of this one. Three straight runs needed a non-default base; run-5 abandoned `/adw-build`
   for want of it — design §10 v2.8.
 - **`shape:` is optional, and `port` is its only value** (§3 Port shape). `/adw-build` refuses a
-  `shape: port` unit whose depth is not D1, or in a repo whose profile has no §20.
+  `shape: port` unit whose depth is not D1, or in a repo whose profile has no §20 with a Stop rule
+  that names a maximum number of rounds.
 - No spec, no build: `/adw-build` refuses a unit whose header is missing any of the six
   required fields.
 
@@ -222,26 +223,34 @@ its one pure reskin (two screens, D2) spent over two hours in a one-edit-per-bui
 no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get this path.
 
 - **Cut.** A screen with behaviour is two units: the port unit (the render) and a D2+ unit for
-  state, actions, navigation and data. The port unit takes `after: [<behaviour unit>]` when it
-  renders a state shape that unit defines; a screen with no behaviour is a port unit alone.
-- **Depth.** Always `depth: D1` + `shape: port`. Of the four D1 criteria, only the trap-domain one
+  state, actions, navigation and data. The port unit always takes `after: [<behaviour unit>]`, so
+  the two chain and never share a sub-PR: §4's same-file rule does not group them, because `after:`
+  already orders their edits. A screen with no behaviour is a port unit alone.
+- **Depth.** Always `depth: D1` + `shape: port`, never D0 (D0 has no fan-out, and the fan-out is
+  where baselines are rendered). Of the four D1 criteria, only the trap-domain one
   applies as written. The root-cause one does not apply (there is no bug). The ≤4-production-file
   bound is replaced by §20's **port surface**: the unit's production diff stays inside it. The
   verify-home criterion is met by §20's render-and-score command, whose red-on-revert the mutation
   check measures as for any verify. A port unit never escalates to D2 for failing the criteria this
-  bullet replaces. There is no critical pass: the check that sees a port is the render, and a refute agent
-  cannot run it. Surfaces print the word `port`, never `spec`.
+  bullet replaces. There is no critical pass: a refute pass over prose cannot see pixels, and the
+  check that does is the render. Surfaces print the word `port`, never `spec`.
 - **Spec.** The problem, a `## Screens` table — snapshot name · reference route or state · test
   class · baseline mismatch · ceiling — the fixture source and any declared divergence. The
-  baseline is **measured at init**, by rendering, never judged: specs that said "no change" were
-  wrong when the compare ran. Guard rail 150 lines.
+  baseline is **measured at init**, by rendering, never judged. A row whose state an `after:` unit
+  defines cannot render yet: its baseline is `deferred`, and the implementer's gate-mode
+  round measures it. The spec follows the D1 line budget (adw-init Phase 3).
 - **`verify`** renders every screen in the table in ONE gate-mode build, then `&&`-chains one
   fail-closed score per row (§20's template). A row the `verify` does not score is a Phase 4 failure.
-  The baseline in the table is measured in gate mode too, since that is what `verify` grades.
+  The approved `verify` is that template; the spec's author adds or drops scores to match the rows
+  it wrote, and changes nothing else. The baseline in the table is measured in gate mode too, since
+  that is what `verify` grades.
 - **Build** (adw-build §3.1, §3.2): the implementer loops in §20's fast mode, every screen per
-  build, then grades once in gate mode. The loop stops by §20's stop rule. The mutation check runs `verify` in fast mode; the §3.4
-  verifier runs it in gate mode. A diff that leaves the surface or touches a trap domain bounces
-  `blocked` (`shape escalation`), the same way a D0/D1 depth envelope does.
+  build, then grades once in gate mode. The loop stops by §20's stop rule or its round cap. The
+  mutation check, its per-file sweep and the §3.4 verifier's repeat of both run `verify` in fast
+  mode (gate mode when the fast one is not green on the unneutralised code); the verifier's own
+  `verify` run is gate mode. Port units render one at a time. A diff that leaves the surface or
+  touches a trap domain bounces `blocked` (`shape escalation`), the same way a D0/D1 depth
+  envelope does.
 
 ## 4. Packaging
 
@@ -357,7 +366,7 @@ cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · 
    uncharted territory>                    ← these print only when they exist
 
 approve → cut + build · specs only → stop after specs · detail · re-cut "<instruction>" ·
-regroup "u3→sub-PR 1" · depth "u4→spec"
+regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port"   ← `shape` only when repo-profile has a §20
 
                         ← nothing follows this block: no summary, no narration
 ```
@@ -385,7 +394,7 @@ pipeline, and the pre-v2.8 shape buried both the cut and the asks under rational
   decided with its default applied is `fyi` (hidden). `⚠` is the one zone that grew when
   `approve` started building — see the verb semantics below.
 - **The cut line prints the depth WORD** (§3), never `D<N>`. `detail` prints `why-<word>:`
-  to match.
+  to match (`why-port` for a port unit).
 - **Anything that needs an answer is a numbered `QN`, never an fyi bullet.** A line
   containing "confirm", "your call", or a question mark inside `fyi` is a contract
   violation — run-6 buried its base-branch override there as concern #1 of ten. Q ids

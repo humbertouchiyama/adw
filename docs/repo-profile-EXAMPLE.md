@@ -14,8 +14,8 @@ runs `/adw-init`, `/adw-build`, `/pr-ready` or `/code-review`; the contract file
 The format is prose and tables, not a parsed config. The reader is an agent, so precision matters
 more than syntax.
 
-**Section anchors are frozen** — the contract files cite `repo-profile §1`…`§18` by number. Do not
-renumber. Add new sections at the end.
+**Section anchors are frozen** — the contract files cite `repo-profile §1`…`§18` by number, and the
+optional §19 and §20 where a profile carries them. Do not renumber. Add new sections at the end.
 
 | § | Section | Read by |
 |---|---|---|
@@ -37,6 +37,8 @@ renumber. Add new sections at the end.
 | §16 | Project rule tables | code-review Phase 5.2, 5.3 |
 | §17 | Convention doc routing | code-review Phase 6.2 |
 | §18 | Disposable state | cleanup Phase 3, 5 |
+| §19 | Review-lane map, layer to angle (optional; absent → derived) | code-review lane table |
+| §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §3, adw-init Phase 1/3/4, adw-build Phase 0/§3.1/§3.2 |
 
 ---
 
@@ -605,8 +607,10 @@ The form above passes `-c`, so it is unaffected — keep it that way.
 
 ## §20 — Visual port loop (optional)
 
-Absent → no unit may take `shape: port` (adw-core §3). This repository has no native render loop,
-so it has no §20. A repo that ports screens from a design reference declares:
+A profile that keeps this section declares a render loop, and `/adw-init` then proposes
+`shape: port` units (adw-core §3). **Delete the whole section unless the repo has one**: absent →
+no unit may take `shape: port`. A repo that ports screens from a design reference fills every row
+below with a value, not with the description:
 
 | | |
 |---|---|
@@ -614,10 +618,11 @@ so it has no §20. A repo that ports screens from a design reference declares:
 | **Fast mode** | how to make the same command render fast (an env var), for rounds and the mutation check |
 | **Gate mode** | the same command without it: the only render a screen is graded on |
 | **Score** | the compare command, its exit codes and its threshold |
-| **References** | how the design reference is rendered, once per screen |
+| **References** | how the design reference is rendered, once per screen, into a path that a linked worktree and a fresh verify worktree (§4) also read |
 | **Port surface** | the path globs a port unit's production diff must stay inside |
-| **Stop rule** | when a round loop stops without a pass (plateau, thrash, a backstop) |
+| **Stop rule** | when a round loop stops without a pass (plateau, thrash), and **a maximum number of rounds**: required, `/adw-build` refuses a port unit without it |
 
 Plus a fail-closed `verify` template for several screens: delete the previous renders, render
-them all in one build, then `&&`-chain one score per screen, each exiting 1 on an empty score.
+them all in one build, then `&&`-chain one score per screen, each exiting 1 on an empty score. Its
+first token must be on §5's allowlist (adw-init Phase 4); wrap it in `bash -c '…'` otherwise.
 
