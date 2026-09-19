@@ -173,8 +173,8 @@ gate file to get green · let a subagent create its own worktree.
    **Not the PR's review submissions — there are none to count.** `/code-review` reports via
    `gh pr comment`, so `.reviews` is empty on every adw PR and a count of it reads `0` on a
    unit that has spent both cycles. §3.6's fetch is a different quantity in a different
-   place: an existence *floor* dated against the code head, plus a block on any `[Blocking]` still
-   open under a review's `🔧 To fix` (`/pr-ready` §5), and it runs
+   place: an existence *floor* dated against the code head, plus a grade of every `[Blocking]` a
+   review lists under `🔧 To fix` (`/pr-ready` §5), and it runs
    later in this session's per-unit loop — at resume nothing has fetched it yet.
    No block (a PR predating §3.4's block, or a run that died before 3.5) → fall back to the
    `fix(review):` commit count as the upper bound and carry a `note` saying which was used.
@@ -763,9 +763,11 @@ run `/pr-ready <N> apply` with `BASE`, `PASS=v2` and `REF` set to 3.4's values, 
 unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and return
 **Layer 2 only** (`/pr-ready` §7 — suppress Layer 1 in the brief): the `ready|blocked` machine
 line with `verified <sha7>`, the review cycle count and tier, the per-gate table and mutation
-row from the re-pass, the §5 review-evidence count, the `/pr-ready` §3 open-findings lines
-(`closed:` / `open:` / `unclear:`, or `open-findings: none` — a return with neither did not run the
-check), the §8 cleanup line, and on `blocked` the question with its default. **Plus the boundary log**, one row per boundary the driver crossed
+row from the re-pass, the §5 review-evidence count, the `/pr-ready` §5 open-findings lines
+(`closed:` / `open:`, or `open-findings: none` / `fetch failed` / `NOT RUN`), the §8 cleanup line,
+and on `blocked` the question with its default. **A return without the open-findings lines has not
+returned:** the PR is `blocked` with `default: re-run /adw-build <slug>`. The orchestrator checks
+the lines and never prints them into the run report. **Plus the boundary log**, one row per boundary the driver crossed
 (each review cycle's end, the §4 re-pass's end): `date +%s` at the crossing,
 `git rev-parse origin/<unit-branch>` after it, the gate exit-code vector, and `gh pr view
 --json state`. The orchestrator evaluates §3's conditions 5 and 6 over those rows **on return**
@@ -773,8 +775,8 @@ check), the §8 cleanup line, and on `blocked` the question with its default. **
 the evidence block's `review` / `reverify` durations from the stamps. Inside the driver the
 live bounds are `/pr-ready` §3's 2-cycle cap and `review-core.md` §7's stops; a driver that
 returns without the log has not returned, and the PR is `blocked` with
-`default: re-run /adw-build <slug>`. The driver runs `/pr-ready` §2, §3, §5, §6, §4, §7 and §8
-in the main checkout; `/code-review`, its lanes and §4's relay verifier all nest under the
+`default: re-run /adw-build <slug>`. The driver runs `/pr-ready` §2, §3, §4, §5, §6, §7 and §8
+in the main checkout; `/code-review`, its lanes, §4's relay verifier and §5's grader all nest under the
 driver's window — a subagent can invoke skills and dispatch agents (`Skill` and `Agent` calls
 from inside subagents are routine in the measured transcripts, `docs/adw/run-log.md`
 2026-09-13), and every one of those dispatches is pinned by adw-core §8 as it would be here.
@@ -856,10 +858,10 @@ consent — and adds:
   human-owned.
 - **The `blocked` default line names adw**, not `/pr-ready`:
   `default: run /code-review <N> <tier> apply, then re-run /adw-build <slug>`. **One exception:**
-  when `/pr-ready`'s reason is an open `[Blocking]` (§3 `open:` / `unclear:`, or §5's To-fix read),
-  keep its own default with `/adw-build <slug>` as the re-run — `default: fix <finding> on
-  <unit-branch>, then re-run /adw-build <slug>`, or the §7 sentence for a `held by §7` stop.
-  `/code-review … apply` would re-hit the same stop and re-post the same finding.
+  when `/pr-ready`'s reason is an open `[Blocking]` (§5's `open:` lines), keep its own default
+  (`fix <finding> on <headRefName>, then re-run /pr-ready <N>`, or its §7 sentence for a
+  blast-radius path). `/code-review … apply` would re-hit the same stop, and `/adw-build <slug>`
+  halts at Phase 0 on the still-open PR, so neither re-grades the finding.
 
 ### 3.7 Terminal states
 
@@ -972,7 +974,8 @@ whole class; the unbounded one is what gets skipped.
 So gate the consent request on the mechanism, not on intent — **print `/pr-ready` §5's
 count for the final PR on the run-report line; `0` → `blocked`, never `ready`,** with
 `default: run /code-review <N> <tier> apply on the composition, then re-run /adw-build <slug>`.
-An open `[Blocking]` from §5's To-fix read → `blocked` the same way, with §3.6's exception default.
+Run §5's open-findings grade for the final PR as well: any `open:` → `blocked` the same way, with
+`/pr-ready`'s own default (§3.6's exception). The final PR has no §3 grade of its own.
 
 **§5's count, not a fresh one.** §5 filters on `(.createdAt // .submittedAt) > "$CODE_TS"`;
 an unfiltered `gh pr view --json comments,reviews | length` is a *different, weaker* number

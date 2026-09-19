@@ -412,10 +412,12 @@ each distinct line once, whatever its date and whether or not a later comment sa
 a `✅ Done` line cannot be matched to a finding by `file:line`, because lines shift when a fix
 lands. The grader decides, not a match.
 
-Dispatch **one** `general-purpose` subagent, report-only, never inline, waited for as §4.3's
-verifier is, and pinned `model: opus`, written out (adw-core §8): clearing a `Blocking` is the
-refutation step's job, and `review-core.md` §9 puts that step on the top tier. Hand it the
-findings and `$VSHA` as a literal (§1). It reads code with `git show <sha>:<path>` and
+Dispatch **one** `general-purpose` subagent, report-only, never inline, pinned `model: opus`,
+written out (adw-core §8's row for clearing a `Blocking`: it is the refutation step's job, and
+`review-core.md` §9 puts that step on the top tier). Wait for it by `review-core.md` §10 —
+its brief ends with §10's report-file step, and the wait is the 20-minute form, not the verifier's
+long one. `NOT RUN` → `blocked`, reason `open-findings: NOT RUN`, never `open-findings: none`. Hand
+it the findings and `$VSHA` as a literal (§1). It reads code with `git show <sha>:<path>` and
 `git grep <pattern> <sha>`, never from the checkout it runs in — that checkout may be on base — and
 follows renames (`git log --follow`). Per finding it returns exactly one of:
 

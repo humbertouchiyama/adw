@@ -457,8 +457,8 @@ note     <further run-level caveats — one line each, only when present>
 `ready` and the words `review clean` may not be printed on evidence the runner asserts:
 adw-build §3.6 (→ `/pr-ready` §5) fetches the PR's comments and reviews and requires one
 dated after the last production-code commit (NOT `$VSHA` — a docs-only amendment must not
-demand a re-review the void rule exempts). None → the line is `blocked`; so is a `[Blocking]` still
-open under a review's `🔧 To fix`. One line per PR, ordered
+demand a re-review the void rule exempts). None → the line is `blocked`; so is any `[Blocking]` a
+review lists under `🔧 To fix` that `/pr-ready` §5's grader cannot close. One line per PR, ordered
 ready → blocked → failed → unbuilt. These four keywords are the
 only PR states — a PR whose `ready` was voided by a post-review amendment (adw-build
 §3.6) prints on the `blocked` row, never as a fifth state and never as `failed`.
@@ -645,6 +645,7 @@ important the unit is:
 | The agent's job | Tier |
 |---|---|
 | **Find** — refute, review, audit, scan, check against a doc, run a fixed checklist | `sonnet` |
+| **Clear a `Blocking`** — grade whether an earlier finding still holds at the head (`pr-ready.md` §5), the refutation step of `review-core.md` §9 | `opus` |
 | **Re-execute and relay** — run gates, report exit codes and output tails, verify | `sonnet` |
 | **Look up** — read a file or a history and answer a bounded question | `haiku` |
 | **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file | `sonnet` |
@@ -688,9 +689,9 @@ normalized by diff churn, never on raw token counts — that error is what this 
 exists to correct (design §10 v2.15; the Sonnet-implementer reading and its correction).
 
 **This section is the only place the tier table lives.** `adw-init.md` and `adw-build.md`
-reference it; they must not restate it. `pr-ready.md` §4 keeps its own inline pin because
-it is invocable standalone and must not depend on this file being loaded — that one
-duplication is deliberate. If the table changes, change §4 with it.
+reference it; they must not restate it. `pr-ready.md` §4 and §5 keep their own inline pins because
+it is invocable standalone and must not depend on this file being loaded — those
+duplications are deliberate. If the table changes, change §4 and §5 with it.
 
 ## 9. The contract source
 
