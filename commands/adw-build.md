@@ -422,13 +422,14 @@ largest legitimate single-phase run on record (31-file per-file mutation, ~90 mi
 projected) with ~2.7× margin. Never re-size it from per-PR totals; that is the error the
 45 made.
 
-**Be honest about what it can catch.** A subagent that returns nothing leaves the
-orchestrator blocked *inside* the `Agent` call, which takes no timeout — so no check of any
+**Be honest about what it can catch.** A subagent that never returns leaves the orchestrator
+waiting for a hand-back that never arrives, and a wait has no timeout — so no check of any
 kind runs, and this ceiling is evaluated at the *next* boundary, as a post-hoc `failed`
 classification rather than a live trigger. It genuinely bounds a phase built of many
 returning calls; it does **not** bound a true hang. A hung *gate* is already bounded — the
 `Bash` timeout maxes at 600000 ms. If a live bound on subagent hangs is ever wanted, the
-mechanism is background dispatch plus `Monitor` polling, not a number in this paragraph.
+mechanism is a `Monitor` poll from this top-level session (`review-core.md` §10 exempts it), not
+a number in this paragraph.
 **Precautionary, not evidenced** — no run has yet produced a hung subagent.
 
 Every run-report PR line still carries `· ⏱ <N>m`, and §3.4 lands it in the **PR body** where it
@@ -477,7 +478,9 @@ narrower pin rules had already been written and neither generalised.
 
 One implementer subagent per PR, working in the provisioned worktree, **pinned by the
 unit's `depth:` per adw-core §8** — `model: opus` at D3, `model: sonnet` at D0–D2. Its brief
-carries the same adw-core §8 wait line as 3.6's driver brief. A
+carries the same wait line as 3.6's driver brief ("wait for every agent you dispatch by
+`review-core.md` §10, never by polling") and the **absolute path** of `review-core.md` in the main
+checkout's `.claude/adw/cache/commands/`, since the implementer works from its worktree. A
 grouped sub-PR takes the tier of its deepest unit. D3 → follow the plan file; D2 → follow
 the spec's `## Implementation` section (adw-core §3); D0/D1 → implement from the spec.
 Units sharing a sub-PR: **one commit each, dependency order**. Keep the SAME implementer across fix cycles via SendMessage — the ORCHESTRATOR

@@ -25,7 +25,7 @@ Examples: `/pr-ready 838` · `/pr-ready 838 apply` · `/pr-ready 839 apply inter
 
 ## Who runs this — dispatch before reading further
 
-**Stop reading here and decide whether you are the driver.** Everything below §1 pulls
+**Stop reading here and decide whether you are the driver.** §1 and everything after it pull
 `review-core.md`, `repo-profile.md` and `code-review.md` into the window that runs it (~125k bytes on
 top of this file), and every later turn re-reads them. Measured on standalone `/pr-ready` sessions
 (Plantoes-app run-log, 2026-09-18): the caller read all four files before `/code-review` dispatched
@@ -45,11 +45,25 @@ combined.
   > not dispatch another. Wait for every agent you dispatch by `review-core.md` §10 (report files +
   > one blocking wait call), never by polling. The contract was fetched at `<CONTRACT_SHA>` with
   > `fetch.sh` exit `<0|2>`; on exit 2 the report must carry `⚠ contract from cache, not verified
-  > against origin (<sha>)`. Return **only** §7's Layer 1 report followed by its Layer 2 machine
-  > line, verbatim.
+  > against origin (<sha>)`. Keep the phase ledger as a printed checklist, not `TaskCreate` (a
+  > ledger inside a subagent reaches nobody). Return **only** §7's Layer 1 report, then one
+  > `Phases:` line — `Phases: all ran`, or naming every phase that did not run and every agent
+  > recorded `NOT RUN`, and why — then its Layer 2 machine line, verbatim.
 
   The caller prints the driver's report as its own final message, unchanged, and re-checks none of
   it.
+
+  **A dispatch that fails is not a silent run.** If the Agent call errors, or the driver's hand-back
+  holds no Layer 1 report, print `driver dispatch failed — <the error, or "empty hand-back">; no
+  audit ran` and stop. Running it in this window costs the ~125k above: that is the user's call, not
+  yours. (`Async agent launched` is the normal immediate result, not a failure — wait for the
+  hand-back.)
+
+  **The merge gate belongs to you, the caller.** Layer 1 ends `say "merge" to ship`, and the user
+  replies to you — you have read neither `repo-profile §3` nor `§9`. On the word "merge", read
+  `code-review.md` §7a steps 6–7 and those two `repo-profile` sections, then run them: CI check,
+  merge convention, mergeability, `gh pr merge`. Never merge from memory, and never on any other
+  word.
 
 ---
 
@@ -111,7 +125,8 @@ and does not belong in this file.
 ## Phases
 
 Create one `TaskCreate` per phase (`review-core.md` §2): `Setup` · `Tier` · `Review` ·
-`Independence` · `Evidence` · `Verdict` · `Cleanup`.
+`Independence` · `Evidence` · `Verdict` · `Cleanup`. A driver, whose ledger no human sees, prints the
+same list as a checklist and reports it through the `Phases:` line instead.
 
 ### §1 Setup
 
@@ -366,7 +381,8 @@ Then dispatch a **fresh verifier subagent** that re-runs every gate
   unpinned dispatch inherits the session's most expensive tier for a job that is exit
   codes and output tails.
 - **Wait by `review-core.md` §10.** This pass usually runs inside a driver, which must
-  not poll.
+  not poll. The verifier gets §10's long form: it re-issues the wait for up to 4 hours, not 20
+  minutes, because its gates can legitimately run ~90.
 - **A subagent, never inline.** Inline mixes the verdict into a transcript that also holds
   the author's and the reviewer's claims — the first step toward interpreting instead of
   relaying.
@@ -379,7 +395,9 @@ Any red → the PR is `blocked` with the failing gate's output and
 `default: fix <gate> on <headRefName>, then re-run /pr-ready <N>`. All green → the state is
 earned, pending §5.
 
-Remove `$VWT` (`git worktree remove --force`) as soon as its verdict is recorded.
+Remove `$VWT` (`git worktree remove --force`) as soon as its verdict is recorded. A verifier
+recorded `NOT RUN` may still be running in `$VWT`: leave it in place and put its path on the
+cleanup line.
 
 ### §5 Review evidence — fetched, never asserted
 

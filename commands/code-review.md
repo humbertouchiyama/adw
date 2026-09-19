@@ -83,7 +83,8 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   > must carry `⚠ contract from cache, not verified against origin (<sha>)`.
   > Wait for every agent you dispatch by `review-core.md` §10 (one blocking call), never by polling.
   > End the report with one `Phases:` line — `Phases: 1-8 complete`, or naming every phase that did
-  > not run and why (`Phases: 1-8 complete except 5.3 skipped — PR body empty`).
+  > not run and every agent recorded `NOT RUN`, and why (`Phases: 1-8 complete except 5.3 skipped —
+  > PR body empty`; `Phases: 1-8 complete except panel lane B NOT RUN — no report after 20 min`).
 
   The caller then **prints the driver's report as its own final message**, unchanged. It does not
   re-derive, re-check or re-summarise any of it — doing so reloads into the caller's window exactly
@@ -116,9 +117,10 @@ mergeability, `gh pr merge` — which need none of that state, and the report sa
   visible to nobody, and across this machine's subagent transcripts `TaskCreate` and `TodoWrite` are
   called **zero** times against hundreds of `Agent` and `Skill` calls. The driver's `Phases:` line is
   the only ledger that reaches the human, so it is required, not optional.
-- **A dispatch that fails is not a silent light run.** If the Agent call is unavailable or returns
-  nothing usable, run Phases 1–8 in this window and say so on the report: `driver dispatch
-  unavailable — ran inline`. Never report a review that did not happen.
+- **A dispatch that fails is not a silent light run.** `Async agent launched` is the normal
+  immediate result, not a failure: wait for the hand-back. If the Agent call errors, or the
+  hand-back holds no report, run Phases 1–8 in this window and say so on the report: `driver
+  dispatch unavailable — ran inline`. Never report a review that did not happen.
 
 ---
 
@@ -260,7 +262,9 @@ this single lane. `light` and `full` both run this lane. **Under `since:` this l
 the tier says**: a delta is small by construction, and three lanes over it is three agents reading
 the same small thing.
 
-Launch 1 Agent (`subagent_type: general-purpose`, `model: sonnet`); wait by `review-core.md` §10:
+Launch 1 Agent (`subagent_type: general-purpose`, `model: sonnet`); wait by `review-core.md` §10
+(its step 2 write line goes at the end of the brief below; under `since:` the 5.3 agent shares this
+wave, so `<N>` is 2):
 
 > Review PR #<number> on `<headRefName>` (base: `<baseRefName>`).
 > Worktree: `$WT`.
@@ -401,6 +405,9 @@ bounded` / `should not ship as is`. B — `sound` / `has a gap` / `unsafe`. C �
 - **An assigned check with no `CHECKS:` line is `unanswered`**, and each one prints in Phase 7 as
   `<check> assigned to lane <X>, no verdict returned`. An obligation that can be skipped silently is
   not an obligation.
+- **A lane recorded `NOT RUN` (review-core §10) contributes no findings and no `VERDICT:`.** It is
+  not a clean lane: name it on the `Phases:` line (`panel lane B NOT RUN — no report after 20 min`),
+  and its layers count as unread.
 - Keep every lane's `VERDICT:` line and every `not reachable here` verdict — **review-core §9 attacks
   them**. A verdict nothing reads is decoration.
 - Angle C's `SCOPE:` block becomes one `Warning` naming the unaccounted regions, or nothing.
@@ -542,7 +549,9 @@ negative**, which is a violation a lane claimed was absent and is graded by `rep
 any other finding, not filed under coverage. **A downgrade rewrites `severity` only**; §6.6 keeps
 reading `originalSeverity`. With no `Blocking`, the claims
 are the lanes' verdicts and their `holds` / `not reachable here` checks (§9). Log one line per
-verdict. Neither condition holds → skip silently.
+verdict. Neither condition holds → skip silently. **A refuter recorded `NOT RUN` (review-core §10) is
+not "skip silently"**: name it on the `Phases:` line, and the `Blocking` claims it was to attack stay
+unrefuted — reported, not applied (review-core §9).
 
 Findings array is now complete. **Read `.agent/review-calibration.md` from the main-repo working tree (review-core §6.1/§6.3 — resolve `$MAIN_REPO`, never `$WT`) before triaging** — when a finding matches a recorded class, bias the adjudication accordingly and note `per calibration: …` in the log. The hard guard binds (§6.6): an `apply`-direction calibration line never suppresses a `Blocking` finding or a blast-radius class.
 
@@ -634,7 +643,7 @@ Phase 7 always runs.
 - **~15 lines total.** Longer than a screen has failed regardless of structure.
 - **No diagnostics** — path/score, layers, phase narration, findings counts, and the rejected list stay in the triage log. Never in the report.
 - Every bucket prints its header even when empty (`— none`; *Your decision*: `— none`).
-- The `Next:` line is the final line of the report; nothing follows it. **Two** things are allowed between the last bucket and the `Next:` line, each one plain line: a calibration line recorded this run (§6.4 requires the echo) — `Calibration recorded: <line> — delete if wrong` — and, when the run was dispatched into a driver (Phase 0), the `Phases:` line that replaces the ledger — `Phases: 1-8 complete`, or naming every phase that did not run and why. Nothing else.
+- The `Next:` line is the final line of the report; nothing follows it. **Two** things are allowed between the last bucket and the `Next:` line, each one plain line: a calibration line recorded this run (§6.4 requires the echo) — `Calibration recorded: <line> — delete if wrong` — and, when the run was dispatched into a driver (Phase 0), the `Phases:` line that replaces the ledger — `Phases: 1-8 complete`, or naming every phase that did not run and every agent recorded `NOT RUN`, and why. Nothing else.
 
 ### 7a — `apply` set
 
@@ -685,7 +694,7 @@ Phase 7 always runs.
    - Merge convention: `repo-profile §3` declares it. Confirm against the base's own history rather than trusting either — `git -C "$WT" log --format='%P' origin/<baseRefName> | head -5` (the PR's actual base, never a hardcoded branch name): 1 SHA/line = squash (`--squash`); 2 SHAs = merge (`--merge`).
    - Mergeability: `gh pr view <N> --json mergeable,mergeStateStatus`.
      - `MERGEABLE` + `CLEAN` → proceed.
-     - `UNKNOWN` → GitHub is still computing mergeability. Re-query with a **non-foreground** wait (the harness Monitor/until pattern) — never a foreground `sleep` loop (blocked in some environments) — until it resolves or a bounded number of attempts pass; if still `UNKNOWN`, soft-stop and ask to re-run the merge once GitHub settles.
+     - `UNKNOWN` → GitHub is still computing mergeability. Re-query with a **non-foreground** wait (the harness Monitor/until pattern) — never a foreground `sleep` loop (blocked in some environments) — until it resolves or a bounded number of attempts pass. This step runs in the top-level session that owns the merge gate, so `Monitor` is allowed here; a subagent never runs it, and waits only by review-core §10. If still `UNKNOWN`, soft-stop and ask to re-run the merge once GitHub settles.
      - `CONFLICTING` → likely upstream squash. Rebase + `--force-with-lease`; conflict or lease rejection → safety stop.
 
 7. **Confirm + merge → escalation surface per review-core §5.** The merge confirmation is an escalation of the "ship it?" decision — and **it is the report's `Next:` line, not a second block.** Do not print a separate "Ready to merge" panel restating what the buckets already show; that duplication is the verbosity the Output contract exists to kill.

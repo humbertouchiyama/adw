@@ -12,7 +12,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 
 `.claude/commands/*.md` are prompt templates with **no auto-include**, so the mechanism is an explicit Phase-1 `Read`, not silent transclusion. Each skill quotes the one-line rule for a behavior and links here (`→ review-core §N`) for the detail.
 
-**Section anchors are frozen** — the two skills cite `review-core §1`…`§9` by number. Do not renumber. Add new sections at the end.
+**Section anchors are frozen** — the two skills cite `review-core §1`…`§10` by number. Do not renumber. Add new sections at the end.
 
 | § | Section | Owns |
 |---|---|---|
@@ -25,6 +25,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 | §7 | Blast-radius safety stops | union stop-list; when to fall back to comment-only |
 | §8 | Local ship policy | commit/push/merge consent; apply≠merge; stage-only default vs declared auto-ship |
 | §9 | Refutation pass | attack findings before acting; CONFIRMED/OVERSTATED/REFUTED; gated on the wide path alone — attacks negatives when there is no Blocking |
+| §10 | Waiting for dispatched agents | report files + one blocking wait call, for subagents; a top-level session is exempt; what `NOT RUN` means |
 
 ---
 
@@ -98,8 +99,10 @@ Removal failure → warn in terminal, don't block. **File mode: nothing to clean
 ## §2 — Phase ledger contract
 
 **Mandatory for whoever runs the phases.** A skill that dispatches its pipeline into a driver
-(code-review Phase 0) creates no ledger in the caller — it runs no phases — and the driver's own
-ledger is invisible to the human, so that skill states what carries the result out instead. At
+(code-review Phase 0, `/pr-ready`'s "Who runs this") creates no ledger in the caller — it runs no
+phases — and the driver's own ledger is invisible to the human, so that skill states what carries
+the result out instead: the driver keeps the ledger as a printed checklist and ends its report with
+a `Phases:` line. At
 Phase 1, create one `TaskCreate` per phase the skill declares. Mark each `in_progress` before starting, `completed` immediately after. The ledger is the contract that **the run is incomplete until every task is `completed`** — forgetting a phase requires forgetting to update its task, which is visible to the user. Each skill lists its own phase set.
 
 ---
@@ -409,28 +412,47 @@ attack killed 5 claims and produced 7 new confirmed defects.
 line, or the unreachability. "I could not reproduce it" is not a refutation — it is `CONFIRMED` with
 weaker evidence, and it stays.
 
+**A refuter recorded `NOT RUN` (§10) is not a skipped pass.** Nothing it would have attacked is
+`CONFIRMED`: the claims stay unrefuted, the report names `refutation NOT RUN`, and under `apply` a
+`Blocking` that needed the refuter is reported, not applied.
+
 ## §10 — Waiting for dispatched agents (subagents only)
 
+**A top-level session — an `interactive` run included — skips this section.** It may end its turn,
+and the notification wakes it. Everything below is for a dispatcher running inside a subagent.
+
 **The `Agent` tool has no foreground mode.** Every dispatch returns `Async agent launched` at once,
-and `run_in_background: false` is ignored — on Plantoes-app on 2026-09-18, every dispatch that passed
-it launched async. The result comes back as a hand-back message, and a subagent receives it only
+and `run_in_background: false` does not change that: the two dispatches that passed it on
+Plantoes-app on 2026-09-18 launched async (a stricter harness may reject the parameter instead). Do
+not pass it. The result comes back as a hand-back message, and a subagent receives it only
 when one of its own tool calls returns. It cannot end its turn to wait, because ending the turn *is*
 returning to its caller. Left alone it spins: measured review drivers spent 154–282 turns of
 `echo`/`true` on this, 65–77% of their cost (Plantoes-app `docs/adw/run-log.md`, 2026-09-18).
 
 So every dispatcher below the top level — a driver, a verifier, a lane — does this:
 
-1. Once per wave: `OUT="$(mktemp -d)"`. Substitute its value as a literal into every brief.
+1. Once per wave, one Bash call: `OUT="$(mktemp -d)"; echo "$OUT"`. Shell variables do not survive
+   between Bash calls, so copy the printed path as a literal into every brief and into the wait
+   call. (This `echo` prints a path. It is not a wait.)
 2. Every brief ends with: *"As your LAST step, write your complete final report to `<OUT>/<name>.md`
-   with the Write tool, then hand back the same text."* `<name>` is unique per agent.
+   with the Write tool, then hand back the same text."* `<name>` is unique per agent. Nothing else
+   is written into `<OUT>`.
 3. Dispatch the whole wave in one message. Then make **one** Bash call with the tool parameter
    `timeout: 600000`, where `<N>` is the number of agents in the wave:
    ```bash
    until [ "$(find "<OUT>" -name '*.md' | wc -l)" -ge <N> ]; do sleep 5; done; ls "<OUT>"
    ```
    Then Read each file. The file is the result; the hand-back carries the same text.
-4. If that call times out or is moved to the background, issue it once more. After the second
-   miss, use the files and hand-backs you have, and record every missing agent as
-   `NOT RUN — no report after 20 min`. Never wait with `echo`, `true`, a bare `sleep` or `Monitor`.
+4. Hand-backs queue while a call runs and reach you when it returns. If the wait call times out or
+   is moved to the background, an agent whose hand-back arrived has reported: use it as that agent's
+   result and stop waiting for its file. If some agent has neither a file nor a hand-back, issue the
+   call once more. After the second miss, use what you have and record each agent with neither as
+   `NOT RUN — no report after 20 min`.
+   **The verifier is the exception to the 20 minutes.** Its gates can legitimately run ~90 minutes
+   (`adw-build.md` §3 sizes its single-phase ceiling at 4 hours). A verifier wave re-issues the call
+   until its file or hand-back arrives, at most 24 calls; only then is it `NOT RUN`.
+5. **`NOT RUN` is never a clean result — the agent may still be running.** Whatever consumes the wave
+   names it: `code-review`'s `Phases:` line, `pr-ready`'s per-gate table (a missing row is red).
+   Never remove a worktree an unfinished agent may still be using.
 
-A top-level session does not need this. It may end its turn, and the notification wakes it.
+Never wait with `echo`, `true`, a bare `sleep` or `Monitor`.

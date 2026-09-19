@@ -628,9 +628,9 @@ tier is the failure this field exists to close, not a pass.
 
 **A subagent waits for its own dispatches with report files and one blocking call, never by
 polling — `review-core.md` §10 is the procedure.** The `Agent` tool has no foreground mode, so
-`run_in_background: false` is ignored, and a subagent that polls spends most of its cost doing it
-(measured in §10). The top-level session is the exception: it may end its turn, and the
-notification wakes it.
+`run_in_background: false` buys nothing, and a subagent that polls spends most of its cost doing it
+(measured in `review-core.md` §10). The top-level session is the exception: it may end its turn, and
+the notification wakes it.
 
 **Every dispatch declares `model:`. An omitted `model:` is a defect, not a default.** An
 unpinned dispatch inherits the session's tier — so the omission is invisible in the prompt and
