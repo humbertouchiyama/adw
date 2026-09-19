@@ -403,26 +403,30 @@ Collect every `[Blocking]` any `### Code review` comment lists under `🔧 To fi
 suffix, `— remediation` included. That tag appears in no other bucket:
 
 ```bash
-gh pr view <N> --json comments --jq '.comments[] | select(.body | startswith("### Code review")) | .body | split("\n")[] | select(startswith("- **[Blocking]**"))' || echo "FETCH FAILED"
+gh pr view <N> --json comments --jq '(.comments | length | "read \(.) comments"), (.comments[] | select(.body | startswith("### Code review")) | .body | split("\n")[] | select(startswith("- **[Blocking]**")))' || echo "FETCH FAILED"
 ```
 
-`FETCH FAILED` → **not** `ready`; print `blocked`, reason `open-findings: fetch failed`, with
-`default: re-run /pr-ready <N>`. No lines → print `open-findings: none` and go on. Otherwise grade
+The first output line, `read <n> comments`, proves the fetch ran. `FETCH FAILED` → **not** `ready`;
+print `blocked`, reason `open-findings: fetch failed`, with `default: re-run /pr-ready <N>`. No
+`[Blocking]` lines → print `open-findings: none — read <n> comments` and go on. Otherwise grade
 each distinct line once, whatever its date and whether or not a later comment says it was fixed:
 a `✅ Done` line cannot be matched to a finding by `file:line`, because lines shift when a fix
 lands. The grader decides, not a match.
 
-Dispatch **one** `general-purpose` subagent, report-only, never inline, pinned `model: opus`,
-written out (adw-core §8's row for clearing a `Blocking`: it is the refutation step's job, and
-`review-core.md` §9 puts that step on the top tier). Wait for it by `review-core.md` §10 —
-its brief ends with §10's report-file step, and the wait is the 20-minute form, not the verifier's
-long one. `NOT RUN` → `blocked`, reason `open-findings: NOT RUN`, never `open-findings: none`. Hand
-it the findings and `$VSHA` as a literal (§1). It reads code with `git show <sha>:<path>` and
+Dispatch `general-purpose` subagents, report-only, never inline, pinned `model: opus`, written
+out (adw-core §8's row for clearing a `Blocking`: it is the refutation step's job, and
+`review-core.md` §9 puts that step on the top tier). One agent for up to 4 findings; more than 4,
+two agents with the findings split evenly, as `review-core.md` §9 splits. Wait for them by
+`review-core.md` §10 — each brief ends with §10's report-file step, and the wait is the 20-minute
+form, not the verifier's long one. `NOT RUN` → return `REVIEW NOT COMPLETE — grader NOT RUN` as
+§10 step 5 says, then print `blocked`, reason `open-findings: NOT RUN`, with `default: re-run
+/pr-ready <N>` — never `open-findings: none`. Hand each the findings and `$VSHA` as a literal (§1). It reads code with `git show <sha>:<path>` and
 `git grep <pattern> <sha>`, never from the checkout it runs in — that checkout may be on base — and
 follows renames (`git log --follow`). Per finding it returns exactly one of:
 
-- `CLOSED` — the `file:line` of the guard that closes it at `$VSHA`, or the commit that removed or
-  moved the cited code;
+- `CLOSED` — the `file:line` of the guard that closes it at `$VSHA`, the commit that removed or
+  moved the cited code, or the line that shows the finding's claim false (a finding that was never
+  a defect closes this way);
 - `OPEN` — the concrete input that still reproduces it.
 
 A `CLOSED` with no guard, and a finding with no returned line, both count as `OPEN`: a `Blocking` is
@@ -431,10 +435,9 @@ never cleared on the agent's authority alone (`review-core.md` §9).
 Print every result, one line per finding: `closed: <finding file:line> — <guard>` ·
 `open: <finding file:line> — <input>`. Any `open:` → **not** `ready`; print `blocked`, the reason
 naming the count, with `default: fix <first finding> on <headRefName>, then re-run /pr-ready <N>`.
-When that finding's file matches `repo-profile §8`, review-core §7 held its fix back: print the
-sentence this file's §7 requires that authorizes it instead.
+A true finding the owner accepts stays `open:`; the owner merges over `blocked` (§7).
 
-Three mechanical facts this snippet depends on, each verified against `gh` and `git`
+Three mechanical facts the `CODE_TS` snippet depends on, each verified against `gh` and `git`
 rather than assumed:
 
 - A review object carries `submittedAt` and its `createdAt` is **null** — without the `//`
@@ -533,8 +536,10 @@ blocked  #839  <title>  — <one-line reason> · verified <sha7>
 incomplete. Echo a non-default `BASE` and a draft state on the same line.
 
 **Above the machine line, always — for a caller too — print §5's open-findings result:** one
-`closed:` / `open:` line per finding, or `open-findings: none` / `open-findings: fetch failed`. It is
-evidence, not Layer 1 prose. A report with none of them did not run the check.
+`closed:` / `open:` line per finding, or `open-findings: none — read <n> comments` /
+`open-findings: fetch failed` / `open-findings: NOT RUN`. It is evidence, not Layer 1 prose. A
+`ready` report with none of them did not run the check. A `blocked` decided before §5 — a red §4
+gate, an escalation, a count of `0` — prints none of them, and its reason says which.
 
 **`blocked` is one token covering two unrelated situations, and Layer 1 MUST say which.**
 The token cannot split — `/adw-build` switches on `ready|blocked` — so the disambiguation

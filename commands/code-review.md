@@ -734,6 +734,8 @@ EOF
 )"
 ```
 
+`/pr-ready` §5 collects the `- **[Blocking]**` lines of this template from every `### Code review` comment: keep that exact prefix.
+
 No findings → collapse to the OK + empty-decision buckets: `### Code review` / `**👍 OK** — no issues. Checked <the same list as above>.` / `**⏳ Your decision** — none.`
 
 **Every path** posts this one template — `light`, `full` and `panel` alike. There is no second

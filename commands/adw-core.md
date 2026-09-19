@@ -645,7 +645,7 @@ important the unit is:
 | The agent's job | Tier |
 |---|---|
 | **Find** — refute, review, audit, scan, check against a doc, run a fixed checklist | `sonnet` |
-| **Clear a `Blocking`** — grade whether an earlier finding still holds at the head (`pr-ready.md` §5), the refutation step of `review-core.md` §9 | `opus` |
+| **Clear a `Blocking`** — grade whether an earlier finding still holds at the head (`pr-ready.md` §5), the refutation step of `review-core.md` §9 | `opus` — takes precedence over the Find row |
 | **Re-execute and relay** — run gates, report exit codes and output tails, verify | `sonnet` |
 | **Look up** — read a file or a history and answer a bounded question | `haiku` |
 | **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file | `sonnet` |
