@@ -188,6 +188,8 @@ Do not proceed without an answer.
 - `re-cut "<instruction>"` → send the instruction to the SAME triage agent
   (SendMessage — context intact), re-render the approval surface.
 - `regroup` / `depth` → apply mechanically, re-render the approval surface.
+- `shape "u4→port"` / `shape "u4→none"` → set or clear a unit's `shape: port` (adw-core §3 Port
+  shape; `port` also sets `depth: D1`), re-render the approval surface. `depth` never takes `port`.
 - `new intent` (extend mode only) → drop the extension, cut a fresh slug, re-render the approval surface.
 
 Any number of rounds. Only `approve` / `specs only` exits the gate.
@@ -239,8 +241,9 @@ prior-unit table, so their specs can cite what shipped.
 
 **By depth:**
 - **Port (`shape: port`, adw-core §3):** "Render the reference and the current app for every
-  screen now, with `repo-profile §20`'s commands, and write each screen's baseline mismatch into
-  the `## Screens` table. Do not judge a baseline you did not render. Write the spec and stop: no
+  screen now, with `repo-profile §20`'s commands in GATE mode, and write each screen's baseline
+  mismatch into the `## Screens` table. Renders share one build lock: when several port units
+  author at once, they render one at a time. Do not judge a baseline you did not render. Write the spec and stop: no
   `## Implementation`, no plan." No critical pass.
 - **D0 (adw-core §3):** no fan-out — the triage agent's draft IS the spec;
   write it to the flat path, then straight to Phase 4. No plan, no critical pass.
@@ -357,7 +360,8 @@ Fix in place on any failure, except where a bullet says it only reports:
 - **every D3 unit has a plan file; D0/D1/D2 units have none** — a plan file next to a D2
   spec is a contract violation, not a bonus (adw-core §3);
 - **every `shape: port` unit is D1, the profile has a §20, and its spec carries one
-  `## Screens` table** whose rows each have a measured baseline;
+  `## Screens` table** whose rows each have a measured baseline, and whose `verify` scores every
+  row (grep each snapshot name in the `verify:` value);
 - **every D2 spec carries a `## Implementation` section** — `grep -c '^## Implementation'`
   returns 1. A D2 spec without it has no build input and goes back to its authoring agent;
 - `wc -l` every **D2/D3** spec and plan against the artifact budget table (Phase 3) — the

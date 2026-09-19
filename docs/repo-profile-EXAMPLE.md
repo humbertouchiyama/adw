@@ -616,7 +616,8 @@ so it has no §20. A repo that ports screens from a design reference declares:
 | **Score** | the compare command, its exit codes and its threshold |
 | **References** | how the design reference is rendered, once per screen |
 | **Port surface** | the path globs a port unit's production diff must stay inside |
+| **Stop rule** | when a round loop stops without a pass (plateau, thrash, a backstop) |
 
-Plus a fail-closed `verify` template: delete the previous render first, `&&`-chain every step up to
-the score capture, and exit 1 on an empty score.
+Plus a fail-closed `verify` template for several screens: delete the previous renders, render
+them all in one build, then `&&`-chain one score per screen, each exiting 1 on an empty score.
 

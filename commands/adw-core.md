@@ -224,17 +224,22 @@ no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get thi
 - **Cut.** A screen with behaviour is two units: the port unit (the render) and a D2+ unit for
   state, actions, navigation and data. The port unit takes `after: [<behaviour unit>]` when it
   renders a state shape that unit defines; a screen with no behaviour is a port unit alone.
-- **Depth.** Always `depth: D1` + `shape: port`. The D1 bound of ≤4 production files is replaced by
-  §20's **port surface**: the unit's production diff stays inside it and touches no `§11` trap
-  domain. There is no critical pass: the check that sees a port is the render, and a refute agent
+- **Depth.** Always `depth: D1` + `shape: port`. Of the four D1 criteria, only the trap-domain one
+  applies as written. The root-cause one does not apply (there is no bug). The ≤4-production-file
+  bound is replaced by §20's **port surface**: the unit's production diff stays inside it. The
+  verify-home criterion is met by §20's render-and-score command, whose red-on-revert the mutation
+  check measures as for any verify. A port unit never escalates to D2 for failing the criteria this
+  bullet replaces. There is no critical pass: the check that sees a port is the render, and a refute agent
   cannot run it. Surfaces print the word `port`, never `spec`.
 - **Spec.** The problem, a `## Screens` table — snapshot name · reference route or state · test
   class · baseline mismatch · ceiling — the fixture source and any declared divergence. The
   baseline is **measured at init**, by rendering, never judged: specs that said "no change" were
   wrong when the compare ran. Guard rail 150 lines.
-- **`verify`** scores every screen in the table in §20's gate mode, fail-closed as §20 states.
+- **`verify`** renders every screen in the table in ONE gate-mode build, then `&&`-chains one
+  fail-closed score per row (§20's template). A row the `verify` does not score is a Phase 4 failure.
+  The baseline in the table is measured in gate mode too, since that is what `verify` grades.
 - **Build** (adw-build §3.1, §3.2): the implementer loops in §20's fast mode, every screen per
-  build, then grades once in gate mode. The mutation check runs `verify` in fast mode; the §3.4
+  build, then grades once in gate mode. The loop stops by §20's stop rule. The mutation check runs `verify` in fast mode; the §3.4
   verifier runs it in gate mode. A diff that leaves the surface or touches a trap domain bounces
   `blocked` (`shape escalation`), the same way a D0/D1 depth envelope does.
 
@@ -323,7 +328,8 @@ Three rules (owner feedback, structural after prose failed twice):
 3. **Decisions read plainly** — one sentence a non-engineer can act on, recommended
    default first. Engineering detail one level down (spec or `<details>` fold).
 4. **Depth renders as its §3 word** — `express` / `spec` / `plan` / `design` — on every
-   surface and in every `note` line. `D<N>` is the contract's code and the spec header's
+   surface and in every `note` line. A `shape: port` unit renders as `port` instead of `spec`.
+   `D<N>` is the contract's code and the spec header's
    value; it is never printed to a human.
 
 ### approval — the human gate (interactive, `/adw-init`)

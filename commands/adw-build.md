@@ -120,8 +120,9 @@ gate file to get green · let a subagent create its own worktree.
    extended single-unit intent, the flat file being its first unit's spec (adw-core §1.1)
    — parse both into one manifest.
 4. Parse every spec header (adw-core §2). Any missing required field, duplicate unit id,
-   an `intent:` value that does not equal the slug, an `after` cycle, or a `base:`
-   present on some units but not all (or with differing values) → refuse the whole
+   an `intent:` value that does not equal the slug, an `after` cycle, a `base:`
+   present on some units but not all (or with differing values), or a `shape: port` unit
+   whose depth is not D1 or whose repo profile has no §20 → refuse the whole
    run, print what to fix, stop. No partial builds on a broken manifest.
 5. **Base resolution:** `INTENT_BASE` = the intent's `base:` header value, default
    `repo-profile §3`'s default base; `git ls-remote --heads origin <INTENT_BASE>` must return it,
@@ -511,11 +512,12 @@ shipped trap. Count **production** files only, as adw-core §3 does. A diff exce
 does not bounce — it carries `· ⚠ depth envelope: N source files (spec promised ≤4)` on
 its run-report PR line (size is a proxy; the trap list is the risk).
 
-**Port units (`shape: port`, adw-core §3).** The implementer's brief carries `repo-profile §20`
-and the spec's `## Screens` table, and this loop: render every screen in one fast-mode build,
-score them all, fix every independent cause the images show, repeat until each screen passes or
-stops by the repo's own stop rule; then one gate-mode round, which is the grade. The envelope
-check swaps the file bound for §20's port surface: a production path outside it, or any trap
+**Port units (`shape: port`, adw-core §3).** This replaces the D0/D1 depth-envelope check above
+for a port unit. The implementer's brief carries `repo-profile §20` and the spec's `## Screens`
+table, and this loop: render every screen in one fast-mode build, score them all, fix every
+independent cause the images show, repeat until each screen passes or stops by §20's stop rule;
+then one gate-mode round, which is the grade. The envelope check swaps the file bound for §20's
+port surface: a production path outside it, or any trap
 domain, halts `blocked` — `shape escalation — diff touched <path>; re-cut the behaviour as a D2 unit`.
 
 ### 3.2 Gates (cheapest first, run in the worktree by the implementer)
