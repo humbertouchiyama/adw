@@ -457,7 +457,8 @@ note     <further run-level caveats — one line each, only when present>
 `ready` and the words `review clean` may not be printed on evidence the runner asserts:
 adw-build §3.6 (→ `/pr-ready` §5) fetches the PR's comments and reviews and requires one
 dated after the last production-code commit (NOT `$VSHA` — a docs-only amendment must not
-demand a re-review the void rule exempts). None → the line is `blocked`. One line per PR, ordered
+demand a re-review the void rule exempts). None → the line is `blocked`; so is a `[Blocking]` still
+open under a review's `🔧 To fix`. One line per PR, ordered
 ready → blocked → failed → unbuilt. These four keywords are the
 only PR states — a PR whose `ready` was voided by a post-review amendment (adw-build
 §3.6) prints on the `blocked` row, never as a fifth state and never as `failed`.

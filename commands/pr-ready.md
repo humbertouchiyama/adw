@@ -165,26 +165,54 @@ produces large diffs.
 
 **Before cycle 1: the open-findings check.** A review cycle carries nothing from the reviews
 before it, so a `Blocking` an earlier run found and could not push — a blast-radius stop, a failed
-gate, a run that ended — is invisible to this one. Collect every `[Blocking]` listed under
-`🔧 To fix` in the PR's earlier `### Code review` comments and not later reported under `✅ Done`.
-None → go straight to cycle 1.
+gate, a run that ended — is invisible to this one. Collect **the open set**, once, from the PR's
+`### Code review` comments (any header suffix, `— remediation` included):
 
-Otherwise dispatch **one** agent, report-only, against the pushed head, with
-`run_in_background: false`. Per finding it returns exactly one of:
+```bash
+gh pr view <N> --json comments --jq '.comments[] | select(.body | startswith("### Code review")) | .createdAt as $t | .body | split("\n")[] | select(startswith("- **[Blocking]**")) | "\($t)  \(.)"'
+```
 
-- `CLOSED` — the `file:line` of the guard or change that closes it at this head;
-- `OPEN` — the concrete input that still reproduces it.
+Each output line is a `[Blocking]` under a `🔧 To fix` bucket (that tag appears in no other
+bucket), stamped with its comment's time. Drop a line only when a **later** comment's `✅ Done`
+reports the same finding fixed — same file, same subject. `file:line` alone is not a match: lines
+shift when a fix lands. **In doubt, keep it.** The check below grades every kept line at the head, so
+a wrong keep costs one finding in one dispatch and a wrong drop loses a `Blocking`.
 
-Each `OPEN` counts exactly like a non-converged finding below: §4 still runs, and the verdict is
-`blocked` listing it. Field case: Plantoes-app PR #1264 (2026-09-18) — two `Blocking` sat under an
-earlier comment's `🔧 To fix` while a fresh cycle 1 had no way to know they existed.
+Empty set → print `open-findings: none` and go straight to cycle 1.
+
+Otherwise run `git fetch origin`, resolve `git rev-parse origin/<headRefName>`, and dispatch **one**
+`general-purpose` subagent, report-only, as §4.3 dispatches its verifier — never inline, waited for
+by that bullet's rule — but pinned `model: opus`, written out (adw-core §8): clearing a `Blocking`
+is the refutation step's job, and `review-core.md` §9 puts that step on the top tier. Hand it each
+kept finding and the head SHA as a literal (§1). It reads code with `git show <sha>:<path>` and
+`git grep <pattern> <sha>`, never from the checkout it runs in, which may be on base. Per finding
+it returns exactly one of:
+
+- `CLOSED` — the `file:line` of the guard or change that closes it at this SHA;
+- `OPEN` — the concrete input that still reproduces it;
+- `UNCLEAR` — the file is gone or renamed, or the finding cannot be parsed. Counts as `OPEN`.
+
+Print every result, one line per finding: `closed: <finding file:line> — <guard file:line>` ·
+`open: <finding file:line> — <input>` · `unclear: <finding file:line> — <why>`. A `CLOSED` with no
+printed guard is a `Blocking` dropped on an agent's own authority — the suppression channel
+`review-core.md` §9 forbids.
+
+Each `OPEN` or `UNCLEAR` counts exactly like a non-converged finding below: §4 still runs, and the
+verdict is `blocked` with `default: fix <first finding> on <headRefName>, then re-run /pr-ready
+<N>`; the reason names the count. **If `$VSHA` (§4.1) differs from the SHA you handed the agent**
+— a cycle pushed — re-grade every `OPEN` and `UNCLEAR` at `$VSHA` with the same dispatch before §7,
+so a finding the cycle fixed never prints as open. Field case: Plantoes-app PR #1264 (2026-09-18) —
+two `Blocking` sat under an earlier comment's `🔧 To fix` while a fresh cycle 1 had no way to know
+they existed.
 
 **Earlier findings never enter a lane prompt.** They go to this agent and nowhere else. A lane
 told what an earlier pass found returns that finding and reads as confirmation, so its own work is
-unproven — the same rule as `repo-profile §19`'s "What does NOT go in a lane prompt" and
-review-core §9's "hand it the claim, never the argument". Cycle 1 stays blind to history; this
-check is the only place history is read. It is not the post-cycle-2 closure check below: that one
-grades what a fix changed, this one asks whether an old finding still holds.
+unproven — the same rule as `code-review.md` Phase 4's "Never put a suspicion's answer in a
+question" and review-core §9's "hand it the claim, never the argument". Cycle 1 stays blind to
+history: this check is the only agent that is handed it. (§5 and `code-review.md` Phase 1 read
+earlier comments only to count or print them, never to brief a lane.) It is not the post-cycle-2
+closure check below: that one grades what a fix changed, this one asks whether an old finding still
+holds.
 
 **Max 2 cycles that can push, and cycle 2 is scoped to the delta.** Hand it `since:<sha>` — the head SHA
 cycle 1 reviewed — so cycle 2 grades *what the fixes changed*, never the whole PR again.
@@ -405,11 +433,12 @@ store. Any live checkout of this repo works; a removed one does not.
 `default: the review never posted against this head — run /code-review <N> <tier> apply,
 then re-run /pr-ready <N>`.
 
-**Then read what that review concluded.** Take the latest `### Code review` comment dated after
-`CODE_TS` and list every `[Blocking]` under its `🔧 To fix` bucket — found and not pushed, as
-distinct from `✅ Done`. Any one → **not** `ready`; print `blocked` naming each finding, with
-`default: fix <finding> on <headRefName>, then re-run /pr-ready <N>` — or, when a blast-radius stop
-held the fix back, the sentence §7 requires that authorizes it.
+**Then read what the reviews concluded.** Re-collect §3's open set — same command, same drop rule —
+and keep the lines stamped after `CODE_TS`, minus every finding §3's check graded `CLOSED` at this
+head. That is `Blocking` found and not pushed, as distinct from `✅ Done`. Any line left → **not**
+`ready`; print `blocked`, the reason naming the count, with `default: fix <first finding> on
+<headRefName>, then re-run /pr-ready <N>`. When that finding's `🔧 To fix` line says `held by §7`,
+a blast-radius stop held the fix back: use the sentence §7 requires that authorizes it instead.
 
 The count above proves a review *exists*; it never asked what the review *said*. Field case:
 Plantoes-app PR #1264 (2026-09-18). A `since:` pass found two `Blocking` and could not push them —
@@ -426,7 +455,7 @@ rather than assumed:
   is lexicographic, so unnormalised, a UTC−3 commit reads ~3h early and passes a review
   that predates the code.
 - Keyed on **timestamp, not comment shape**, deliberately: `/code-review` has branches
-  that post no project comment at all (an `apply` run with an empty `toFix`), so a header match would block precisely the cleanest reviews.
+  that post no project comment at all (an `apply` run with an empty `toFix`), so a header match would block precisely the cleanest reviews. The read above keys on the header only to *block*: no header, nothing to read, nothing blocked — the floor stays the timestamp count.
 
 Dating on the code head rather than `$VSHA` is what keeps this consistent with §6: a
 docs-only amendment moves the head, no review post-dates it, and keyed on `$VSHA` the PR
@@ -438,7 +467,8 @@ This is a **floor, not a proof**: an unrelated human comment satisfies it. It is
 against the failure that actually happened, which was not forgery — a run skipped the
 review on three PRs, said so in its report, and shipped them as `ready` when the note drew
 no objection. Flagging a deviation is not permission to take it, and a rule the runner can
-decline and then narrate past is not a gate. **The fetch is not declinable.**
+decline and then narrate past is not a gate. **Neither fetch is declinable — not the count, not
+the read of what the reviews concluded.**
 
 ### §6 The void rule
 
@@ -512,6 +542,10 @@ blocked  #839  <title>  — <one-line reason> · verified <sha7>
 
 `blocked` carries a recommended default; a blocked verdict with no named next action is
 incomplete. Echo a non-default `BASE` and a draft state on the same line.
+
+**Above the machine line, always — for a caller too — print §3's open-findings result:** one
+`closed:` / `open:` / `unclear:` line per finding, or `open-findings: none`. It is evidence, not
+Layer 1 prose. A report with neither did not run the check, and a caller must treat it so.
 
 **`blocked` is one token covering two unrelated situations, and Layer 1 MUST say which.**
 The token cannot split — `/adw-build` switches on `ready|blocked` — so the disambiguation

@@ -79,6 +79,8 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   > and `.claude/repo-profile.md` **in full**, then run Phases 1–8 of code-review yourself. You are
   > the driver — do not dispatch another driver. Return **only** the Phase-7 terminal report,
   > verbatim, and nothing else: no preamble, no summary of your own, no recap of what you read.
+  > If Phase 1 exits at the eligibility gate, that exit note is the report — return it verbatim,
+  > open-finding lines included, then `Phases: 1 — exited at the eligibility gate`.
   > The contract was fetched at `<CONTRACT_SHA>` with `fetch.sh` exit `<0|2>`; on exit 2 the report
   > must carry `⚠ contract from cache, not verified against origin (<sha>)`.
   > Every `Agent` call you make passes `run_in_background: false` (adw-core §8).
@@ -136,7 +138,7 @@ mergeability, `gh pr merge` — which need none of that state, and the report sa
    ```bash
    gh pr view <PR_NUMBER> --json headRefName,baseRefName,title,body,number,url,state,isDraft,headRefOid
    ```
-   Eligibility gate — exit with terminal note if `state != OPEN` or `isDraft == true`. If a prior `### Code review` comment exists (`gh pr view <N> --json comments`) AND its body contains the current `headRefOid` short SHA → exit "already reviewed at this SHA", **and print every `[Blocking]` still listed under that comment's `🔧 To fix` bucket** (not under `✅ Done`), verbatim, or `no open findings` when there are none. A silent exit reads as "reviewed and clean" when the comment it defers to may say the opposite — on Plantoes-app PR #1264 (2026-09-18) a `since:` pass left two `Blocking` unpushed under a blast-radius stop, and the next run would have exited here on that SHA with neither on screen. Otherwise warn-only (re-running on a new SHA is legitimate). **A `since:` pass skips this check**: `/pr-ready` §3's closure check runs at the head cycle 2 just pushed, and cycle 2's `— remediation` comment names that SHA.
+   Eligibility gate — exit with terminal note if `state != OPEN` or `isDraft == true`. If a prior `### Code review` comment exists (`gh pr view <N> --json comments`) AND its body contains the current `headRefOid` short SHA → exit "already reviewed at this SHA", **and print every open `[Blocking]`**, verbatim, or `no open findings` when there are none. Open means the set `/pr-ready` §3 collects: a `[Blocking]` under a `🔧 To fix` bucket in **any** of the PR's `### Code review` comments, less those a later comment's `✅ Done` reports fixed. Not only the matching comment: the `— remediation` comment that carries the SHA has no To-fix bucket, so reading it alone would print `no open findings` over an earlier comment's open `Blocking`. A silent exit reads as "reviewed and clean" when the comments it defers to may say the opposite — on Plantoes-app PR #1264 (2026-09-18) a `since:` pass left two `Blocking` unpushed under a blast-radius stop, and the next run would have exited here on that SHA with neither on screen. Otherwise warn-only (re-running on a new SHA is legitimate). **A `since:` pass skips this check**: `/pr-ready` §3's closure check runs at the head cycle 2 just pushed, and cycle 2's `— remediation` comment names that SHA.
 
 4. Store `headRefName`, `baseRefName`, `title`, `body`, `url`. Set `WT=.claude/worktrees/pr-<PR_NUMBER>`.
 
@@ -697,7 +699,7 @@ Phase 7 always runs.
 - **Stops the push** (fall back to "post review comment + leave PR open", nothing committed): unfixable Blocking, failed §4 verification, undeclared skipped browser check, blast-radius path touched, `--force-with-lease` rejected.
 - **Stops only the merge** (the remediation still commits + pushes): failing remote CI, declared browser skip, an unresolved escalation.
 
-Document the stop reason in the Remediation comment **and** in the report's `Next:` line.
+Document the stop reason where the run posted, **and** in the report's `Next:` line: a push stop posts 7b, so the reason goes on its `🔧 To fix` line as `— held by §7: <reason>`; a merge-only stop posts the Remediation comment, so it goes there.
 
 ### 7b — `apply` not set
 
@@ -726,6 +728,8 @@ Generated with [Claude Code](https://claude.ai/code)
 EOF
 )"
 ```
+
+Reached from a §7 push stop under `apply`: append `— held by §7: <the stop reason>` to the `🔧 To fix` line. `/pr-ready` §5 reads that marker; without it the reason is lost between sessions.
 
 No findings → collapse to the OK + empty-decision buckets: `### Code review` / `**👍 OK** — no issues. Checked <the same list as above>.` / `**⏳ Your decision** — none.`
 
