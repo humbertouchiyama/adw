@@ -15,11 +15,9 @@ The contract for this command is **not in this repo**. Fetch it, then read it.
      origin (<sha>)` on the run report, the approval surface and the PR evidence block. Do not
      print this sha as if it were verified.
    - **exit 1** — no usable contract. **Stop and tell the user.** Do not run from memory.
-2. Read `.claude/adw/cache/commands/pr-ready.md` from the top before doing anything else, and obey
-   its "Who runs this" section before you read past it: it says whether to dispatch a driver and
-   stop, or to read the rest in full. That file is the contract; this file is only the loader and
-   binds nothing. Reading a summary of it, or acting on what you remember of it, is the one failure
-   this design cannot detect.
+2. Read `.claude/adw/cache/commands/pr-ready.md` **in full** before doing anything else. That file
+   is the contract; this file is only the loader and binds nothing. Reading a summary of it, or
+   acting on what you remember of it, is the one failure this design cannot detect.
 3. While reading it: every `repo-profile §N` resolves to `.claude/repo-profile.md` in THIS repo.
    Every `design §N` resolves to `.claude/adw/cache/docs/00-design.md`.
 

@@ -25,7 +25,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 | §7 | Blast-radius safety stops | union stop-list; when to fall back to comment-only |
 | §8 | Local ship policy | commit/push/merge consent; apply≠merge; stage-only default vs declared auto-ship |
 | §9 | Refutation pass | attack findings before acting; CONFIRMED/OVERSTATED/REFUTED; gated on the wide path alone — attacks negatives when there is no Blocking |
-| §10 | Waiting for dispatched agents | report files + one blocking wait call, for subagents; a top-level session is exempt; what `NOT RUN` means |
+| §10 | Waiting for dispatched agents | report files + one blocking wait call, for subagents; a top-level session is exempt; a `NOT RUN` agent is never "no findings" |
 
 ---
 
@@ -99,12 +99,9 @@ Removal failure → warn in terminal, don't block. **File mode: nothing to clean
 ## §2 — Phase ledger contract
 
 **Mandatory for whoever runs the phases.** A skill that dispatches its pipeline into a driver
-(code-review Phase 0, `/pr-ready`'s "Who runs this") creates no ledger in the caller — it runs no
-phases — and the driver's own ledger is invisible to the human, so that skill states what carries
-the result out instead: the driver keeps the ledger as a printed checklist and ends its report with
-a `Phases:` line. At
-Phase 1, a session that is not a driver creates one `TaskCreate` per phase the skill declares; a
-driver prints the same list as a checklist. Mark each `in_progress` before starting, `completed` immediately after. The ledger is the contract that **the run is incomplete until every task is `completed`** — forgetting a phase requires forgetting to update its task, which is visible to the user. Each skill lists its own phase set.
+(code-review Phase 0) creates no ledger in the caller — it runs no phases — and the driver's own
+ledger is invisible to the human, so that skill states what carries the result out instead. At
+Phase 1, create one `TaskCreate` per phase the skill declares. Mark each `in_progress` before starting, `completed` immediately after. The ledger is the contract that **the run is incomplete until every task is `completed`** — forgetting a phase requires forgetting to update its task, which is visible to the user. Each skill lists its own phase set.
 
 ---
 
@@ -413,10 +410,6 @@ attack killed 5 claims and produced 7 new confirmed defects.
 line, or the unreachability. "I could not reproduce it" is not a refutation — it is `CONFIRMED` with
 weaker evidence, and it stays.
 
-**A refuter recorded `NOT RUN` (§10) is not a skipped pass.** Nothing it would have attacked is
-`CONFIRMED`: the claims stay unrefuted, the report names `refutation NOT RUN`, and under `apply` a
-`Blocking` that needed the refuter is escalated (`code-review` 6.1, Your decision), not applied.
-
 ## §10 — Waiting for dispatched agents (subagents only)
 
 **A top-level session — an `interactive` run included — skips this section.** It may end its turn,
@@ -454,9 +447,9 @@ So every dispatcher below the top level — a driver, a verifier, a lane — doe
    (`adw-build.md` §3 sizes its single-phase ceiling at 4 hours). A verifier wave re-issues the call
    until its file or hand-back arrives, at most 24 calls; only then is it
    `NOT RUN — no report after 240 min`.
-5. **`NOT RUN` is never a clean result.** An agent recorded `NOT RUN`, or one whose hand-back is an
-   error and not a report, is a phase that did not run. Whatever consumes the wave names it
-   (`code-review`'s `Phases:` line and Your decision; `pr-ready`'s per-gate table, where a missing
-   row is red), and no surface prints `clean` or `ready` over it.
+5. **A `NOT RUN` agent is not an empty result.** An agent recorded `NOT RUN`, or one whose hand-back
+   is an error and not a report, never counts as "no findings". Open your report with one line,
+   `REVIEW NOT COMPLETE — <agent> NOT RUN — no report after <M> min`, and print no `clean`,
+   `no issues` or `ready` anywhere in it.
 
 Never wait with `echo`, `true`, a bare `sleep` or `Monitor`.

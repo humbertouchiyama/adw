@@ -21,61 +21,7 @@ the consuming repo's `.claude/repo-profile.md`, cited below as `repo-profile §N
 
 Examples: `/pr-ready 838` · `/pr-ready 838 apply` · `/pr-ready 839 apply interactive`.
 
-**The driver never merges.** Merge needs the explicit word, every time (`review-core.md` §8), and the
-caller runs it (see *Who runs this*).
-
-## Who runs this — dispatch before reading further
-
-**Stop reading here and decide whether you are the driver.** §1 and everything after it pull
-`review-core.md`, `repo-profile.md` and `code-review.md` into the window that runs it (~125k bytes on
-top of this file), and every later turn re-reads them. Measured on standalone `/pr-ready` sessions
-(Plantoes-app run-log, 2026-09-18): the caller read all four files before `/code-review` dispatched
-its driver, which cost $5–7 per review on the caller's tier, about as much as every review lane
-combined.
-
-- **You were dispatched as a subagent whose brief names this command** (`/adw-build` §3.6, or an
-  explicit "run `/pr-ready` as a driver") → **you are the driver.** Continue at §1 and run every
-  phase here. Do not dispatch another driver.
-- **`interactive` is set** → run inline, from §1. A subagent has no path to `AskUserQuestion`.
-- **Otherwise — a human or an orchestrator typed `/pr-ready <args>` in this session** → **dispatch
-  one driver and stop.** Do not read `review-core.md`, `repo-profile.md` or `code-review.md` first.
-  Launch a single Agent (`subagent_type: general-purpose`, `model: sonnet`) with:
-
-  > You are the driver for `/pr-ready <the full argument string, verbatim>`. Read
-  > `.claude/adw/cache/commands/pr-ready.md` in full and run §1–§8 yourself; you are the driver — do
-  > not dispatch another. Wait for every agent you dispatch by `review-core.md` §10 (report files +
-  > one blocking wait call), never by polling. The contract was fetched at `<CONTRACT_SHA>` with
-  > `fetch.sh` exit `<0|2>`; on exit 2 the report must carry `⚠ contract from cache, not verified
-  > against origin (<sha>)`. Keep the phase ledger as a printed checklist, not `TaskCreate` (a
-  > ledger inside a subagent reaches nobody). Return **only** §7's Layer 1 report, then one
-  > `Phases:` line — `Phases: all ran`, or naming every phase that did not run and every agent
-  > recorded `NOT RUN`, and why — then its Layer 2 machine line, verbatim.
-
-  The caller prints the driver's report as its own final message, unchanged, and re-checks none of
-  it.
-
-  **A dispatch that fails is not a silent run.** If the Agent call errors, or the driver's hand-back
-  holds no Layer 1 report, print `driver dispatch failed — <the error, or "empty hand-back">; no
-  verdict was returned` and stop. Under `apply` the driver may already have pushed, so add `check
-  the PR head before re-running`. Running it in this window costs the ~125k above: that is the
-  user's call, not yours. (`Async agent launched` is the normal immediate result, not a failure —
-  wait for the hand-back.)
-
-  **The merge gate belongs to you, the caller.** Layer 1 ends `say "merge" to ship`, and the user
-  replies to you. You have read neither `repo-profile §3` nor `§9`, and there is no `$WT`. Only the
-  bare word "merge" ships:
-
-  1. Run §6's comparison: `git fetch origin`, then `gh pr view <N> --json headRefOid` against the
-     `verified <sha7>` in Layer 2. Different → say `head moved since verified <sha7> — re-run
-     /pr-ready <N>` and stop.
-  2. Read `code-review.md` §7a steps 6–7 and those two `repo-profile` sections, and run them: CI
-     check, merge convention, mergeability (the main checkout stands in for `$WT`), then
-     `gh pr merge <N> --match-head-commit <the full head sha>`. On `CONFLICTING` do not rebase: say
-     `conflicts with base — rebase <headRefName>, then re-run /pr-ready <N>`.
-  3. Any other reply (`apply and merge`, `apply the fixes`, `fix <gate>`) is not a merge. Run what it
-     asks (`/pr-ready <N> apply`, or the fix), then ask again.
-
-  Never merge from memory.
+**This command never merges.** Merge needs the explicit word, every time (`review-core.md` §8).
 
 ---
 
@@ -137,8 +83,7 @@ and does not belong in this file.
 ## Phases
 
 Create one `TaskCreate` per phase (`review-core.md` §2): `Setup` · `Tier` · `Review` ·
-`Independence` · `Evidence` · `Verdict` · `Cleanup`. A driver, whose ledger no human sees, prints the
-same list as a checklist and reports it through the `Phases:` line instead.
+`Independence` · `Evidence` · `Verdict` · `Cleanup`.
 
 ### §1 Setup
 
@@ -260,11 +205,6 @@ fix for that is to review the push, not to refuse the PR. The closure check is
 
 A finding clearing the escalation bar (`review-core.md` §3.1 — both gates, neither
 resolution rule disposes) → `blocked`, with the question and a recommended default.
-
-**A review that did not run is not a review that found nothing.** If the report's `Phases:` line
-names a review phase that did not run, or an agent recorded `NOT RUN` (`review-core.md` §10), that
-cycle — the closure check included — did not review: never `converged`, never `review clean`. Run §4
-anyway, then print `blocked` with `default: re-run /pr-ready <N>`.
 
 ### §4 Independence pass
 
@@ -409,8 +349,7 @@ Then dispatch a **fresh verifier subagent** that re-runs every gate
   to kill; without the table nothing distinguishes a full pass from a quiet subset.
 
 Any red → the PR is `blocked` with the failing gate's output and
-`default: fix <gate> on <headRefName>, then re-run /pr-ready <N>`. A verifier recorded `NOT RUN` is
-not a red gate — no gate failed: `blocked` with `default: re-run /pr-ready <N>`. All green → the state is
+`default: fix <gate> on <headRefName>, then re-run /pr-ready <N>`. All green → the state is
 earned, pending §5.
 
 Remove `$VWT` (`git worktree remove --force`) as soon as its verdict is recorded.
