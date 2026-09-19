@@ -638,7 +638,7 @@ merge — that nothing checks.
 | State | Meaning | Result |
 |---|---|---|
 | **ready** | gates re-verified green in a clean checkout **after the review loop's last push** | independent/final PR: open, awaits human merge. Sub-PR: merged into the integration branch (§4.1 carve-out), chain continues |
-| **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), or the 16-boundary cap fired (condition 6 — gate-green but unconverged) | PR open, labelled, body per §6.1 S4. A blocked sub-PR halts its chain |
+| **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), or the 16-boundary cap fired (condition 6 — gate-green but unconverged) | PR open, labelled, body per §6.1 S4. A blocked sub-PR halts its chain |
 | **failed** | a §4.8 progress condition fired — **fix**-cycle caps exhausted, repeated error signature, gate regression, diff oscillation, or stall — or an environment fault (including the 4h single-phase clock) | PR open **non-draft**, labelled, body per §6.1 S4 (last red output included). A failed sub-PR halts its chain |
 
 Nothing dies silently in a worktree (30 live today, 2026-07-20). A halted chain reports
