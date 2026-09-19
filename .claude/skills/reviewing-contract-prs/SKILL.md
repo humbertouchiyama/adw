@@ -52,6 +52,19 @@ is a `Warning` when the citing line itself carries that fallback, and `Blocking`
 `OLD` lines were already broken at the merge-base. `OPT` lines are old citations of an `OPTIONAL`
 anchor. Neither is a finding. Print both under Coverage.
 
+**Cost rule.** A full review (three lanes, refuter) runs once per PR. It is about 12 agents. Every
+later review of the same PR, after the author pushed fix commits, is a **delta review**: run step 1
+(the anchor check still runs), then ONE lane and no others. Its brief is the lane text below with
+these changes: the question is "for each rule the new commits (`git diff <last reviewed
+sha>..pr/<N>`) add or change, search the repo at the PR head for stale or missing sites, and walk
+each changed step as written"; read only the changed files whole, and grep the rest. Step 3 then
+hands over that lane's `POSITIVE` claims only and skips `NEGATIVE` ones. A delta review that
+returns no claim skips step 3. Ask for a full re-review only when the user says so or the fix
+commits rewrite more than half of the PR diff.
+
+Every lane brief also carries: "Use at most 30 tool calls, then return what you have. Every turn
+re-reads your whole context, so do not read a file you do not need."
+
 **2. Three lanes, in parallel, in ONE message** (`general-purpose`, `model: sonnet`; a retry keeps
 the pin). **Never put your own suspicions in a brief.** A lane told what to find returns it, and
 that proves nothing. Each brief is this text, with the lane's question from the table pasted in:
