@@ -521,7 +521,10 @@ table, and this loop: render every screen in one fast-mode build, score them all
 independent cause the images show, repeat until each screen passes, or §20's stop rule or its round
 cap stops the loop; then one gate-mode round, which is the grade — it also measures every
 `deferred` baseline into the table. A gate-mode build can outlast the `Bash` timeout (600000 ms):
-run it as a background command and poll for its exit. A screen still over its ceiling after that
+run it as a background command that writes its exit code to a file, then wait for that file with
+`review-core.md` §10 step 3's one blocking call (its deadline in the command, the exit file in place
+of the `<OUT>` count), re-issued while the build runs. Never poll with `echo` calls: a subagent that
+polls spends most of its cost doing it. A screen still over its ceiling after that
 round halts `blocked` — `port not converged — <screen> <mismatch> over ceiling <c>`, an owner
 decision, not a fix cycle. The envelope check swaps
 the file bound for §20's port surface: a production path outside it, or any trap
@@ -563,7 +566,7 @@ Three properties hold in every repo, whatever that file declares:
   fast mode**, so the sweep stays affordable. Run the fast-mode `verify` on the unneutralised code
   first: if it is not green there, a red after neutralising proves nothing — run the whole check in
   gate mode instead. §3.4's verifier repeats the check the same way and still runs the unit's
-  `verify` once in gate mode, as a background command polled to its exit like the implementer's.
+  `verify` once in gate mode, as a background command waited on the same way as the implementer's.
   A verify still green against neutralised code is vacuous — feed it to the implementer
   as a genuine red (the test, not the code, is wrong; it counts as a fix cycle). Skip
   only for verify forms with no test to mutate (tsc/grep proofs — design §5.2's
