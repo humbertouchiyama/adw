@@ -95,8 +95,9 @@ change everywhere at once.
 
 These files are prose contracts. No linter reads them; a script only resolves their `§N`
 citations. What has actually caught defects is a fresh subagent, read-only, prompted to **refute**
-the change rather than approve it. Three such passes have each found blocking defects. Run one:
-`/reviewing-contract-prs <PR number>` does it, with the anchor check.
+the change rather than approve it. Passes like this have found blocking defects. Run one:
+`/reviewing-contract-prs <PR number>` runs the whole procedure: an anchor check, three review
+lanes, and a refuter that attacks their findings.
 
 ## Provenance
 

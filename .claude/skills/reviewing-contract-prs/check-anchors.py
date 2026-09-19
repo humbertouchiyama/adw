@@ -1,43 +1,44 @@
 #!/usr/bin/env python3
-"""Resolve every cross-file citation in the ADW contract against real headings.
+"""Resolve cross-file citations in the ADW contract against real headings.
 
-Usage: check-anchors.py <base-ref> <head-ref>   (run from inside the adw repo)
+Usage: check-anchors.py <base-ref> <head-ref>   (run from anywhere inside the adw repo)
+Tests: python3 -B test_check_anchors.py         (next to this file)
 
 Compares <head-ref> with its merge-base against <base-ref>, so an anchor the base
 branch fixed after the PR branched is not charged to the PR. Prints citations that do
 not resolve at <head-ref>, split into NEW (the citing line is not at the merge-base)
-and OLD (it is). A line the PR rewords counts as new. An anchor in OPTIONAL prints as
-OPT and is never NEW. Exit 1 if any NEW, 2 if a ref cannot be read.
-A citation is `<file> §N`, `<file> §N.M` or `<file> Phase N[.M][a]`, with or without
-`.md` and backticks. It may wrap across lines. `repo-profile §N` resolves against
-docs/repo-profile-EXAMPLE.md. Bare `§N` (self-reference) is not checked.
+and OLD (it is). A line the PR rewords counts as new. Every citing site is printed.
+Old sites of an anchor in OPTIONAL print as OPT; a new site of it is still NEW.
+Exit 1 if any NEW. Exit 2 if the check could not run: unreadable ref, no contract
+files, no merge-base, bad usage.
+
+Forms it reads: `<file> §N`, `<file> §N.M`, `<file> §N/§M`, `<file> Phase N[.M][a]`,
+with or without `.md` and backticks, wrapped across lines or blockquote prefixes.
+<file> is a commands/*.md name, `design` (docs/00-design.md) or `repo-profile`
+(docs/repo-profile-EXAMPLE.md, the profile the anchors are checked against).
+Not read: comma lists (`§3, §8`), bare numbers (`code-review 4b`), bare `§N`, and a
+citation of a file by its own name. A bold lead that opens with `§N` or `Phase N`
+counts as an anchor even when it is a sentence.
 Scans README.md and every tracked .md under commands/, install/, docs/ and .claude/skills/.
 Citations inside code fences count: an agent copies fenced text verbatim.
 """
 import re, subprocess, sys
 from collections import Counter
 
-FILES = {
-    "adw-core": "commands/adw-core.md", "adw-build": "commands/adw-build.md",
-    "adw-init": "commands/adw-init.md", "pr-ready": "commands/pr-ready.md",
-    "review-core": "commands/review-core.md", "code-review": "commands/code-review.md",
-    "cleanup": "commands/cleanup.md", "design": "docs/00-design.md",
-    "repo-profile": "docs/repo-profile-EXAMPLE.md",
-}
+DOCS = {"design": "docs/00-design.md", "repo-profile": "docs/repo-profile-EXAMPLE.md"}
 SCAN_DIRS = ("commands/", "install/", "docs/", ".claude/skills/")
 # Anchors the contract cites and documents a fallback for when a profile lacks them
-# (code-review.md: "Where a repo carries no `§19`, derive"). Printed as OPT, never NEW.
+# (code-review.md: "Where a repo carries no `§19`, derive"). Old sites print as OPT.
 OPTIONAL = {("repo-profile", "§19")}
+NUM = r"\d+(?:\.\d+)*[a-z]?"
 # A heading, or a bold paragraph lead that names its own anchor, blockquoted or not
 # (`**§4.2 — Gate-file tripwire.**`, `> **Phase 0 reads ...**`). A bold lead that
 # starts with a bare number is prose (`**61.4% of ...**`), not an anchor.
 HEAD_RE = re.compile(
     r"^(?:#{1,6}\s+(?:Phase\s+|§\s?)?|(?:>\s*)?\*\*(?:Phase\s+|§\s?))"
-    r"(\d+(?:\.\d+)*[a-z]?)(?=[\s.—:-]|$)"
+    r"(" + NUM + r")(?=[\s.—:-]|$)"
 )
-CITE_RE = re.compile(
-    r"`?\b(" + "|".join(FILES) + r")(?:\.md)?`?[\s>]+(?:(§)\s?|Phase\s+)(\d+(?:\.\d+)*[a-z]?)"
-)
+TAIL_RE = re.compile(r"/§\s?(" + NUM + ")")
 
 
 def git(*args):
@@ -49,10 +50,26 @@ def show(ref, path):
     return git("show", f"{ref}:{path}")
 
 
+def ls(ref, *paths):
+    return (git("ls-tree", "-r", "--name-only", "--full-tree", ref, *paths) or "").splitlines()
+
+
+def files(ref):
+    """{name: path} for every file a citation may name, at <ref>."""
+    out = dict(DOCS)
+    for p in ls(ref, "--", "commands/"):
+        if p.endswith(".md"):
+            out[p[len("commands/"):-3]] = p
+    return out
+
+
 def scan_paths(ref):
-    names = git("ls-tree", "-r", "--name-only", ref) or ""
-    return [n for n in names.splitlines()
-            if n.endswith(".md") and (n == "README.md" or n.startswith(SCAN_DIRS))]
+    return [n for n in ls(ref) if n.endswith(".md") and (n == "README.md" or n.startswith(SCAN_DIRS))]
+
+
+def cite_re(names):
+    alt = "|".join(sorted(map(re.escape, names), key=len, reverse=True))
+    return re.compile(r"`?\b(" + alt + r")(?:\.md)?`?[\s>]+(?:(§)\s?|Phase\s+)(" + NUM + ")")
 
 
 def anchors(text):
@@ -66,21 +83,34 @@ def anchors(text):
     return out
 
 
+def cites(text, cre):
+    """Yield (offset, file name, '§' or 'Phase', number) for every citation in text."""
+    for m in cre.finditer(text):
+        form = "§" if m.group(2) else "Phase"
+        yield m.start(), m.group(1), form, m.group(3)
+        if form == "§":
+            t = TAIL_RE.match(text, m.end())
+            while t:
+                yield m.start(), m.group(1), form, t.group(1)
+                t = TAIL_RE.match(text, t.end())
+
+
 def broken(ref):
-    """{(file, form): [(site label, (path, citing line text))]} for cites that do not resolve."""
-    heads = {k: anchors(show(ref, p) or "") for k, p in FILES.items()}
+    """{(file, form+number): [(site label, (path, citing line text))]} for cites that do not resolve."""
+    fmap = files(ref)
+    cre = cite_re(fmap)
+    heads = {k: anchors(show(ref, p) or "") for k, p in fmap.items()}
     bad = {}
     for path in scan_paths(ref):
         text = show(ref, path) or ""
         lines = text.split("\n")
-        for m in CITE_RE.finditer(text):
-            key, num = m.group(1), m.group(3)
-            form = f"§{num}" if m.group(2) else f"Phase {num}"
-            if FILES.get(key) == path:
+        for pos, key, form, num in cites(text, cre):
+            if fmap[key] == path:
                 continue  # self-citation by name: headings may be phrased differently
             if num not in heads[key]:
-                n = text.count("\n", 0, m.start()) + 1
-                bad.setdefault((key, form), []).append((f"{path}:{n}", (path, lines[n - 1].strip())))
+                n = text.count("\n", 0, pos) + 1
+                label = f"§{num}" if form == "§" else f"Phase {num}"
+                bad.setdefault((key, label), []).append((f"{path}:{n}", (path, lines[n - 1].strip())))
     return bad
 
 
@@ -112,13 +142,12 @@ def main():
                 old.setdefault(key, []).append(label)
             else:
                 new.setdefault(key, []).append(label)
-    opt = {k: new.pop(k, []) + old.pop(k, []) for k in OPTIONAL if k in head}
+    opt = {k: old.pop(k) for k in OPTIONAL if k in old}
     for label, group in (("NEW", new), ("OLD", old), ("OPT", opt)):
         for (key, num), where in sorted(group.items()):
-            print(f"{label}  {key} {num} does not resolve  <- {', '.join(where[:5])}"
-                  + (f" (+{len(where) - 5})" if len(where) > 5 else ""))
+            print(f"{label}  {key} {num} does not resolve  <- {', '.join(where)}")
     if not head:
-        print("all citations resolve")
+        print("all parsed citations resolve")
     sys.exit(1 if new else 0)
 
 
