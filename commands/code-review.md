@@ -79,6 +79,8 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   > and `.claude/repo-profile.md` **in full**, then run Phases 1–8 of code-review yourself. You are
   > the driver — do not dispatch another driver. Return **only** the Phase-7 terminal report,
   > verbatim, and nothing else: no preamble, no summary of your own, no recap of what you read.
+  > If Phase 1 exits at the eligibility gate, that exit note is the report — return it verbatim,
+  > open-finding lines included, then `Phases: 1 — exited at the eligibility gate`.
   > The contract was fetched at `<CONTRACT_SHA>` with `fetch.sh` exit `<0|2>`; on exit 2 the report
   > must carry `⚠ contract from cache, not verified against origin (<sha>)`.
   > Wait for every agent you dispatch by `review-core.md` §10 (one blocking call), never by polling;
@@ -139,7 +141,7 @@ mergeability, `gh pr merge` — which need none of that state, and the report sa
    ```bash
    gh pr view <PR_NUMBER> --json headRefName,baseRefName,title,body,number,url,state,isDraft,headRefOid
    ```
-   Eligibility gate — exit with terminal note if `state != OPEN` or `isDraft == true`. If a prior `### Code review` comment exists (`gh pr view <N> --json comments`) AND its body contains the current `headRefOid` short SHA → exit "already reviewed at this SHA"; otherwise warn-only (re-running on a new SHA is legitimate). **A `since:` pass skips this check**: `/pr-ready` §3's closure check runs at the head cycle 2 just pushed, and cycle 2's `— remediation` comment names that SHA.
+   Eligibility gate — exit with terminal note if `state != OPEN` or `isDraft == true`. If a prior `### Code review` comment exists (`gh pr view <N> --json comments`) AND its body contains the current `headRefOid` short SHA → exit "already reviewed at this SHA", **and print every `[Blocking]` that any of the PR's `### Code review` comments lists under `🔧 To fix`**, verbatim, marked `listed, not graded — /pr-ready <N> grades them`, or `none listed` when there are none. All comments, not only the matching one: a `— remediation` comment that carries the SHA may list none, and reading it alone would print `none listed` over an earlier comment's `Blocking`. A silent exit reads as "reviewed and clean" when the comments it defers to may say the opposite — on Plantoes-app PR #1264 (2026-09-18) a `since:` pass left two `Blocking` unpushed under a blast-radius stop, and the next run would have exited here on that SHA with neither on screen. Otherwise warn-only (re-running on a new SHA is legitimate). **A `since:` pass skips this check**: `/pr-ready` §3's closure check runs at the head cycle 2 just pushed, and cycle 2's `— remediation` comment names that SHA.
 
 4. Store `headRefName`, `baseRefName`, `title`, `body`, `url`. Set `WT=.claude/worktrees/pr-<PR_NUMBER>`.
 
@@ -731,6 +733,8 @@ Generated with [Claude Code](https://claude.ai/code)
 EOF
 )"
 ```
+
+`/pr-ready` §5 collects the `- **[Blocking]**` lines of this template from every `### Code review` comment: keep that exact prefix.
 
 No findings → collapse to the OK + empty-decision buckets: `### Code review` / `**👍 OK** — no issues. Checked <the same list as above>.` / `**⏳ Your decision** — none.`
 
