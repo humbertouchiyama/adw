@@ -72,7 +72,7 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   dispatches a driver is a loop.
 - **Otherwise — a human or an orchestrator typed `/code-review <args>` in this session** →
   **dispatch one driver and stop.** Launch a single Agent (`subagent_type: general-purpose`,
-  `model: sonnet`, `run_in_background: false`) with:
+  `model: sonnet`) with:
 
   > You are the review driver for `/code-review <the full argument string, verbatim>`.
   > Read `.claude/adw/cache/commands/code-review.md`, `.claude/adw/cache/commands/review-core.md`
@@ -83,7 +83,8 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   > open-finding lines included, then `Phases: 1 — exited at the eligibility gate`.
   > The contract was fetched at `<CONTRACT_SHA>` with `fetch.sh` exit `<0|2>`; on exit 2 the report
   > must carry `⚠ contract from cache, not verified against origin (<sha>)`.
-  > Every `Agent` call you make passes `run_in_background: false` (adw-core §8).
+  > Wait for every agent you dispatch by `review-core.md` §10 (one blocking call), never by polling;
+  > if §10 step 5 applies, return its `REVIEW NOT COMPLETE` text instead of the report.
   > End the report with one `Phases:` line — `Phases: 1-8 complete`, or naming every phase that did
   > not run and why (`Phases: 1-8 complete except 5.3 skipped — PR body empty`).
 
@@ -118,9 +119,11 @@ mergeability, `gh pr merge` — which need none of that state, and the report sa
   visible to nobody, and across this machine's subagent transcripts `TaskCreate` and `TodoWrite` are
   called **zero** times against hundreds of `Agent` and `Skill` calls. The driver's `Phases:` line is
   the only ledger that reaches the human, so it is required, not optional.
-- **A dispatch that fails is not a silent light run.** If the Agent call is unavailable or returns
-  nothing usable, run Phases 1–8 in this window and say so on the report: `driver dispatch
-  unavailable — ran inline`. Never report a review that did not happen.
+- **A dispatch that fails is not a silent light run.** `Async agent launched` is the normal
+  immediate result, not a failure: wait for the hand-back. A hand-back that is `REVIEW NOT COMPLETE`
+  (review-core §10 step 5) is a report: print it unchanged and never re-run over it. If the Agent
+  call errors, or the hand-back holds no report at all, run Phases 1–8 in this window and say so on
+  the report: `driver dispatch unavailable — ran inline`. Never report a review that did not happen.
 
 ---
 
@@ -262,7 +265,9 @@ this single lane. `light` and `full` both run this lane. **Under `since:` this l
 the tier says**: a delta is small by construction, and three lanes over it is three agents reading
 the same small thing.
 
-Launch 1 Agent (`subagent_type: general-purpose`, `model: sonnet`, `run_in_background: false`):
+Launch 1 Agent (`subagent_type: general-purpose`, `model: sonnet`); wait by `review-core.md` §10
+(its step 2 write line goes at the end of the brief below; under `since:` the 5.3 agent shares this
+wave, so `<N>` is 2):
 
 > Review PR #<number> on `<headRefName>` (base: `<baseRefName>`).
 > Worktree: `$WT`.
@@ -322,11 +327,11 @@ because Y" returns Y and reads as confirmation, while the lane's independent wor
 
 #### Step 3 — Dispatch
 
-**Launch 3 Agents in ONE message** (`subagent_type: general-purpose`, `model: sonnet`,
-`run_in_background: false`) so they run in parallel **and the driver blocks until all three
-return**. Background lanes inside a driver never deliver their completion notice to it: measured
-drivers spent 154–282 turns (65–77% of their cost) polling with `echo` for lanes that had already
-finished. Foreground dispatch in one message is still parallel.
+**Launch 3 Agents in ONE message** (`subagent_type: general-purpose`, `model: sonnet`) so they run
+in parallel, then wait for all three with **one** blocking call by `review-core.md` §10 — each brief
+ends with "write your final report to `<OUT>/<lane>.md`", and the wait is one Bash call with
+`timeout: 600000` and its deadline inside the command (§10 step 3, with `-ge 3`).
+Never poll: measured drivers spent 154–282 turns (65–77% of their cost) on `echo` while lanes ran.
 
 | Angle | Owns | Reads |
 |---|---|---|
@@ -456,7 +461,7 @@ gate that does not exist.
 
 ### 5.2 — Convention checks (single sub-agent)
 
-Spawn 1 Haiku agent (`run_in_background: false`). Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
+Spawn 1 Haiku agent (`subagent_type: general-purpose`, `model: haiku`; wait by `review-core.md` §10). Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
 verbatim** — the repo's rule tables. The agent runs each check against changed files only and
 returns findings `{file, line, description, severity}` where severity ∈ `Blocking|Warning`.
 
@@ -472,7 +477,7 @@ finding you grade on the spot.
 
 ### 5.3 — Structural checks (sub-agent verification, not grep)
 
-Spawn 1 Sonnet agent (`run_in_background: false`) to verify cross-file and syntactic rules that a
+Spawn 1 Sonnet agent (`subagent_type: general-purpose`, `model: sonnet`; wait by `review-core.md` §10) to verify cross-file and syntactic rules that a
 grep cannot express. **Under `since:`, dispatch it in the same message as the 4a lane** — the two
 are independent, so the driver waits once, not twice.
 
@@ -687,7 +692,7 @@ Phase 7 always runs.
    - Merge convention: `repo-profile §3` declares it. Confirm against the base's own history rather than trusting either — `git -C "$WT" log --format='%P' origin/<baseRefName> | head -5` (the PR's actual base, never a hardcoded branch name): 1 SHA/line = squash (`--squash`); 2 SHAs = merge (`--merge`).
    - Mergeability: `gh pr view <N> --json mergeable,mergeStateStatus`.
      - `MERGEABLE` + `CLEAN` → proceed.
-     - `UNKNOWN` → GitHub is still computing mergeability. Re-query with a **non-foreground** wait (the harness Monitor/until pattern) — never a foreground `sleep` loop (blocked in some environments) — until it resolves or a bounded number of attempts pass; if still `UNKNOWN`, soft-stop and ask to re-run the merge once GitHub settles.
+     - `UNKNOWN` → GitHub is still computing mergeability. Re-query with a **non-foreground** wait (the harness Monitor/until pattern) — never a foreground `sleep` loop (blocked in some environments) — until it resolves or a bounded number of attempts pass. This step is the caller's, run in the top-level session that owns the merge gate; a driver never reaches it, so `Monitor` is allowed here. If still `UNKNOWN`, soft-stop and ask to re-run the merge once GitHub settles.
      - `CONFLICTING` → likely upstream squash. Rebase + `--force-with-lease`; conflict or lease rejection → safety stop.
 
 7. **Confirm + merge → escalation surface per review-core §5.** The merge confirmation is an escalation of the "ship it?" decision — and **it is the report's `Next:` line, not a second block.** Do not print a separate "Ready to merge" panel restating what the buckets already show; that duplication is the verbosity the Output contract exists to kill.

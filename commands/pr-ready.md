@@ -212,6 +212,10 @@ fix for that is to review the push, not to refuse the PR. The closure check is
 A finding clearing the escalation bar (`review-core.md` §3.1 — both gates, neither
 resolution rule disposes) → `blocked`, with the question and a recommended default.
 
+A `/code-review` return that is `REVIEW NOT COMPLETE` (`review-core.md` §10 step 5) is not a review:
+never `converged`, never `review clean`. Run §4 anyway, then print `blocked` with
+`default: re-run /pr-ready <N>`.
+
 ### §4 Independence pass
 
 Judges anchor on confident closing language — no configuration beat AUROC 0.65 at
@@ -343,8 +347,9 @@ Then dispatch a **fresh verifier subagent** that re-runs every gate
 - **Pin it to `model: sonnet`.** The verifier re-executes and relays; it never judges. An
   unpinned dispatch inherits the session's most expensive tier for a job that is exit
   codes and output tails.
-- **`run_in_background: false`.** This pass usually runs inside a driver, where a background
-  completion never arrives (adw-core §8).
+- **Wait by `review-core.md` §10.** This pass usually runs inside a driver, which must
+  not poll. The verifier gets §10's long form: it re-issues the wait for up to 4 hours, not 20
+  minutes, because its gates can legitimately run ~90.
 - **A subagent, never inline.** Inline mixes the verdict into a transcript that also holds
   the author's and the reviewer's claims — the first step toward interpreting instead of
   relaying.
