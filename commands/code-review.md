@@ -82,7 +82,7 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   > The contract was fetched at `<CONTRACT_SHA>` with `fetch.sh` exit `<0|2>`; on exit 2 the report
   > must carry `⚠ contract from cache, not verified against origin (<sha>)`.
   > Wait for every agent you dispatch by `review-core.md` §10 (one blocking call), never by polling;
-  > if §10 step 5 applies, its `REVIEW NOT COMPLETE` line comes first in your report.
+  > if §10 step 5 applies, return its `REVIEW NOT COMPLETE` text instead of the report.
   > End the report with one `Phases:` line — `Phases: 1-8 complete`, or naming every phase that did
   > not run and why (`Phases: 1-8 complete except 5.3 skipped — PR body empty`).
 
@@ -327,7 +327,7 @@ because Y" returns Y and reads as confirmation, while the lane's independent wor
 **Launch 3 Agents in ONE message** (`subagent_type: general-purpose`, `model: sonnet`) so they run
 in parallel, then wait for all three with **one** blocking call by `review-core.md` §10 — each brief
 ends with "write your final report to `<OUT>/<lane>.md`", and the wait is one Bash call with
-`timeout: 600000`: `until [ "$(find "<OUT>" -name '*.md' | wc -l)" -ge 3 ]; do sleep 5; done`.
+`timeout: 600000` and its deadline inside the command (§10 step 3, with `-ge 3`).
 Never poll: measured drivers spent 154–282 turns (65–77% of their cost) on `echo` while lanes ran.
 
 | Angle | Owns | Reads |
@@ -458,7 +458,7 @@ gate that does not exist.
 
 ### 5.2 — Convention checks (single sub-agent)
 
-Spawn 1 Haiku agent (wait by `review-core.md` §10). Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
+Spawn 1 Haiku agent (`subagent_type: general-purpose`; wait by `review-core.md` §10). Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
 verbatim** — the repo's rule tables. The agent runs each check against changed files only and
 returns findings `{file, line, description, severity}` where severity ∈ `Blocking|Warning`.
 
@@ -474,7 +474,7 @@ finding you grade on the spot.
 
 ### 5.3 — Structural checks (sub-agent verification, not grep)
 
-Spawn 1 Sonnet agent (wait by `review-core.md` §10) to verify cross-file and syntactic rules that a
+Spawn 1 Sonnet agent (`subagent_type: general-purpose`; wait by `review-core.md` §10) to verify cross-file and syntactic rules that a
 grep cannot express. **Under `since:`, dispatch it in the same message as the 4a lane** — the two
 are independent, so the driver waits once, not twice.
 
@@ -547,6 +547,7 @@ any other finding, not filed under coverage. **A downgrade rewrites `severity` o
 reading `originalSeverity`. With no `Blocking`, the claims
 are the lanes' verdicts and their `holds` / `not reachable here` checks (§9). Log one line per
 verdict. Neither condition holds → skip silently.
+
 Findings array is now complete. **Read `.agent/review-calibration.md` from the main-repo working tree (review-core §6.1/§6.3 — resolve `$MAIN_REPO`, never `$WT`) before triaging** — when a finding matches a recorded class, bias the adjudication accordingly and note `per calibration: …` in the log. The hard guard binds (§6.6): an `apply`-direction calibration line never suppresses a `Blocking` finding or a blast-radius class.
 
 ### 6.1 — Action triage

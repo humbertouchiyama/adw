@@ -206,6 +206,10 @@ fix for that is to review the push, not to refuse the PR. The closure check is
 A finding clearing the escalation bar (`review-core.md` §3.1 — both gates, neither
 resolution rule disposes) → `blocked`, with the question and a recommended default.
 
+A `/code-review` return that is `REVIEW NOT COMPLETE` (`review-core.md` §10 step 5) is not a review:
+never `converged`, never `review clean`. Run §4 anyway, then print `blocked` with
+`default: re-run /pr-ready <N>`.
+
 ### §4 Independence pass
 
 Judges anchor on confident closing language — no configuration beat AUROC 0.65 at

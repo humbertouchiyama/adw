@@ -25,7 +25,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 | §7 | Blast-radius safety stops | union stop-list; when to fall back to comment-only |
 | §8 | Local ship policy | commit/push/merge consent; apply≠merge; stage-only default vs declared auto-ship |
 | §9 | Refutation pass | attack findings before acting; CONFIRMED/OVERSTATED/REFUTED; gated on the wide path alone — attacks negatives when there is no Blocking |
-| §10 | Waiting for dispatched agents | report files + one blocking wait call, for subagents; a top-level session is exempt; a `NOT RUN` agent is never "no findings" |
+| §10 | Waiting for dispatched agents | report files + one blocking wait call, for subagents; a top-level session is exempt; a `NOT RUN` agent stops the run |
 
 ---
 
@@ -413,7 +413,8 @@ weaker evidence, and it stays.
 ## §10 — Waiting for dispatched agents (subagents only)
 
 **A top-level session — an `interactive` run included — skips this section.** It may end its turn,
-and the notification wakes it. Everything below is for a dispatcher running inside a subagent.
+and the notification wakes it. You are a subagent if an `Agent` call dispatched you: your first
+message is a brief from a caller, not a human. Everything below is for a subagent.
 
 **The `Agent` tool has no foreground mode.** Every dispatch returns `Async agent launched` at once,
 and `run_in_background: false` does not change that: the two dispatches that passed it on
@@ -430,26 +431,30 @@ So every dispatcher below the top level — a driver, a verifier, a lane — doe
    call. (This `echo` prints a path. It is not a wait.)
 2. Every brief ends with: *"As your LAST step, write your complete final report to `<OUT>/<name>.md`
    with the Write tool, then hand back the same text."* `<name>` is unique per agent. Nothing else
-   is written into `<OUT>`.
+   is written into `<OUT>`. Dispatch with `subagent_type: general-purpose`: an `Explore` agent has no
+   `Write` tool, so it writes no file.
 3. Dispatch the whole wave in one message. Then make **one** Bash call with the tool parameter
-   `timeout: 600000`, where `<N>` is the number of agents in the wave:
+   `timeout: 600000`, where `<N>` is the number of agents in the wave. **The deadline lives in the
+   command**, so the call returns by itself and leaves nothing running (a call killed or moved to the
+   background at the tool timeout keeps polling, and a subagent's report is held until it exits):
    ```bash
-   until [ "$(find "<OUT>" -name '*.md' | wc -l)" -ge <N> ]; do sleep 5; done; ls "<OUT>"
+   end=$(( $(date +%s) + 570 )); until [ "$(find "<OUT>" -name '*.md' | wc -l)" -ge <N> ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; ls "<OUT>"
    ```
    Then Read each file. The file is the result; the hand-back carries the same text.
-4. Hand-backs queue while a call runs and reach you when it returns. If the wait call times out or
-   is moved to the background, an agent whose hand-back arrived has reported: use it as that agent's
-   result and stop waiting for its file. If some agent has neither a file nor a hand-back, issue the
-   call once more, with `<N>` cut to the files already present plus the agents that still have
-   neither. After the second miss, use what you have and record each agent with neither as
+4. Hand-backs queue while a call runs and reach you when it returns. If the call returns with fewer
+   than `<N>` files, an agent whose hand-back arrived has reported: use it as that agent's result and
+   stop waiting for its file. If some agent has neither a file nor a hand-back, issue the call once
+   more, with `<N>` cut to the files already present plus the agents that still have neither. After
+   the second miss, use what you have and record each agent with neither as
    `NOT RUN — no report after 20 min`.
    **The verifier is the exception to the 20 minutes.** Its gates can legitimately run ~90 minutes
    (`adw-build.md` §3 sizes its single-phase ceiling at 4 hours). A verifier wave re-issues the call
    until its file or hand-back arrives, at most 24 calls; only then is it
-   `NOT RUN — no report after 240 min`.
-5. **A `NOT RUN` agent is not an empty result.** An agent recorded `NOT RUN`, or one whose hand-back
-   is an error and not a report, never counts as "no findings". Open your report with one line,
-   `REVIEW NOT COMPLETE — <agent> NOT RUN — no report after <M> min`, and print no `clean`,
-   `no issues` or `ready` anywhere in it.
+   `NOT RUN — no report after 4 h`.
+5. **A `NOT RUN` agent stops the run.** An agent recorded `NOT RUN`, or one whose hand-back is an
+   error and not a report, never counts as "no findings". Do not triage, apply, push, post a comment
+   or print a merge invite. Return only `REVIEW NOT COMPLETE — <agent> NOT RUN — no report after
+   <time>`, then the reports the other agents did return. Print no `clean`, `no issues` or `ready`
+   anywhere in it.
 
 Never wait with `echo`, `true`, a bare `sleep` or `Monitor`.
