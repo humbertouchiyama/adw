@@ -52,18 +52,23 @@ is a `Warning` when the citing line itself carries that fallback, and `Blocking`
 `OLD` lines were already broken at the merge-base. `OPT` lines are old citations of an `OPTIONAL`
 anchor. Neither is a finding. Print both under Coverage.
 
-**Cost rule.** A full review (three lanes, refuter) runs once per PR. It is about 12 agents. Every
-later review of the same PR, after the author pushed fix commits, is a **delta review**: run step 1
-(the anchor check still runs), then ONE lane and no others. Its brief is the lane text below with
-these changes: the question is "for each rule the new commits (`git diff <last reviewed
-sha>..pr/<N>`) add or change, search the repo at the PR head for stale or missing sites, and walk
-each changed step as written"; read only the changed files whole, and grep the rest. Step 3 then
-hands over that lane's `POSITIVE` claims only and skips `NEGATIVE` ones. A delta review that
-returns no claim skips step 3. Ask for a full re-review only when the user says so or the fix
-commits rewrite more than half of the PR diff.
+**Cost rule.** A full review (three lanes, refuter) runs once per PR: 4 to 6 agents. Every later
+review of the same PR is a **delta review**, and it needs a base. The base is the `reviewed <sha>`
+in the header of the newest report on the PR (`gh pr view <N> --comments`) or a sha the user
+names. With neither, run the full review. Run a full review again only when the user says so, or
+when the fix commits are more than half of the PR (`git diff --shortstat <sha>..pr/<N>` against
+`git diff --shortstat origin/<base>...pr/<N>`, insertions plus deletions).
 
-Every lane brief also carries: "Use at most 30 tool calls, then return what you have. Every turn
-re-reads your whole context, so do not read a file you do not need."
+A delta review runs step 1 whole (the anchor check and the open-PR loop still run), then ONE lane
+and no others: `general-purpose`, `model: sonnet`, brief from step 2, lane label `delta`. Its
+question is: "(1) For each Blocking in the last report, is it fixed at the PR head? One line each:
+`fixed` or `open`, with `file:line`. (2) For each rule the new commits (`git diff <sha>..pr/<N>`)
+add or change, search the repo at the PR head for stale or missing sites, and walk each changed
+step as written. (3) For every other open PR `<M>`: `git merge-tree --write-tree pr/<N> pr/<M>`,
+report a conflict. Before your `VERDICT:` line write `PRS CHECKED: <the #M whose merge-tree ran>`."
+Read only the changed files whole, and grep the rest. Step 3 hands over that lane's `POSITIVE`
+claims and every `open` line as a `POSITIVE`, and skips `NEGATIVE` ones. A delta review with no
+claim and no `open` line skips step 3.
 
 **2. Three lanes, in parallel, in ONE message** (`general-purpose`, `model: sonnet`; a retry keeps
 the pin). **Never put your own suspicions in a brief.** A lane told what to find returns it, and
@@ -74,7 +79,9 @@ that proves nothing. Each brief is this text, with the lane's question from the 
 > extracted, whole, at `<pr dir>`: read whole files there, not hunks. The checked-out tree is not
 > the PR head. Other open PR heads are refs `pr/<M>` (fetched). Also available: `git diff
 > origin/<base>...pr/<N>`, `gh pr view`. Do not edit, push or comment. Never dispatch an agent,
-> start a wait loop, or load the `reviewing-contract-prs` skill.
+> start a wait loop, or load the `reviewing-contract-prs` skill. Use at most 30 tool calls (50 on
+> a retry), then return what you have. Every turn re-reads your whole context, so do not read a
+> file you do not need.
 >
 > Your question (<lane letter and name>): <the lane's question>
 >
@@ -89,7 +96,7 @@ that proves nothing. Each brief is this text, with the lane's question from the 
 | **B — literal execution** | You are a `sonnet` driver. Walk every changed procedure step by step, as written, by reading it. To test whether a command works, run it read-only, or in a scratch repo under `$TMPDIR`. Where do you stall, spin, wait forever, time out, read a field no template ever writes, branch on a fact you cannot know in a fresh session, or silently skip work while the report still claims it ran? Name any dispatch with no pinned `model:`. For each hit give `file:line` and the concrete run that breaks. |
 | **C — claims and context** | (1) Match the PR body to the diff, per commit (`git log --stat origin/<base>..pr/<N>`): work in the diff the body never names, and body claims the diff does not make. (2) Mark every number and every "X does not work" or "X is ignored" claim as re-derived (show how) or unverified. (3) List repo-specific values a run would consume, added to `commands/`: repo names, paths, branch names, stack nouns. They belong in `repo-profile`. A PR number or repo name cited as the evidence for a rule is provenance, not a value (`README.md`, "The split"): leave it out. (4) For every other open PR `<M>`: `git merge-tree --write-tree pr/<N> pr/<M>` (two branches only; exit 1 is a conflict, report it), then read both diffs. Does one reintroduce what the other removes, or depend on text the other changes? (5) Is `docs/00-design.md` now wrong? Before your `VERDICT:` line, write two lines: `PRS CHECKED: <the #M whose merge-tree ran>` and `UNVERIFIED: <the body claims you marked unverified, or none>`. |
 
-A lane that errors, returns no `VERDICT:` line (for lane C, also no `PRS CHECKED:` line), or
+A lane that errors, returns no `VERDICT:` line (for lane C and a delta lane, also no `PRS CHECKED:` line), or
 returns `does not hold` with no claim line is dispatched once more. If it fails again, Coverage
 says `failed` for it.
 
@@ -101,7 +108,7 @@ file:line | assurance`: each lane `VERDICT: holds`, every "no X remains" or "eve
 statement a lane made, and lane A's `consistent` rows, one claim per rule with its sites listed.
 
 Dispatch one agent per 40 claims, all in one message: `model: opus` (the top tier in `adw-core
-§8`), read-only. Use the quoted prompt block in `commands/review-core.md` §9, not its dispatch
+§8`), read-only, at most 40 tool calls. Use the quoted prompt block in `commands/review-core.md` §9, not its dispatch
 rules, with three changes. The claim is about what an agent executing the text does, not about
 product code. The sentence "Your cwd is the review worktree at the PR head" becomes: "Read-only:
 do not edit, push or comment. The PR head is extracted at `<pr dir>`: read whole files there."
@@ -126,7 +133,7 @@ so the table above is the whole rule.
 **4. Report.** Print this, and nothing else:
 
 ```
-PR #<N> — <merge | fix first | do not merge | incomplete>   (<one clause: why>)
+PR #<N> — <merge | fix first | do not merge | incomplete>   (<one clause: why>) · reviewed <short sha of pr/<N>> · <full | delta>
 
 Blocking
 - file:line — defect — the run that breaks — fix
@@ -135,16 +142,16 @@ Warning
 Refuted (<n>)
 - file:line — claim — the line that breaks it
 Coverage
-- anchors: <n> NEW, <n> OLD, <n> OPT (output lines of check-anchors.py), or `failed` · lanes: A <ran|failed> B <ran|failed> C <ran|failed> · refuter <ran|failed> · open PRs checked: <lane C's PRS CHECKED line, or `none: C failed`>
+- anchors: <n> NEW, <n> OLD, <n> OPT (output lines of check-anchors.py), or `failed` · lanes: A <ran|failed> B <ran|failed> C <ran|failed> (a delta prints `delta <ran|failed>`, and B, C `skipped (delta)`) · refuter <ran|failed> · open PRs checked: <lane C's or the delta lane's PRS CHECKED line, or `none: failed`>
 - OLD and OPT lines: <the lines from check-anchors.py, verbatim, or none>
-- unverified claims in the PR body: <lane C's UNVERIFIED line, or `none: C failed`>
+- unverified claims in the PR body: <lane C's UNVERIFIED line, or `none: C failed`; `not checked (delta)` on a delta>
 ```
 
 `merge` means no `Blocking` survived and nothing `failed`. `fix first` means at least one
 `Blocking` survived and an edit to this PR fixes it. `do not merge` means a `Blocking` survived
 that no edit to this PR fixes: it needs another PR to land first, or the approach is wrong.
 `incomplete` means the anchor check, a lane or the refuter `failed` and no `Blocking` survived:
-re-run before merging. A `failed` component never allows `merge`. A PR with zero surviving
+re-run before merging. A `failed` component never allows `merge`; `skipped (delta)` is not `failed`. On a delta, an `open` earlier Blocking is a surviving `Blocking`. A PR with zero surviving
 findings still prints Coverage. **Do not post to the PR, push or edit the branch** unless the user
 asks. When they ask to post, post this report as one `gh pr comment`.
 
@@ -154,7 +161,7 @@ asks. When they ask to post, post this report as one `gh pr comment`.
 |---|---|
 | Report one site of a defect | Lane A sweeps the class. One stale site of a rule means every site that states or quotes the rule must be checked. |
 | Call a cited anchor "unverifiable" | Run `check-anchors.py`. It resolves the citation forms listed in its docstring; a form it does not read is not checked. |
-| Review the PR alone | Open PRs land in either order. Lane C checks every pair. |
+| Review the PR alone | Open PRs land in either order. Lane C, or a delta's question (3), checks every pair. |
 | Trust the PR body's numbers | Unverified numbers go under Coverage, by name. |
 | Print lane findings unrefuted | Every lane finding goes through step 3. A reviewer re-reading its own claim agrees with itself. |
 | Put a hypothesis in a lane brief | The lane returns it and it reads as confirmation. Keep briefs to the question. |
