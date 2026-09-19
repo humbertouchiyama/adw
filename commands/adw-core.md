@@ -123,10 +123,12 @@ Rules:
   branch of this one. Three straight runs needed a non-default base; run-5 abandoned `/adw-build`
   for want of it — design §10 v2.8.
 - **`shape:` is optional, and `port` is its only value** (§3 Port shape). `/adw-build` refuses a
-  `shape: port` unit whose depth is not D1, whose `packaging:` value another unit also carries (a
-  port unit never shares a sub-PR), or in a repo whose profile has no **complete §20**: every row
-  holds a value, not the EXAMPLE's description — a command in backticks (Renders, Score), path
-  globs (Port surface), a number of minutes (Gate mode), a number of rounds (Stop rule).
+  `shape: port` unit whose depth is not D1, that shares a PR or sub-PR with another unit (its
+  `packaging:` value ends `/ PR N` or `/ sub-PR N` and another unit carries the same value), or in a
+  repo whose profile has no **complete §20**: every row holds a value, not the EXAMPLE's description —
+  a command in backticks (Renders, Score), a command or env var (Fast mode), a number of minutes
+  (Gate mode), a path or command (References), path globs (Port surface), a number of rounds (Stop
+  rule).
 - No spec, no build: `/adw-build` refuses a unit whose header is missing any of the six
   required fields.
 
@@ -237,17 +239,18 @@ no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get thi
   check measures as for any verify. A port unit never escalates to D2 for failing the criteria this
   bullet replaces. There is no critical pass: a refute pass over prose cannot see pixels, and the
   check that does is the render. Surfaces print the word `port`, never `spec`.
-- **Spec.** The problem, a `## Screens` table — snapshot name · reference route or state · test
-  class · baseline mismatch · ceiling — the fixture source and any declared divergence. The
-  baseline is **measured at init**, by rendering, never judged. A row whose state an `after:` unit
-  defines cannot render yet: its baseline is `deferred — <the state that unit defines>`, and the
-  implementer measures it in one gate-mode render before its first edit. The spec stays within 200
-  lines (adw-init Phase 3's D0/D1 row).
+- **Spec.** The problem, a `## Screens` table — snapshot name (only `[A-Za-z0-9_-]`) · reference
+  route or state · test class · baseline mismatch · ceiling — the fixture source and any declared
+  divergence. The baseline is **measured at init**, by rendering, never judged. A row whose state an
+  `after:` unit defines cannot render yet: its baseline is `deferred — <the state that unit
+  defines>`, its ceiling is §20's Score threshold (never a guess), and the implementer measures the
+  baseline in one gate-mode render before its first edit. The spec follows adw-init Phase 3's D0/D1
+  budget (guard rail 200, hard stop 400).
 - **`verify`** renders every screen in the table in ONE gate-mode build, then `&&`-chains one
   fail-closed score per row (§20's template). A row the `verify` does not score is a Phase 4 failure.
-  The approved `verify` is that template; the spec's author adds or drops each row's entries in it
-  (its score, its delete-list entry, its test-class filter) to match the rows it wrote, and changes
-  nothing else. The baseline in the table is measured in gate mode too, since
+  The approved `verify` is that template as triage instantiated it; the spec's author repeats every
+  per-row part of it for each row it wrote (one score per row included), drops those of a row it
+  did not write, and changes nothing else. The baseline in the table is measured in gate mode too, since
   that is what `verify` grades.
 - **Build** (adw-build §3.1, §3.2): the implementer loops in §20's fast mode, every screen per
   build, then grades once in gate mode, which §20's Gate mode row bounds in minutes. The loop stops

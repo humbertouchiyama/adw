@@ -614,15 +614,16 @@ below with a value, not with the description (adw-core §2 calls that a complete
 
 | | |
 |---|---|
-| **Renders** | one command that renders several screens in one build; its output is disposable state (§18) |
+| **Renders** | one command that renders several screens in one build; add its output path to §18 (disposable state) |
 | **Fast mode** | how to make the same command render fast (an env var), for rounds and the mutation check |
 | **Gate mode** | the same command without it: the only render a screen is graded on; and the most minutes it may take (`/adw-build` waits that long, then kills it) |
 | **Score** | the compare command, its exit codes and its threshold |
 | **References** | how the design reference is rendered, once per screen, into a path that a linked worktree and a fresh verify worktree (§4) also read |
 | **Port surface** | the path globs a port unit's production diff must stay inside |
-| **Stop rule** | when a round loop stops without a pass (plateau, thrash), and **a maximum number of rounds**: required, `/adw-build` refuses a port unit without it |
+| **Stop rule** | when a round loop stops without a pass (plateau, thrash), and **a maximum number of rounds**: required, an incomplete §20 refuses every port unit (adw-core §2) |
 
 Plus a fail-closed `verify` template for several screens: delete the previous renders, render
-them all in one build, then `&&`-chain one score per screen, each exiting 1 on an empty score. Its
-first token must be on §5's allowlist (adw-init Phase 4); wrap it in `bash -c '…'` otherwise.
+them all in one build, then `&&`-chain one score per screen, each exiting 1 on an empty score. Every part
+that names a screen (its score, and any per-screen delete or filter) is a per-row part that
+`/adw-init` repeats for each row. Its first token must be on §5's allowlist (adw-init Phase 4); wrap it in `bash -c '…'` otherwise.
 

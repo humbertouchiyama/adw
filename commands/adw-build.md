@@ -122,7 +122,7 @@ gate file to get green · let a subagent create its own worktree.
 4. Parse every spec header (adw-core §2). Any missing required field, duplicate unit id,
    an `intent:` value that does not equal the slug, an `after` cycle, a `base:`
    present on some units but not all (or with differing values), or a `shape: port` unit
-   whose depth is not D1, whose `packaging:` value another unit also carries, or whose repo profile
+   whose depth is not D1, that shares a PR or sub-PR with another unit, or whose repo profile
    has no complete §20 (adw-core §2) → refuse the whole
    run, print what to fix, stop. No partial builds on a broken manifest.
 5. **Base resolution:** `INTENT_BASE` = the intent's `base:` header value, default
@@ -239,7 +239,7 @@ gate file to get green · let a subagent create its own worktree.
   fault; charging the owner's real 90 minutes to the machine hides a schedulable halt. Only
   the stamps separate them, which is the whole reason adw-core §7.1 defines them.
 - **Independent PRs build in parallel** — one worktree each; never two agents in one
-  working tree — except port units, which build one at a time (adw-core §3).
+  working tree — except port units, which build one at a time with each other (adw-core §3).
 - **Chains build by DAG level, not in a line.** `after:` (adw-core §2) is a graph the init
   phase already validated acyclic — schedule against it. Units whose `after:` sets are all
   satisfied are **siblings** and build concurrently, one worktree and one unit branch each,
@@ -523,18 +523,21 @@ its run-report PR line (size is a proxy; the trap list is the risk).
 **Port units (`shape: port`, adw-core §3).** This replaces the D0/D1 depth-envelope check above
 for a port unit. The implementer's brief carries `repo-profile §20` and the spec's `## Screens`
 table, and this loop: if the table has `deferred` rows, first one gate-mode render measures each
-into the table (committed on its own, `docs(spec): baselines`); then render every screen in one
-fast-mode build, score them all, fix every independent cause the images show, repeat until each
-screen passes, or §20's stop rule (which names a round cap) stops the loop; then one gate-mode round,
-which is the grade. The implementer returns the number of rounds it ran, for the evidence block. A
-gate-mode build can outlast the `Bash` timeout (600000 ms):
-run it as a background command that writes its exit code to a file, then wait for that file with
+into the table, committed on its own as `docs(spec): baselines` after the spec-copy commit; then render
+every screen in one fast-mode build, score them all, fix every independent cause the images show,
+repeat until each screen passes, or §20's stop rule (which names a round cap) stops the loop; then
+one gate-mode round, which is the grade. The implementer returns the number of rounds it ran across
+all fix cycles, for the evidence block. **Every gate-mode `verify` run of a port unit** — the
+baseline render, the grade round, §3.2's mutation fallback and per-file sweep, and §3.4's verifier
+run — can outlast the `Bash` timeout (600000 ms): run it as a background command that writes its
+exit code to a fresh file (`mktemp`, never a reused path), then wait for that file with
 `review-core.md` §10 step 3's one blocking call (its deadline in the command, the exit file in place
-of the `<OUT>` count), re-issued while the build runs, until §20's Gate mode maximum minutes have
-passed: then kill the build and classify the round an environment fault (§3.3). Never poll with `echo` calls: a subagent that
-polls spends most of its cost doing it. A screen still over its ceiling after that
-round halts `blocked` — `port not converged — <screen> <mismatch> over ceiling <c>; re-run /adw-init with that
-screen's ceiling at <mismatch>`, an owner decision, not a fix cycle. The envelope check swaps
+of the `<OUT>` count), re-issued until §20's Gate mode maximum minutes have passed. Past them, kill
+the build and return `gate-mode build exceeded <n> min`: the orchestrator classifies it an
+environment fault (§3.3). Never poll with `echo` calls: a subagent that polls spends most of its
+cost doing it. A screen still over its ceiling after the grade round halts `blocked` — `port not
+converged — <screen> <mismatch> over ceiling <c>; fix the render, or edit that ceiling in the
+unit's spec and re-run /adw-build`, an owner decision, not a fix cycle. The envelope check swaps
 the file bound for §20's port surface: a production path outside it, or any trap
 domain, halts `blocked` — `shape escalation — diff touched <path>; re-cut the behaviour as a D2 unit`.
 
@@ -573,8 +576,8 @@ Three properties hold in every repo, whatever that file declares:
   **A port unit runs this check, and the per-file sweep, with its `verify` in `repo-profile §20`'s
   fast mode**, so the sweep stays affordable. Run the fast-mode `verify` on the unneutralised code
   first: if it is not green there, a red after neutralising proves nothing — run the whole check in
-  gate mode instead. §3.4's verifier repeats the check the same way and still runs the unit's
-  `verify` once in gate mode, as a background command waited on the same way as the implementer's.
+  gate mode instead (each gate-mode run waited on as §3.1 says). §3.4's verifier repeats the check
+  the same way and still runs the unit's `verify` once in gate mode, waited on the same way.
   A verify still green against neutralised code is vacuous — feed it to the implementer
   as a genuine red (the test, not the code, is wrong; it counts as a fix cycle). Skip
   only for verify forms with no test to mutate (tsc/grep proofs — design §5.2's
@@ -666,12 +669,14 @@ pipeline knows:
   PR, so `/pr-ready` §1's default `<N>` does not exist yet; §4.3 names the worktree and §8
   sweeps it, both off `$REF`. Pass the same value to every `PASS` of the same unit.
 - **The mutation check.** The verifier's report must ALSO carry §3.2's red-then-restored
-  pair, plus the per-file iteration where §3.2 makes it mandatory. It stays here rather
+  pair, plus the per-file iteration where §3.2 makes it mandatory, and for a port unit the mode
+  the check ran in (`fast` or `gate`). It stays here rather
   than in `/pr-ready` because it is keyed on the unit's declared `verify` command — a
   contract field a generic PR does not have. A report missing it is a red, by the same
   rule as a missing gate row.
 - **A port unit's render grade.** The verifier's report must ALSO carry the unit's `verify` run
-  once in gate mode at `$VSHA`, with its exit code, waited on as §3.1 says. A report missing it is
+  once in gate mode at `$VSHA`, with its exit code, waited on as §3.1 says with the `review-core.md`
+  path and §20's Gate mode row from its brief. A report missing it is
   a red, by the same rule as a missing gate row.
 - **Where the evidence lands: the PR body, not only a comment.** Copy the per-gate table
   and the mutation row into the PR body at 3.5 (re-pass → edit the body). A review comment
@@ -699,7 +704,7 @@ pipeline knows:
   open-findings none — read 4 comments
   ```
 
-  A port unit's block reads `depth D1 · shape port`, its `cycles` row adds `rounds N`, its
+  A port unit's block reads `depth D1 · shape port`, its `cycles` row adds `rounds N` (the unit's total across fix cycles), its
   `mutation` row ends `· fast` or `· gate` (the mode that graded discrimination), and its `gates`
   field adds `render gate-mode <exit code>`, so the TRIAL (adw-core §3) leaves a record.
 
@@ -799,7 +804,9 @@ semantic-conflict risk.
 ### 3.6 Review loop — dispatched, never run in this session
 
 **Dispatch ONE `model: sonnet` review driver per PR** (adw-core §8's Drive row). Its brief
-carries "wait for every agent you dispatch by `review-core.md` §10, never by polling", and:
+carries "wait for every agent you dispatch by `review-core.md` §10, never by polling" (for a port
+unit also the absolute path of `review-core.md` and `repo-profile §20`'s Gate mode row, which the
+driver hands the verifier for its gate-mode `verify`, §3.1), and:
 run `/pr-ready <N> apply` with `BASE`, `PASS=v2` and `REF` set to 3.4's values, carrying the
 unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and return
 **Layer 2 only, plus the open-findings lines below** (`/pr-ready` §7 — suppress Layer 1 in the

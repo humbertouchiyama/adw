@@ -189,12 +189,13 @@ Do not proceed without an answer.
   (adw-core §7). Not an exit — the gate stays open.
 - `re-cut "<instruction>"` → send the instruction to the SAME triage agent
   (SendMessage — context intact), re-render the approval surface.
-- `regroup` / `depth` → apply mechanically, re-render the approval surface.
+- `regroup` / `depth` → apply mechanically, re-render the approval surface. `regroup` refuses to put
+  a port unit in a shared PR or sub-PR, and to put another unit in a port unit's.
 - `shape "u4→port"` / `shape "u4→none"` → set or clear a unit's `shape: port` (adw-core §3 Port
-  shape; `port` also sets `depth: D1`, and `none` leaves it at D1 until a `depth` verb moves it),
-  re-render the approval surface. `port` on a unit in a shared sub-PR chains it out first (adw-core
-  §3). `depth` never takes `port`, and refuses a `shape: port` unit: clear the shape first.
-  `regroup` refuses to put a port unit in a shared sub-PR.
+  shape). `port` also sets `depth: D1`, refuses when the profile has no complete §20 (adw-core §2),
+  and first chains the unit out of a shared PR or sub-PR; `none` leaves the depth at D1 until a
+  `depth` verb moves it. Re-render the approval surface. `depth` never takes `port`, and refuses a
+  `shape: port` unit: clear the shape first.
 - `new intent` (extend mode only) → drop the extension, cut a fresh slug, re-render the approval surface.
 
 Any number of rounds. Only `approve` / `specs only` exits the gate.
@@ -212,9 +213,9 @@ across re-cut rounds the gate total accumulates and the re-render itself is mach
 ## Phase 3 — fan-out (parallel, one subagent per unit)
 
 Dispatch all unit agents in a single message (they are independent — documents only, main
-tree, distinct files), except port units, which run one at a time (a TRIAL default: a render is a
-full build in the shared main tree): the first port unit's agent goes in that message and each later
-one is dispatched when the previous one returns.
+tree, distinct files), except port units, which run one at a time: they render in the shared main
+tree, and §20's `verify` template deletes the previous renders first. The first port unit's agent goes
+in that message and each later one is dispatched when the previous one returns.
 Each prompt is composed from the frozen proposal:
 
 **Pin each unit agent by the unit's own `depth:` (adw-core §8):** `model: opus` at D3,
@@ -251,16 +252,18 @@ prior-unit table, so their specs can cite what shipped.
 **By depth:**
 - **Port (`shape: port`, adw-core §3) — replaces the D1 bullet below for this unit:** "Write
   `shape: port` in the header. Render the reference for every screen, and the current app for every
-  screen it can show, with `repo-profile §20`'s commands in GATE mode (a gate-mode build can outlast
-  the `Bash` timeout: wait for it as adw-build §3.1 says). Write the `## Screens` table with the
-  columns adw-core §3 lists, each baseline mismatch measured; a row whose state an `after:` unit
-  defines cannot show yet: write `deferred — <the state that unit defines>`. Do not judge a baseline
-  you did not render. The approved `verify` is §20's template: for each row you wrote, add its
-  entries in the template (score, delete-list entry, test-class filter), drop the entries of a row
-  you did not write, and change nothing else. Keep the spec to 200 lines. Write the spec and stop:
-  no `## Implementation`, no plan." An `amend:` that adds a row gets the same render for that row.
-  The render is not a code edit; its output is disposable state (`repo-profile §18`). No critical
-  pass.
+  screen it can show, with `repo-profile §20`'s commands in GATE mode. Wait for each build as
+  adw-build §3.1 says (`review-core.md` §10 step 3, at its path in the main checkout's
+  `.claude/adw/cache/commands/`, for §20's Gate mode minutes); past them, kill the build and write
+  `deferred — render timed out` for its rows. Write the `## Screens` table with the columns adw-core
+  §3 lists (snapshot names only `[A-Za-z0-9_-]`), each baseline mismatch measured; a row whose state
+  an `after:` unit defines cannot show yet: write `deferred — <the state that unit defines>`, with
+  §20's Score threshold as its ceiling. Do not judge a baseline you did not render. The approved
+  `verify` is §20's template as triage instantiated it: repeat every per-row part of it for each row
+  you wrote, drop those of a row you did not write, and change nothing else. Follow the D0/D1 budget
+  (Phase 3). Write the spec and stop: no `## Implementation`, no plan." An `amend:` that adds a row
+  gets the same render for that row. Render output is disposable state (`repo-profile §18`). A
+  `render timed out` row is one owner question in Phase 5's `needs you`. No critical pass.
 - **D0 (adw-core §3):** no fan-out — the triage agent's draft IS the spec;
   write it to the flat path, then straight to Phase 4. No plan, no critical pass.
 - **D1 (bug):** "Use superpowers:systematic-debugging to reach a reproduced root cause —
@@ -375,13 +378,14 @@ Fix in place on any failure, except where a bullet says it only reports:
   any other tool wraps in `bash -c '…'`;
 - **every D3 unit has a plan file; D0/D1/D2 units have none** — a plan file next to a D2
   spec is a contract violation, not a bonus (adw-core §3);
-- **every unit approved as `port` is D1, carries `shape: port` in its header, shares its
-  `packaging:` value with no other unit, and the profile has a complete §20 (adw-core §2); its spec
-  carries one `## Screens` table** whose rows each have a measured baseline (`deferred — <state>`
-  only for a unit with `after:`), and whose `verify` scores every row: each snapshot name appears in
-  the `verify:` value as a whole token, meaning the characters on both sides of it are outside
-  `[A-Za-z0-9_-]` (`login` does not count inside `login-error`, and does inside `renders/login.png`).
-  A `verify` that misses a row goes back to its authoring agent to add that row's entries; no other
+- **every unit approved as `port` is D1, carries `shape: port` in its header, shares no PR or
+  sub-PR with another unit, and the profile has a complete §20 (adw-core §2); its spec carries one
+  `## Screens` table** whose rows each have a measured baseline (`deferred — <reason>` only for a row
+  an `after:` unit's state defines, or a render that timed out), and whose `verify` scores every row:
+  split the `verify:` value on `&&`, and each snapshot name must appear as a whole token (the
+  characters on both sides are outside `[A-Za-z0-9_-]`; `login` does not count inside `login-error`)
+  in a segment that begins with §20's Score command, after any `bash -c '` wrapper. A `verify` that
+  misses a row goes back to its authoring agent to repeat the template's per-row parts; no other
   edit to an approved `verify`;
 - **every D2 spec carries a `## Implementation` section** — `grep -c '^## Implementation'`
   returns 1. A D2 spec without it has no build input and goes back to its authoring agent;
