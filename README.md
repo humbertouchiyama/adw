@@ -21,6 +21,7 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 | `docs/00-design.md` | The design, and a frozen archive of every contract change up to the extraction. |
 | `docs/repo-profile-EXAMPLE.md` | A filled-in `repo-profile.md` from a real repository, to copy and edit. |
 | `install/` | The loader stubs and the fetch script a consuming repo drops in. |
+| `.claude/skills/reviewing-contract-prs/` | The skill that reviews a PR to this repo: an anchor checker, three review lanes, one refuter, one report. |
 
 ## The split
 
@@ -92,9 +93,10 @@ One PR here. It is live in every consuming repo on their next run — no staging
 sync. That is the benefit and the risk in one sentence, so review a contract PR as a production
 change everywhere at once.
 
-These files are prose contracts, and no linter reads them. What has actually caught defects is a
-fresh subagent, read-only, prompted to **refute** the change rather than approve it. Three such
-passes have each found blocking defects. Run one.
+These files are prose contracts. No linter reads them; a script only resolves their `§N`
+citations. What has actually caught defects is a fresh subagent, read-only, prompted to **refute**
+the change rather than approve it. Three such passes have each found blocking defects. Run one:
+`/reviewing-contract-prs <PR number>` does it, with the anchor check.
 
 ## Provenance
 
