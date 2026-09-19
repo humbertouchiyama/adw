@@ -12,7 +12,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 
 `.claude/commands/*.md` are prompt templates with **no auto-include**, so the mechanism is an explicit Phase-1 `Read`, not silent transclusion. Each skill quotes the one-line rule for a behavior and links here (`→ review-core §N`) for the detail.
 
-**Section anchors are frozen** — the two skills cite `review-core §1`…`§9` by number. Do not renumber. Add new sections at the end.
+**Section anchors are frozen** — the two skills cite `review-core §1`…`§10` by number. Do not renumber. Add new sections at the end.
 
 | § | Section | Owns |
 |---|---|---|
@@ -25,6 +25,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 | §7 | Blast-radius safety stops | union stop-list; when to fall back to comment-only |
 | §8 | Local ship policy | commit/push/merge consent; apply≠merge; stage-only default vs declared auto-ship |
 | §9 | Refutation pass | attack findings before acting; CONFIRMED/OVERSTATED/REFUTED; gated on the wide path alone — attacks negatives when there is no Blocking |
+| §10 | Waiting for dispatched agents | report files + one blocking wait call, for subagents; a top-level session is exempt; a `NOT RUN` agent stops the run |
 
 ---
 
@@ -328,8 +329,8 @@ A lane returning `unsafe` / `should not ship as is` / `should be better` **with 
 array** is an internal contradiction and is always attacked first.
 
 **How it runs.** Dispatch **one** agent on the **top tier in `adw-core §8`'s tier table** (two when
-`Blocking` > 4, splitting the claims between them), with `run_in_background: false` — it runs
-inside a driver, where a background completion never arrives. Name that tier explicitly in the dispatch —
+`Blocking` > 4, splitting the claims between them), and wait for it by §10 — it runs
+inside a driver, which must not poll. Name that tier explicitly in the dispatch —
 **never "the strongest available", and never inherit the caller's.** A cheap driver reads
 "available" as its own tier and silently removes the one step this contract says must not follow the
 cheap-tier policy, which is also the safety net for lane depth that has never been measured. This is the one step in the pipeline that is not checklist work:
@@ -408,3 +409,52 @@ attack killed 5 claims and produced 7 new confirmed defects.
 **This pass never suppresses on its own authority.** A `REFUTED` verdict must name the guard, the
 line, or the unreachability. "I could not reproduce it" is not a refutation — it is `CONFIRMED` with
 weaker evidence, and it stays.
+
+## §10 — Waiting for dispatched agents (subagents only)
+
+**A top-level session — an `interactive` run included — skips this section.** It may end its turn,
+and the notification wakes it. You are a subagent if an `Agent` call dispatched you: your first
+message is a brief from a caller, not a human. Everything below is for a subagent.
+
+**The `Agent` tool has no foreground mode.** Every dispatch returns `Async agent launched` at once,
+and `run_in_background: false` does not change that: the two dispatches that passed it on
+Plantoes-app on 2026-09-18 launched async (a stricter harness may reject the parameter instead). Do
+not pass it. The result comes back as a hand-back message, and a subagent receives it only
+when one of its own tool calls returns. It cannot end its turn to wait, because ending the turn *is*
+returning to its caller. Left alone it spins: measured review drivers spent 154–282 turns of
+`echo`/`true` on this, 65–77% of their cost (Plantoes-app `docs/adw/run-log.md`, 2026-09-18).
+
+So every dispatcher below the top level — a driver, a verifier, a lane — does this:
+
+1. Once per wave, one Bash call: `OUT="$(mktemp -d)"; echo "$OUT"`. Shell variables do not survive
+   between Bash calls, so copy the printed path as a literal into every brief and into the wait
+   call. (This `echo` prints a path. It is not a wait.)
+2. Every brief ends with: *"As your LAST step, write your complete final report to `<OUT>/<name>.md`
+   with the Write tool, then hand back the same text."* `<name>` is unique per agent. Nothing else
+   is written into `<OUT>`. Dispatch with `subagent_type: general-purpose`: an `Explore` agent has no
+   `Write` tool, so it writes no file.
+3. Dispatch the whole wave in one message. Then make **one** Bash call with the tool parameter
+   `timeout: 600000`, where `<N>` is the number of agents in the wave. **The deadline lives in the
+   command**, so the call returns by itself and leaves nothing running (a call the tool moves to the
+   background at its timeout keeps polling, and a subagent's report is held until it exits):
+   ```bash
+   end=$(( $(date +%s) + 570 )); until [ "$(find "<OUT>" -name '*.md' | wc -l)" -ge <N> ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; ls "<OUT>"
+   ```
+   Then Read each file. The file is the result; the hand-back carries the same text.
+4. Hand-backs queue while a call runs and reach you when it returns. If the call returns with fewer
+   than `<N>` files, an agent whose hand-back arrived has reported: use it as that agent's result and
+   stop waiting for its file. If some agent has neither a file nor a hand-back, issue the call once
+   more, with `<N>` cut to the files already present plus the agents that still have neither. After
+   the second miss, use what you have and record each agent with neither as
+   `NOT RUN — no report after 20 min`.
+   **The verifier is the exception to the 20 minutes.** Its gates can legitimately run ~90 minutes
+   (`adw-build.md` §3 sizes its single-phase ceiling at 4 hours). A verifier wave re-issues the call
+   until its file or hand-back arrives, at most 24 calls; only then is it
+   `NOT RUN — no report after 4 h`.
+5. **A `NOT RUN` agent stops the run.** An agent recorded `NOT RUN`, or one whose hand-back is an
+   error and not a report, never counts as "no findings". Do not triage, apply, push, post a comment
+   or print a merge invite. Return only `REVIEW NOT COMPLETE — <agent> NOT RUN — no report after
+   <time>`, then the reports the other agents did return. Print no `clean`, `no issues` or `ready`
+   anywhere in it.
+
+Never wait with `echo`, `true`, a bare `sleep` or `Monitor`.
