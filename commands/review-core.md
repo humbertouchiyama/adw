@@ -435,8 +435,8 @@ So every dispatcher below the top level — a driver, a verifier, a lane — doe
    `Write` tool, so it writes no file.
 3. Dispatch the whole wave in one message. Then make **one** Bash call with the tool parameter
    `timeout: 600000`, where `<N>` is the number of agents in the wave. **The deadline lives in the
-   command**, so the call returns by itself and leaves nothing running (a call killed or moved to the
-   background at the tool timeout keeps polling, and a subagent's report is held until it exits):
+   command**, so the call returns by itself and leaves nothing running (a call the tool moves to the
+   background at its timeout keeps polling, and a subagent's report is held until it exits):
    ```bash
    end=$(( $(date +%s) + 570 )); until [ "$(find "<OUT>" -name '*.md' | wc -l)" -ge <N> ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; ls "<OUT>"
    ```

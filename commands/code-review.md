@@ -118,9 +118,10 @@ mergeability, `gh pr merge` — which need none of that state, and the report sa
   called **zero** times against hundreds of `Agent` and `Skill` calls. The driver's `Phases:` line is
   the only ledger that reaches the human, so it is required, not optional.
 - **A dispatch that fails is not a silent light run.** `Async agent launched` is the normal
-  immediate result, not a failure: wait for the hand-back. If the Agent call errors, or the
-  hand-back holds no report, run Phases 1–8 in this window and say so on the report: `driver
-  dispatch unavailable — ran inline`. Never report a review that did not happen.
+  immediate result, not a failure: wait for the hand-back. A hand-back that is `REVIEW NOT COMPLETE`
+  (review-core §10 step 5) is a report: print it unchanged and never re-run over it. If the Agent
+  call errors, or the hand-back holds no report at all, run Phases 1–8 in this window and say so on
+  the report: `driver dispatch unavailable — ran inline`. Never report a review that did not happen.
 
 ---
 
@@ -458,7 +459,7 @@ gate that does not exist.
 
 ### 5.2 — Convention checks (single sub-agent)
 
-Spawn 1 Haiku agent (`subagent_type: general-purpose`; wait by `review-core.md` §10). Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
+Spawn 1 Haiku agent (`subagent_type: general-purpose`, `model: haiku`; wait by `review-core.md` §10). Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
 verbatim** — the repo's rule tables. The agent runs each check against changed files only and
 returns findings `{file, line, description, severity}` where severity ∈ `Blocking|Warning`.
 
@@ -474,7 +475,7 @@ finding you grade on the spot.
 
 ### 5.3 — Structural checks (sub-agent verification, not grep)
 
-Spawn 1 Sonnet agent (`subagent_type: general-purpose`; wait by `review-core.md` §10) to verify cross-file and syntactic rules that a
+Spawn 1 Sonnet agent (`subagent_type: general-purpose`, `model: sonnet`; wait by `review-core.md` §10) to verify cross-file and syntactic rules that a
 grep cannot express. **Under `since:`, dispatch it in the same message as the 4a lane** — the two
 are independent, so the driver waits once, not twice.
 
