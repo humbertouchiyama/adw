@@ -122,8 +122,8 @@ gate file to get green · let a subagent create its own worktree.
 4. Parse every spec header (adw-core §2). Any missing required field, duplicate unit id,
    an `intent:` value that does not equal the slug, an `after` cycle, a `base:`
    present on some units but not all (or with differing values), or a `shape: port` unit
-   whose depth is not D1 or whose repo profile has no §20 with a Stop rule that names a maximum
-   number of rounds → refuse the whole
+   whose depth is not D1, whose `packaging:` value another unit also carries, or whose repo profile
+   has no complete §20 (adw-core §2) → refuse the whole
    run, print what to fix, stop. No partial builds on a broken manifest.
 5. **Base resolution:** `INTENT_BASE` = the intent's `base:` header value, default
    `repo-profile §3`'s default base; `git ls-remote --heads origin <INTENT_BASE>` must return it,
@@ -238,7 +238,7 @@ gate file to get green · let a subagent create its own worktree.
   fault; charging the owner's real 90 minutes to the machine hides a schedulable halt. Only
   the stamps separate them, which is the whole reason adw-core §7.1 defines them.
 - **Independent PRs build in parallel** — one worktree each; never two agents in one
-  working tree.
+  working tree — except port units, which build one at a time (adw-core §3).
 - **Chains build by DAG level, not in a line.** `after:` (adw-core §2) is a graph the init
   phase already validated acyclic — schedule against it. Units whose `after:` sets are all
   satisfied are **siblings** and build concurrently, one worktree and one unit branch each,
@@ -248,8 +248,8 @@ gate file to get green · let a subagent create its own worktree.
     that must not be raced. Build the lower unit id
     first; the other joins the next level. `team-active-seat-model`'s u4 says this in its own
     spec — its `after: [u1]` is a *migration* dependency, nothing in it reads u1's column.
-  - **Port siblings serialize** (adw-core §3): each render loop is a run of full builds, and two
-    at once contend for the machine. Build the lower unit id first; the other joins the next level.
+  - **Port siblings serialize** (adw-core §3), a TRIAL default: each render loop is a run of full
+    builds. Build the lower unit id first; the other joins the next level.
   - **File-overlap siblings serialize.** `after:` declares a *logical* dependency; it does
     not promise disjoint files. Plans here are dense with `path:line` references, so
     intersect them:
@@ -431,7 +431,8 @@ waiting for a hand-back that never arrives, and a wait has no timeout — so no 
 kind runs, and this ceiling is evaluated at the *next* boundary, as a post-hoc `failed`
 classification rather than a live trigger. It genuinely bounds a phase built of many
 returning calls; it does **not** bound a true hang. A hung *gate* is already bounded — the
-`Bash` timeout maxes at 600000 ms. If a live bound on subagent hangs is ever wanted, the
+`Bash` timeout maxes at 600000 ms, and a port unit's backgrounded gate-mode build by its own
+deadline (§3.1). If a live bound on subagent hangs is ever wanted, the
 mechanism is a `Monitor` poll from this top-level session (`review-core.md` §10 exempts it), not
 a number in this paragraph.
 **Precautionary, not evidenced** — no run has yet produced a hung subagent.
@@ -520,16 +521,19 @@ its run-report PR line (size is a proxy; the trap list is the risk).
 
 **Port units (`shape: port`, adw-core §3).** This replaces the D0/D1 depth-envelope check above
 for a port unit. The implementer's brief carries `repo-profile §20` and the spec's `## Screens`
-table, and this loop: render every screen in one fast-mode build, score them all, fix every
-independent cause the images show, repeat until each screen passes, or §20's stop rule or its round
-cap stops the loop; then one gate-mode round, which is the grade — it also measures every
-`deferred` baseline into the table. A gate-mode build can outlast the `Bash` timeout (600000 ms):
+table, and this loop: if the table has `deferred` rows, first one gate-mode render measures each
+into the table (committed on its own, `docs(spec): baselines`); then render every screen in one
+fast-mode build, score them all, fix every independent cause the images show, repeat until each
+screen passes, or §20's stop rule (which names a round cap) stops the loop; then one gate-mode round,
+which is the grade. The implementer returns the number of rounds it ran, for the evidence block. A
+gate-mode build can outlast the `Bash` timeout (600000 ms):
 run it as a background command that writes its exit code to a file, then wait for that file with
 `review-core.md` §10 step 3's one blocking call (its deadline in the command, the exit file in place
-of the `<OUT>` count), re-issued while the build runs. Never poll with `echo` calls: a subagent that
+of the `<OUT>` count), re-issued while the build runs, until §20's Gate mode maximum minutes have
+passed: then kill the build and classify the round an environment fault (§3.3). Never poll with `echo` calls: a subagent that
 polls spends most of its cost doing it. A screen still over its ceiling after that
-round halts `blocked` — `port not converged — <screen> <mismatch> over ceiling <c>`, an owner
-decision, not a fix cycle. The envelope check swaps
+round halts `blocked` — `port not converged — <screen> <mismatch> over ceiling <c>; re-run /adw-init with that
+screen's ceiling at <mismatch>`, an owner decision, not a fix cycle. The envelope check swaps
 the file bound for §20's port surface: a production path outside it, or any trap
 domain, halts `blocked` — `shape escalation — diff touched <path>; re-cut the behaviour as a D2 unit`.
 
@@ -665,6 +669,9 @@ pipeline knows:
   than in `/pr-ready` because it is keyed on the unit's declared `verify` command — a
   contract field a generic PR does not have. A report missing it is a red, by the same
   rule as a missing gate row.
+- **A port unit's render grade.** The verifier's report must ALSO carry the unit's `verify` run
+  once in gate mode at `$VSHA`, with its exit code, waited on as §3.1 says. A report missing it is
+  a red, by the same rule as a missing gate row.
 - **Where the evidence lands: the PR body, not only a comment.** Copy the per-gate table
   and the mutation row into the PR body at 3.5 (re-pass → edit the body). A review comment
   is the wrong home for the one artifact that has to outlive the run: three PRs across two
@@ -690,8 +697,9 @@ pipeline knows:
   artifact   plan 260L / diff 71L = 3.66x
   ```
 
-  A port unit's block reads `depth D1 · shape port` and its `cycles` row adds `rounds N`, so the
-  TRIAL (adw-core §3) leaves a record.
+  A port unit's block reads `depth D1 · shape port`, its `cycles` row adds `rounds N`, its
+  `mutation` row ends `· fast` or `· gate` (the mode that graded discrimination), and its `gates`
+  field adds `render gate-mode <exit code>`, so the TRIAL (adw-core §3) leaves a record.
 
   `owner-wait` is the decisive one: it is the single bit that distinguishes a 21-hour
   owner gate from a 21-hour stalled pipeline. Git already exposes the *gap* via commit
@@ -779,7 +787,8 @@ semantic-conflict risk.
   depths): `… = the unit's contract, authored at init and
   approval-approved — review surface is the code diff; verify discrimination is carried by
   the mutation gate.` A port unit takes that line with "the mutation gate" replaced by "the
-  render score, and the mutation check ran in fast mode". Never claim a critical pass a depth did
+  render score, and the mutation check ran in `<fast|gate>` mode" (the mode its `mutation` row
+  records). Never claim a critical pass a depth did
   not run. Without the line a
   reviewer treats already-reviewed contract text as findings fodder (design §10 v2.5).
 

@@ -104,7 +104,7 @@ packaging: chain A / sub-PR 2     # or: independent · grouped independents: ind
 after: [u1, u2]                   # in-chain ordering; [] when independent
 verify: <a command per the rules below and repo-profile §5's allowlist>
 base: <a branch that exists on origin>   # OPTIONAL — omitted = repo-profile §3's default base
-shape: port                       # OPTIONAL — §3 Port shape; D1 only, needs repo-profile §20
+shape: port                       # OPTIONAL — §3 Port shape; D1 only, needs a complete repo-profile §20 (below)
 ```
 
 Rules:
@@ -123,8 +123,10 @@ Rules:
   branch of this one. Three straight runs needed a non-default base; run-5 abandoned `/adw-build`
   for want of it — design §10 v2.8.
 - **`shape:` is optional, and `port` is its only value** (§3 Port shape). `/adw-build` refuses a
-  `shape: port` unit whose depth is not D1, or in a repo whose profile has no §20 with a Stop rule
-  that names a maximum number of rounds.
+  `shape: port` unit whose depth is not D1, whose `packaging:` value another unit also carries (a
+  port unit never shares a sub-PR), or in a repo whose profile has no **complete §20**: every row
+  holds a value, not the EXAMPLE's description — a command in backticks (Renders, Score), path
+  globs (Port surface), a number of minutes (Gate mode), a number of rounds (Stop rule).
 - No spec, no build: `/adw-build` refuses a unit whose header is missing any of the six
   required fields.
 
@@ -223,10 +225,10 @@ its one pure reskin (two screens, D2) spent over two hours in a one-edit-per-bui
 no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get this path.
 
 - **Cut.** A screen with behaviour is two units: the port unit (the render) and a D2+ unit for
-  state, actions, navigation and data. The port unit always takes `after: [<behaviour unit>]`.
-  A port unit never shares a sub-PR: its envelope is the port surface, which a neighbour's diff
-  would break. Where §4's rules would group it with any unit, chain them instead, adding `after:` on
-  that unit unless one of the two already orders them. A screen with no behaviour is a port unit alone.
+  state, actions, navigation and data. The port unit takes `after: [<behaviour unit>]`. A screen with
+  no behaviour is a port unit alone. A port unit never shares a sub-PR: its envelope is the port
+  surface, which a neighbour's diff would break. Where §4's rules would group it with any unit, chain
+  them instead, adding `after:` on that unit unless one of the two already orders them.
 - **Depth.** Always `depth: D1` + `shape: port`, never D0 (D0 has no fan-out, and the fan-out is
   where baselines are rendered). Of the four D1 criteria, only the trap-domain one
   applies as written. The root-cause one does not apply (there is no bug). The ≤4-production-file
@@ -238,15 +240,18 @@ no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get thi
 - **Spec.** The problem, a `## Screens` table — snapshot name · reference route or state · test
   class · baseline mismatch · ceiling — the fixture source and any declared divergence. The
   baseline is **measured at init**, by rendering, never judged. A row whose state an `after:` unit
-  defines cannot render yet: its baseline is `deferred`, and the implementer's gate-mode
-  round measures it. The spec follows the D1 line budget (adw-init Phase 3).
+  defines cannot render yet: its baseline is `deferred — <the state that unit defines>`, and the
+  implementer measures it in one gate-mode render before its first edit. The spec stays within 200
+  lines (adw-init Phase 3's D0/D1 row).
 - **`verify`** renders every screen in the table in ONE gate-mode build, then `&&`-chains one
   fail-closed score per row (§20's template). A row the `verify` does not score is a Phase 4 failure.
-  The approved `verify` is that template; the spec's author adds or drops scores to match the rows
-  it wrote, and changes nothing else. The baseline in the table is measured in gate mode too, since
+  The approved `verify` is that template; the spec's author adds or drops each row's entries in it
+  (its score, its delete-list entry, its test-class filter) to match the rows it wrote, and changes
+  nothing else. The baseline in the table is measured in gate mode too, since
   that is what `verify` grades.
 - **Build** (adw-build §3.1, §3.2): the implementer loops in §20's fast mode, every screen per
-  build, then grades once in gate mode. The loop stops by §20's stop rule or its round cap. The
+  build, then grades once in gate mode, which §20's Gate mode row bounds in minutes. The loop stops
+  by §20's stop rule, which names a round cap. The
   mutation check, its per-file sweep and the §3.4 verifier's repeat of both run `verify` in fast
   mode (gate mode when the fast one is not green on the unneutralised code); the verifier's own
   `verify` run is gate mode. Port units render one at a time. A diff that leaves the surface or
@@ -369,7 +374,7 @@ cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · 
    uncharted territory>                    ← these print only when they exist
 
 approve → cut + build · specs only → stop after specs · detail · re-cut "<instruction>" ·
-regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port"   ← `shape` only when repo-profile has a §20
+regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port"   ← `shape` only when repo-profile has a complete §20 (§2)
 
                         ← nothing follows this block: no summary, no narration
 ```

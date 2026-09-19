@@ -240,7 +240,8 @@ the one silent failure the human gate can catch for free, and only if the surfac
 
 ### 3.3 The fan-out — per-unit front-end
 
-On approval, `/adw-init` dispatches **parallel subagents, one per unit, in the main tree**.
+On approval, `/adw-init` dispatches **parallel subagents, one per unit, in the main tree**. Port units are the exception: one at a
+time (adw-core §3).
 They write documents only — no code, no worktrees needed, and the main tree is where every
 skill exists (§7 · skills). Per unit, by depth:
 
@@ -325,6 +326,7 @@ Packaging is proposed at the §3.2 gate and approved with the cut. Two shapes:
   rule and the backfill of existing rows. Per #757, the backfill *"**arms** the bug on real
   recurring series… Production is safe **only** because `end_date` is empty."* Merging the
   backfill without the derivation is the corruption event.
+  Exception: a port unit never shares (adw-core §3 Port shape); it chains after its neighbour.
 
 **Units MAY be independent when each is independently correct, independently mergeable,
 and independently revertible** — no shared files, no ordering hazard, no consumption of

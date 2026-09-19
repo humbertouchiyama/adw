@@ -57,8 +57,8 @@ had to be rehomed into its `audit.sh` and `repo-profile §16` before the stub co
 Then write `.claude/repo-profile.md`. Start from `docs/repo-profile-EXAMPLE.md` and replace every
 value; the section numbers are anchors and must not be renumbered. A contract file that cites a
 section your profile does not answer will stop the run, which is the intended failure. The
-optional §19 and §20 are the exception: each contract file that cites one says what an absent
-section does.
+optional §19 and §20 are the exception: a profile may omit them, and `code-review.md` (§19) and
+`adw-core.md` §2 (§20) say what the absence does.
 
 ### The loader is a copy, and copies drift
 

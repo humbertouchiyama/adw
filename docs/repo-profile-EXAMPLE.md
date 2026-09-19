@@ -38,7 +38,7 @@ optional §19 and §20 where a profile carries them. Do not renumber. Add new se
 | §17 | Convention doc routing | code-review Phase 6.2 |
 | §18 | Disposable state | cleanup Phase 3, 5 |
 | §19 | Review-lane map, layer to angle (optional; absent → derived) | code-review lane table |
-| §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §3, adw-init Phase 1/3/4, adw-build Phase 0/§3.1/§3.2 |
+| §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2 |
 
 ---
 
@@ -610,13 +610,13 @@ The form above passes `-c`, so it is unaffected — keep it that way.
 A profile that keeps this section declares a render loop, and `/adw-init` then proposes
 `shape: port` units (adw-core §3). **Delete the whole section unless the repo has one**: absent →
 no unit may take `shape: port`. A repo that ports screens from a design reference fills every row
-below with a value, not with the description:
+below with a value, not with the description (adw-core §2 calls that a complete §20):
 
 | | |
 |---|---|
-| **Renders** | one command that renders several screens in one build |
+| **Renders** | one command that renders several screens in one build; its output is disposable state (§18) |
 | **Fast mode** | how to make the same command render fast (an env var), for rounds and the mutation check |
-| **Gate mode** | the same command without it: the only render a screen is graded on |
+| **Gate mode** | the same command without it: the only render a screen is graded on; and the most minutes it may take (`/adw-build` waits that long, then kills it) |
 | **Score** | the compare command, its exit codes and its threshold |
 | **References** | how the design reference is rendered, once per screen, into a path that a linked worktree and a fresh verify worktree (§4) also read |
 | **Port surface** | the path globs a port unit's production diff must stay inside |
