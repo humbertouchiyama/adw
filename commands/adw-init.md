@@ -385,7 +385,8 @@ Fix in place on any failure, except where a bullet says it only reports:
 - **every unit approved as `port` is D1, carries `shape: port` in its header, shares no PR or
   sub-PR with another unit, and the profile has a complete §20 (adw-core §2); its spec carries one
   `## Screens` table** whose rows each have a measured baseline (`deferred — <state>` only for a row
-  an `after:` unit's state defines, otherwise `deferred — render timed out`), and whose `verify` scores every row:
+  an `after:` unit's state defines, otherwise `deferred — render timed out`; a `render timed out`
+  row adds one owner question to `needs you`, whoever wrote it), and whose `verify` scores every row:
   split the `verify:` value on `&&`, and each snapshot name must appear as a whole token (the
   characters on both sides are outside `[A-Za-z0-9_-]`; `login` does not count inside `login-error`)
   in a segment that contains §20's Score command (the render and delete segments do not). A

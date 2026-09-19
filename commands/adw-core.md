@@ -243,8 +243,9 @@ no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get thi
   route or state · test class · baseline mismatch · ceiling — the fixture source and any declared
   divergence. The baseline is **measured at init**, by rendering, never judged. A row that cannot render at init —
   its state is defined by an `after:` unit, or its render timed out — has baseline `deferred —
-  <reason>` and §20's Score threshold as its ceiling (never a guess); the implementer measures the
-  baseline in one gate-mode render before its first edit. The spec follows adw-init Phase 3's D0/D1
+  <the state that unit defines>` or `deferred — render timed out`, and §20's Score threshold as its
+  ceiling (never a guess); the implementer measures the baseline with one gate-mode run of §20's
+  Renders and Score commands before its first edit. The spec follows adw-init Phase 3's D0/D1
   budget (guard rail 200, hard stop 400).
 - **`verify`** renders every screen in the table in ONE gate-mode build, then `&&`-chains one
   fail-closed score per row (§20's template). A row the `verify` does not score is a Phase 4 failure.
