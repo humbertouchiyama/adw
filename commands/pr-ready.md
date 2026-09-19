@@ -21,7 +21,8 @@ the consuming repo's `.claude/repo-profile.md`, cited below as `repo-profile §N
 
 Examples: `/pr-ready 838` · `/pr-ready 838 apply` · `/pr-ready 839 apply interactive`.
 
-**This command never merges.** Merge needs the explicit word, every time (`review-core.md` §8).
+**The driver never merges.** Merge needs the explicit word, every time (`review-core.md` §8), and the
+caller runs it (see *Who runs this*).
 
 ## Who runs this — dispatch before reading further
 
@@ -55,15 +56,26 @@ combined.
 
   **A dispatch that fails is not a silent run.** If the Agent call errors, or the driver's hand-back
   holds no Layer 1 report, print `driver dispatch failed — <the error, or "empty hand-back">; no
-  audit ran` and stop. Running it in this window costs the ~125k above: that is the user's call, not
-  yours. (`Async agent launched` is the normal immediate result, not a failure — wait for the
-  hand-back.)
+  verdict was returned` and stop. Under `apply` the driver may already have pushed, so add `check
+  the PR head before re-running`. Running it in this window costs the ~125k above: that is the
+  user's call, not yours. (`Async agent launched` is the normal immediate result, not a failure —
+  wait for the hand-back.)
 
   **The merge gate belongs to you, the caller.** Layer 1 ends `say "merge" to ship`, and the user
-  replies to you — you have read neither `repo-profile §3` nor `§9`. On the word "merge", read
-  `code-review.md` §7a steps 6–7 and those two `repo-profile` sections, then run them: CI check,
-  merge convention, mergeability, `gh pr merge`. Never merge from memory, and never on any other
-  word.
+  replies to you. You have read neither `repo-profile §3` nor `§9`, and there is no `$WT`. Only the
+  bare word "merge" ships:
+
+  1. Run §6's comparison: `git fetch origin`, then `gh pr view <N> --json headRefOid` against the
+     `verified <sha7>` in Layer 2. Different → say `head moved since verified <sha7> — re-run
+     /pr-ready <N>` and stop.
+  2. Read `code-review.md` §7a steps 6–7 and those two `repo-profile` sections, and run them: CI
+     check, merge convention, mergeability (the main checkout stands in for `$WT`), then
+     `gh pr merge <N> --match-head-commit <the full head sha>`. On `CONFLICTING` do not rebase: say
+     `conflicts with base — rebase <headRefName>, then re-run /pr-ready <N>`.
+  3. Any other reply (`apply and merge`, `apply the fixes`, `fix <gate>`) is not a merge. Run what it
+     asks (`/pr-ready <N> apply`, or the fix), then ask again.
+
+  Never merge from memory.
 
 ---
 
@@ -249,6 +261,11 @@ fix for that is to review the push, not to refuse the PR. The closure check is
 A finding clearing the escalation bar (`review-core.md` §3.1 — both gates, neither
 resolution rule disposes) → `blocked`, with the question and a recommended default.
 
+**A review that did not run is not a review that found nothing.** If the report's `Phases:` line
+names a review phase that did not run, or an agent recorded `NOT RUN` (`review-core.md` §10), that
+cycle — the closure check included — did not review: never `converged`, never `review clean`. Run §4
+anyway, then print `blocked` with `default: re-run /pr-ready <N>`.
+
 ### §4 Independence pass
 
 Judges anchor on confident closing language — no configuration beat AUROC 0.65 at
@@ -392,12 +409,11 @@ Then dispatch a **fresh verifier subagent** that re-runs every gate
   to kill; without the table nothing distinguishes a full pass from a quiet subset.
 
 Any red → the PR is `blocked` with the failing gate's output and
-`default: fix <gate> on <headRefName>, then re-run /pr-ready <N>`. All green → the state is
+`default: fix <gate> on <headRefName>, then re-run /pr-ready <N>`. A verifier recorded `NOT RUN` is
+not a red gate — no gate failed: `blocked` with `default: re-run /pr-ready <N>`. All green → the state is
 earned, pending §5.
 
-Remove `$VWT` (`git worktree remove --force`) as soon as its verdict is recorded. A verifier
-recorded `NOT RUN` may still be running in `$VWT`: leave it in place and put its path on the
-cleanup line.
+Remove `$VWT` (`git worktree remove --force`) as soon as its verdict is recorded.
 
 ### §5 Review evidence — fetched, never asserted
 

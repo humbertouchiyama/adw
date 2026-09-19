@@ -103,7 +103,8 @@ Removal failure → warn in terminal, don't block. **File mode: nothing to clean
 phases — and the driver's own ledger is invisible to the human, so that skill states what carries
 the result out instead: the driver keeps the ledger as a printed checklist and ends its report with
 a `Phases:` line. At
-Phase 1, create one `TaskCreate` per phase the skill declares. Mark each `in_progress` before starting, `completed` immediately after. The ledger is the contract that **the run is incomplete until every task is `completed`** — forgetting a phase requires forgetting to update its task, which is visible to the user. Each skill lists its own phase set.
+Phase 1, a session that is not a driver creates one `TaskCreate` per phase the skill declares; a
+driver prints the same list as a checklist. Mark each `in_progress` before starting, `completed` immediately after. The ledger is the contract that **the run is incomplete until every task is `completed`** — forgetting a phase requires forgetting to update its task, which is visible to the user. Each skill lists its own phase set.
 
 ---
 
@@ -414,7 +415,7 @@ weaker evidence, and it stays.
 
 **A refuter recorded `NOT RUN` (§10) is not a skipped pass.** Nothing it would have attacked is
 `CONFIRMED`: the claims stay unrefuted, the report names `refutation NOT RUN`, and under `apply` a
-`Blocking` that needed the refuter is reported, not applied.
+`Blocking` that needed the refuter is escalated (`code-review` 6.1, Your decision), not applied.
 
 ## §10 — Waiting for dispatched agents (subagents only)
 
@@ -446,13 +447,16 @@ So every dispatcher below the top level — a driver, a verifier, a lane — doe
 4. Hand-backs queue while a call runs and reach you when it returns. If the wait call times out or
    is moved to the background, an agent whose hand-back arrived has reported: use it as that agent's
    result and stop waiting for its file. If some agent has neither a file nor a hand-back, issue the
-   call once more. After the second miss, use what you have and record each agent with neither as
+   call once more, with `<N>` cut to the files already present plus the agents that still have
+   neither. After the second miss, use what you have and record each agent with neither as
    `NOT RUN — no report after 20 min`.
    **The verifier is the exception to the 20 minutes.** Its gates can legitimately run ~90 minutes
    (`adw-build.md` §3 sizes its single-phase ceiling at 4 hours). A verifier wave re-issues the call
-   until its file or hand-back arrives, at most 24 calls; only then is it `NOT RUN`.
-5. **`NOT RUN` is never a clean result — the agent may still be running.** Whatever consumes the wave
-   names it: `code-review`'s `Phases:` line, `pr-ready`'s per-gate table (a missing row is red).
-   Never remove a worktree an unfinished agent may still be using.
+   until its file or hand-back arrives, at most 24 calls; only then is it
+   `NOT RUN — no report after 240 min`.
+5. **`NOT RUN` is never a clean result.** An agent recorded `NOT RUN`, or one whose hand-back is an
+   error and not a report, is a phase that did not run. Whatever consumes the wave names it
+   (`code-review`'s `Phases:` line and Your decision; `pr-ready`'s per-gate table, where a missing
+   row is red), and no surface prints `clean` or `ready` over it.
 
 Never wait with `echo`, `true`, a bare `sleep` or `Monitor`.

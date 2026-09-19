@@ -145,7 +145,7 @@ mergeability, `gh pr merge` — which need none of that state, and the report sa
 5. **Worktree + symlink deps → follow review-core §1.1–§1.2** (idempotent add / reset, `git -C "$WT"`, never `cd`).
 
 6. **Phase ledger → follow review-core §2.** Create one TaskCreate per phase below; mark `in_progress` before, `completed` after:
-   - `Phase 1 — Setup`  *(Phase 0 precedes the ledger. **The driver creates it; a caller that dispatched one does not** — it runs no phases. review-core §2's "mandatory" binds whoever runs Phases 1–8, and the driver's `Phases:` line is what carries the result out to the human, since a ledger inside a subagent reaches nobody.)*
+   - `Phase 1 — Setup`  *(Phase 0 precedes the ledger. **The driver keeps it, as a printed checklist (review-core §2); a caller that dispatched one does not** — it runs no phases. review-core §2's "mandatory" binds whoever runs Phases 1–8, and the driver's `Phases:` line is what carries the result out to the human, since a ledger inside a subagent reaches nobody.)*
    - `Phase 2 — Scope`
    - `Phase 3 — Path`
    - `Phase 4 — Review`
@@ -285,6 +285,12 @@ The parent skill extracts the fenced JSON block via `awk '/^```json$/,/^```$/'` 
 
 The lane **does not post a PR comment**. Comment (if any) is posted by Phase 7.
 
+**A lane recorded `NOT RUN` (review-core §10), or whose hand-back is an error and not the JSON
+block, is not an empty `[]`.** Never parse it as "no findings". Name it on the `Phases:` line, and
+add one line to ⏳ Your decision — `<agent> did not run — re-run /code-review <N>` — so `Next:` is
+never a merge invite. The same holds for the 5.2 and 5.3 agents, the panel lanes and a `since:`
+closure check.
+
 ### 4a-panel — Panel path (3 lanes, parallel)
 
 Used when `path == "panel"` and no `since:` (Phase 3). Its three lanes replace the single 4a lane.
@@ -406,8 +412,8 @@ bounded` / `should not ship as is`. B — `sound` / `has a gap` / `unsafe`. C �
   `<check> assigned to lane <X>, no verdict returned`. An obligation that can be skipped silently is
   not an obligation.
 - **A lane recorded `NOT RUN` (review-core §10) contributes no findings and no `VERDICT:`.** It is
-  not a clean lane: name it on the `Phases:` line (`panel lane B NOT RUN — no report after 20 min`),
-  and its layers count as unread.
+  not a clean lane: name it on the `Phases:` line (`panel lane B NOT RUN — no report after 20 min`)
+  and in ⏳ Your decision (rule at the end of 4a), and its layers count as unread.
 - Keep every lane's `VERDICT:` line and every `not reachable here` verdict — **review-core §9 attacks
   them**. A verdict nothing reads is decoration.
 - Angle C's `SCOPE:` block becomes one `Warning` naming the unaccounted regions, or nothing.
@@ -551,7 +557,7 @@ reading `originalSeverity`. With no `Blocking`, the claims
 are the lanes' verdicts and their `holds` / `not reachable here` checks (§9). Log one line per
 verdict. Neither condition holds → skip silently. **A refuter recorded `NOT RUN` (review-core §10) is
 not "skip silently"**: name it on the `Phases:` line, and the `Blocking` claims it was to attack stay
-unrefuted — reported, not applied (review-core §9).
+unrefuted — routed `escalate` in 6.1 (Your decision), never `toFix` (review-core §9).
 
 Findings array is now complete. **Read `.agent/review-calibration.md` from the main-repo working tree (review-core §6.1/§6.3 — resolve `$MAIN_REPO`, never `$WT`) before triaging** — when a finding matches a recorded class, bias the adjudication accordingly and note `per calibration: …` in the log. The hard guard binds (§6.6): an `apply`-direction calibration line never suppresses a `Blocking` finding or a blast-radius class.
 
@@ -627,7 +633,7 @@ Phase 7 always runs.
      pass; it is a coverage fact, and omitting it lets green local gates read as full coverage.
    - These two lines are **exempt from the one-line-per-item and ~15-line limits below**. That
      pressure is what pushes them into prose under the buckets, where nothing is read.
-4. **⏳ Your decision** — the ONLY bucket that needs the human: escalations that cleared the **§3.1 bar**, each **one plain sentence + a recommended default**, plus convention `Insert` drafts (never auto-landed — need sign-off).
+4. **⏳ Your decision** — the ONLY bucket that needs the human: escalations that cleared the **§3.1 bar**, each **one plain sentence + a recommended default**, plus convention `Insert` drafts (never auto-landed — need sign-off), plus one line per agent that did not run (`<agent> did not run — re-run /code-review <N>`).
    - **Coverage gaps go in their own labelled sub-block and are NOT counted in `<M>`**: an unrun
      obligated gate, a `§16.4` check assigned to a lane that returned no verdict, and a refuted
      `Blocking`. They are mechanically generated and cleared no §3.1 bar, so counting them there
@@ -694,7 +700,7 @@ Phase 7 always runs.
    - Merge convention: `repo-profile §3` declares it. Confirm against the base's own history rather than trusting either — `git -C "$WT" log --format='%P' origin/<baseRefName> | head -5` (the PR's actual base, never a hardcoded branch name): 1 SHA/line = squash (`--squash`); 2 SHAs = merge (`--merge`).
    - Mergeability: `gh pr view <N> --json mergeable,mergeStateStatus`.
      - `MERGEABLE` + `CLEAN` → proceed.
-     - `UNKNOWN` → GitHub is still computing mergeability. Re-query with a **non-foreground** wait (the harness Monitor/until pattern) — never a foreground `sleep` loop (blocked in some environments) — until it resolves or a bounded number of attempts pass. This step runs in the top-level session that owns the merge gate, so `Monitor` is allowed here; a subagent never runs it, and waits only by review-core §10. If still `UNKNOWN`, soft-stop and ask to re-run the merge once GitHub settles.
+     - `UNKNOWN` → GitHub is still computing mergeability. Re-query with a **non-foreground** wait (the harness Monitor/until pattern) — never a foreground `sleep` loop (blocked in some environments) — until it resolves or a bounded number of attempts pass. This step is the caller's, run in the top-level session that owns the merge gate; a driver never reaches it, so `Monitor` is allowed here. If still `UNKNOWN`, soft-stop and ask to re-run the merge once GitHub settles.
      - `CONFLICTING` → likely upstream squash. Rebase + `--force-with-lease`; conflict or lease rejection → safety stop.
 
 7. **Confirm + merge → escalation surface per review-core §5.** The merge confirmation is an escalation of the "ship it?" decision — and **it is the report's `Next:` line, not a second block.** Do not print a separate "Ready to merge" panel restating what the buckets already show; that duplication is the verbosity the Output contract exists to kill.
