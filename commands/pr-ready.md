@@ -163,56 +163,11 @@ produces large diffs.
 
 `/code-review <N> <tier>` — plus `apply` when the flag was given.
 
-**Before cycle 1: the open-findings check.** A review cycle carries nothing from the reviews
-before it, so a `Blocking` an earlier run found and could not push — a blast-radius stop, a failed
-gate, a run that ended — is invisible to this one. Collect **the open set**, once, from the PR's
-`### Code review` comments (any header suffix, `— remediation` included):
-
-```bash
-gh pr view <N> --json comments --jq '.comments[] | select(.body | startswith("### Code review")) | .createdAt as $t | .body | split("\n")[] | select(startswith("- **[Blocking]**")) | "\($t)  \(.)"'
-```
-
-Each output line is a `[Blocking]` under a `🔧 To fix` bucket (that tag appears in no other
-bucket), stamped with its comment's time. Drop a line only when a **later** comment's `✅ Done`
-reports the same finding fixed — same file, same subject. `file:line` alone is not a match: lines
-shift when a fix lands. **In doubt, keep it.** The check below grades every kept line at the head, so
-a wrong keep costs one finding in one dispatch and a wrong drop loses a `Blocking`.
-
-Empty set → print `open-findings: none` and go straight to cycle 1.
-
-Otherwise run `git fetch origin`, resolve `git rev-parse origin/<headRefName>`, and dispatch **one**
-`general-purpose` subagent, report-only, as §4.3 dispatches its verifier — never inline, waited for
-by that bullet's rule — but pinned `model: opus`, written out (adw-core §8): clearing a `Blocking`
-is the refutation step's job, and `review-core.md` §9 puts that step on the top tier. Hand it each
-kept finding and the head SHA as a literal (§1). It reads code with `git show <sha>:<path>` and
-`git grep <pattern> <sha>`, never from the checkout it runs in, which may be on base. Per finding
-it returns exactly one of:
-
-- `CLOSED` — the `file:line` of the guard or change that closes it at this SHA;
-- `OPEN` — the concrete input that still reproduces it;
-- `UNCLEAR` — the file is gone or renamed, or the finding cannot be parsed. Counts as `OPEN`.
-
-Print every result, one line per finding: `closed: <finding file:line> — <guard file:line>` ·
-`open: <finding file:line> — <input>` · `unclear: <finding file:line> — <why>`. A `CLOSED` with no
-printed guard is a `Blocking` dropped on an agent's own authority — the suppression channel
-`review-core.md` §9 forbids.
-
-Each `OPEN` or `UNCLEAR` counts exactly like a non-converged finding below: §4 still runs, and the
-verdict is `blocked` with `default: fix <first finding> on <headRefName>, then re-run /pr-ready
-<N>`; the reason names the count. **If `$VSHA` (§4.1) differs from the SHA you handed the agent**
-— a cycle pushed — re-grade every `OPEN` and `UNCLEAR` at `$VSHA` with the same dispatch before §7,
-so a finding the cycle fixed never prints as open. Field case: Plantoes-app PR #1264 (2026-09-18) —
-two `Blocking` sat under an earlier comment's `🔧 To fix` while a fresh cycle 1 had no way to know
-they existed.
-
-**Earlier findings never enter a lane prompt.** They go to this agent and nowhere else. A lane
-told what an earlier pass found returns that finding and reads as confirmation, so its own work is
-unproven — the same rule as `code-review.md` Phase 4's "Never put a suspicion's answer in a
-question" and review-core §9's "hand it the claim, never the argument". Cycle 1 stays blind to
-history: this check is the only agent that is handed it. (§5 and `code-review.md` Phase 1 read
-earlier comments only to count or print them, never to brief a lane.) It is not the post-cycle-2
-closure check below: that one grades what a fix changed, this one asks whether an old finding still
-holds.
+**Earlier findings never enter a lane prompt.** A review cycle carries nothing from the reviews
+before it, and that is deliberate: a lane told what an earlier pass found returns that finding and
+reads as confirmation, so its own work is unproven (`code-review.md` Phase 4's "Never put a
+suspicion's answer in a question"; `review-core.md` §9's "hand it the claim, never the argument").
+What an earlier review left open is graded once, by a separate agent, in §5.
 
 **Max 2 cycles that can push, and cycle 2 is scoped to the delta.** Hand it `since:<sha>` — the head SHA
 cycle 1 reviewed — so cycle 2 grades *what the fixes changed*, never the whole PR again.
@@ -433,18 +388,44 @@ store. Any live checkout of this repo works; a removed one does not.
 `default: the review never posted against this head — run /code-review <N> <tier> apply,
 then re-run /pr-ready <N>`.
 
-**Then read what the reviews concluded.** Re-collect §3's open set — same command, same drop rule —
-and keep the lines stamped after `CODE_TS`, minus every finding §3's check graded `CLOSED` at this
-head. That is `Blocking` found and not pushed, as distinct from `✅ Done`. Any line left → **not**
-`ready`; print `blocked`, the reason naming the count, with `default: fix <first finding> on
-<headRefName>, then re-run /pr-ready <N>`. When that finding's `🔧 To fix` line says `held by §7`,
-a blast-radius stop held the fix back: use the sentence §7 requires that authorizes it instead.
+**Then grade what the reviews left open.** The count above proves a review *exists*; it never
+asked what the reviews *said*. Field case: Plantoes-app PR #1264 (2026-09-18). A `since:` pass
+found two `Blocking` and could not push them — one fix sat on a blast-radius path, so review-core §7
+held both — and posted them under `🔧 To fix`. That comment post-dated the code head, so the
+timestamp floor counted it as review evidence for a head whose own review said do not merge.
 
-The count above proves a review *exists*; it never asked what the review *said*. Field case:
-Plantoes-app PR #1264 (2026-09-18). A `since:` pass found two `Blocking` and could not push them —
-one fix sat on a blast-radius path, so review-core §7 held both — and posted them under
-`🔧 To fix`. That comment post-dated the code head, so the timestamp floor counted it as review
-evidence for a head whose own review said do not merge.
+Collect every `[Blocking]` any `### Code review` comment lists under `🔧 To fix` — any header
+suffix, `— remediation` included. That tag appears in no other bucket:
+
+```bash
+gh pr view <N> --json comments --jq '.comments[] | select(.body | startswith("### Code review")) | .body | split("\n")[] | select(startswith("- **[Blocking]**"))' || echo "FETCH FAILED"
+```
+
+`FETCH FAILED` → **not** `ready`; print `blocked`, reason `open-findings: fetch failed`, with
+`default: re-run /pr-ready <N>`. No lines → print `open-findings: none` and go on. Otherwise grade
+each distinct line once, whatever its date and whether or not a later comment says it was fixed:
+a `✅ Done` line cannot be matched to a finding by `file:line`, because lines shift when a fix
+lands. The grader decides, not a match.
+
+Dispatch **one** `general-purpose` subagent, report-only, never inline, waited for as §4.3's
+verifier is, and pinned `model: opus`, written out (adw-core §8): clearing a `Blocking` is the
+refutation step's job, and `review-core.md` §9 puts that step on the top tier. Hand it the
+findings and `$VSHA` as a literal (§1). It reads code with `git show <sha>:<path>` and
+`git grep <pattern> <sha>`, never from the checkout it runs in — that checkout may be on base — and
+follows renames (`git log --follow`). Per finding it returns exactly one of:
+
+- `CLOSED` — the `file:line` of the guard that closes it at `$VSHA`, or the commit that removed or
+  moved the cited code;
+- `OPEN` — the concrete input that still reproduces it.
+
+A `CLOSED` with no guard, and a finding with no returned line, both count as `OPEN`: a `Blocking` is
+never cleared on the agent's authority alone (`review-core.md` §9).
+
+Print every result, one line per finding: `closed: <finding file:line> — <guard>` ·
+`open: <finding file:line> — <input>`. Any `open:` → **not** `ready`; print `blocked`, the reason
+naming the count, with `default: fix <first finding> on <headRefName>, then re-run /pr-ready <N>`.
+When that finding's file matches `repo-profile §8`, review-core §7 held its fix back: print the
+sentence this file's §7 requires that authorizes it instead.
 
 Three mechanical facts this snippet depends on, each verified against `gh` and `git`
 rather than assumed:
@@ -455,7 +436,7 @@ rather than assumed:
   is lexicographic, so unnormalised, a UTC−3 commit reads ~3h early and passes a review
   that predates the code.
 - Keyed on **timestamp, not comment shape**, deliberately: `/code-review` has branches
-  that post no project comment at all (an `apply` run with an empty `toFix`), so a header match would block precisely the cleanest reviews. The read above keys on the header only to *block*: no header, nothing to read, nothing blocked — the floor stays the timestamp count.
+  that post no project comment at all (an `apply` run with an empty `toFix`), so a header match would block precisely the cleanest reviews. The grading above keys on the header only to *find* findings: no header, no findings, nothing blocked — the floor stays the timestamp count.
 
 Dating on the code head rather than `$VSHA` is what keeps this consistent with §6: a
 docs-only amendment moves the head, no review post-dates it, and keyed on `$VSHA` the PR
@@ -468,7 +449,7 @@ against the failure that actually happened, which was not forgery — a run skip
 review on three PRs, said so in its report, and shipped them as `ready` when the note drew
 no objection. Flagging a deviation is not permission to take it, and a rule the runner can
 decline and then narrate past is not a gate. **Neither fetch is declinable — not the count, not
-the read of what the reviews concluded.**
+the collection of open findings.**
 
 ### §6 The void rule
 
@@ -476,7 +457,8 @@ the read of what the reviews concluded.**
 branch after the state is earned — owner-feedback amendments included, whatever produced
 them — voids it:
 
-- re-run §4 against the new head with the next `PASS` id, **always**;
+- re-run §4 against the new head with the next `PASS` id, **always** — §5's open-findings grade
+  included, at the new `$VSHA`;
 - plus one `/code-review` cycle **when the delta touches production code**. Docs-only →
   re-verify alone. **Not `since:`-scoped**: an owner amendment can be any size, and a `since:`
   pass collapses to one lane with no refuter.
@@ -526,7 +508,7 @@ no `verifier-green`. Answer, in this order:
 3. **What now?** — as a sentence they can **reply with verbatim**. `say "merge" to ship` ·
    `say "apply and merge"` · `fix <gate> on <branch>, then re-run /pr-ready <N>`.
 
-**Layer 1 is for a human-invoked run. A caller that maps the state takes Layer 2 only** —
+**Layer 1 is for a human-invoked run. A caller that maps the state takes Layer 2 and §5's open-findings lines** —
 `/adw-build` prints its own run-report and PR-body surfaces off `ready`/`blocked` (adw-core §7's templates,
 which are strict), so prose emitted into those is a format violation, not a kindness. The
 head is unconditional when a person typed the command, and suppressed when a caller
@@ -543,9 +525,9 @@ blocked  #839  <title>  — <one-line reason> · verified <sha7>
 `blocked` carries a recommended default; a blocked verdict with no named next action is
 incomplete. Echo a non-default `BASE` and a draft state on the same line.
 
-**Above the machine line, always — for a caller too — print §3's open-findings result:** one
-`closed:` / `open:` / `unclear:` line per finding, or `open-findings: none`. It is evidence, not
-Layer 1 prose. A report with neither did not run the check, and a caller must treat it so.
+**Above the machine line, always — for a caller too — print §5's open-findings result:** one
+`closed:` / `open:` line per finding, or `open-findings: none` / `open-findings: fetch failed`. It is
+evidence, not Layer 1 prose. A report with none of them did not run the check.
 
 **`blocked` is one token covering two unrelated situations, and Layer 1 MUST say which.**
 The token cannot split — `/adw-build` switches on `ready|blocked` — so the disambiguation
@@ -631,7 +613,7 @@ copy of these rules that should exist is this one.
 
 **§3.6 does not run this file in its own session.** It dispatches a `model: sonnet` driver
 (adw-core §8's Drive row) whose brief is this command with `apply` and the three overrides, and
-it consumes §7's Layer 2 only — Layer 1 is suppressed in the brief. Run that way, §3's
-`/code-review` invocation, the lanes it dispatches and §4's relay verifier all nest under the
-driver: a subagent can invoke skills and dispatch agents. §3.4 still reaches §4 directly for the
+it consumes §7's Layer 2 and §5's open-findings lines — Layer 1 is suppressed in the brief. Run
+that way, §3's `/code-review` invocation, the lanes it dispatches, §4's relay verifier and §5's
+grader all nest under the driver: a subagent can invoke skills and dispatch agents. §3.4 still reaches §4 directly for the
 pre-PR `v1` pass, where there is no review to drive. Measured reason in adw-build §3.6.
