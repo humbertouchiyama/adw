@@ -254,17 +254,20 @@ prior-unit table, so their specs can cite what shipped.
   `shape: port` in the header. Render the reference for every screen, and the current app for every
   screen it can show, with `repo-profile §20`'s commands in GATE mode, each run through the wait
   below. Write the `## Screens` table with the columns adw-core §3 lists (snapshot names only
-  `[A-Za-z0-9_-]`), each baseline mismatch measured. A row that cannot render — its state is defined
-  by an `after:` unit, or its render passed §20's Gate mode minutes and you killed it — gets baseline
-  `deferred — <reason>` and §20's Score threshold as its ceiling. Do not judge a baseline you did
-  not render. The approved `verify` is §20's template as triage instantiated it: repeat every
-  per-row part of it for each row you wrote, drop those of a row you did not write, and change
-  nothing else. Keep the spec near 200 lines (guard rail; hard stop 400). Write the spec and stop:
-  no `## Implementation`, no plan." The orchestrator pastes after that prompt adw-build §3.1's
-  gate-mode wait (its two commands) and §20's Gate mode row, read from the cache at
-  `.claude/adw/cache/commands/adw-build.md`. An `amend:` that adds a row gets the same render for
-  that row. Render output is disposable state (`repo-profile §18`). A `render timed out` row is one
-  owner question in Phase 5's `needs you`. No critical pass.
+  `[A-Za-z0-9_-]`), each baseline mismatch measured. A row that cannot render gets §20's Score
+  threshold as its ceiling and a baseline of `deferred — <the state an `after:` unit defines>`, or,
+  when its render passed §20's Gate mode minutes and was killed, `deferred — render timed out`. Do
+  not judge a baseline you did not render. The approved `verify` is §20's template as triage
+  instantiated it: repeat every per-row part of it for each row you wrote, drop those of a row you
+  did not write, and change nothing else. Keep the spec near 200 lines (guard rail; hard stop 400).
+  Write the spec and stop: no `## Implementation`, no plan." The orchestrator pastes after that
+  prompt adw-build §3.1's gate-mode wait (both commands and the paragraph after them, read from
+  `.claude/adw/cache/commands/adw-build.md`) and `repo-profile §20`'s Gate mode row (read from
+  `.claude/repo-profile.md`); for the author, the block's `return gate-mode build exceeded <n> min`
+  means: write `deferred — render timed out` for the rows that render covers, and go on. An `amend:`
+  that adds a row gets the same render for that row. Render output is disposable state
+  (`repo-profile §18`). A `deferred — render timed out` row is one owner question in Phase 5's
+  `needs you`. No critical pass.
 - **D0 (adw-core §3):** no fan-out — the triage agent's draft IS the spec;
   write it to the flat path, then straight to Phase 4. No plan, no critical pass.
 - **D1 (bug):** "Use superpowers:systematic-debugging to reach a reproduced root cause —
@@ -381,8 +384,8 @@ Fix in place on any failure, except where a bullet says it only reports:
   spec is a contract violation, not a bonus (adw-core §3);
 - **every unit approved as `port` is D1, carries `shape: port` in its header, shares no PR or
   sub-PR with another unit, and the profile has a complete §20 (adw-core §2); its spec carries one
-  `## Screens` table** whose rows each have a measured baseline (`deferred — <reason>` only for a row
-  an `after:` unit's state defines, or a render that timed out), and whose `verify` scores every row:
+  `## Screens` table** whose rows each have a measured baseline (`deferred — <state>` only for a row
+  an `after:` unit's state defines, otherwise `deferred — render timed out`), and whose `verify` scores every row:
   split the `verify:` value on `&&`, and each snapshot name must appear as a whole token (the
   characters on both sides are outside `[A-Za-z0-9_-]`; `login` does not count inside `login-error`)
   in a segment that contains §20's Score command (the render and delete segments do not). A

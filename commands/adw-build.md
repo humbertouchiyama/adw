@@ -528,36 +528,43 @@ every screen in one fast-mode build, score them all, fix every independent cause
 repeat until each screen passes, or §20's stop rule (which names a round cap) stops the loop; then
 one gate-mode round, which is the grade. The implementer returns the number of rounds it ran across
 all fix cycles, for the evidence block. **Every gate-mode `verify` run of a port unit** — the baseline render, the grade round, §3.2's
-mutation fallback and per-file sweep, and §3.4's verifier run — goes through the gate-mode wait
+mutation fallback (aggregate check) and §3.4's verifier run — goes through the gate-mode wait
 below. A screen still over its ceiling after the grade round halts `blocked` — `port not
-converged — <screen> <mismatch> over ceiling <c>; default: raise that ceiling in the unit's spec on
-the PR branch, then /pr-ready <N>`, an owner decision, not a fix cycle. The envelope check swaps
-the file bound for §20's port surface: a production path outside it, or any trap
-domain, halts `blocked` — `shape escalation — diff touched <path>; re-cut the behaviour as a D2 unit`.
+converged — <screen> <mismatch> over ceiling <c>; default: re-run /adw-init to extend this intent
+with a port unit for <screen> at ceiling <mismatch>`, an owner decision, not a fix cycle. The
+envelope check swaps the file bound for §20's port surface: a production path outside it, or any
+trap domain, halts `blocked` — `shape escalation — diff touched <path>; re-cut the behaviour as a D2 unit`.
 
 **The gate-mode wait.** A gate-mode build can outlast the `Bash` timeout (600000 ms), so it runs in
-the background and its exit code is read from a file. Launch, in one Bash call that prints the exit
-file, the pid and the start time — copy all three as literals into every later call, since shell
+the background and its exit code is read from a file. Launch, in one Bash call that prints the
+directory, the pid and the start time — copy all three as literals into every later call, since shell
 variables do not survive between calls:
 
 ```bash
-F="$(mktemp -u)"; ( ( <the verify command> ); echo $? >"$F.tmp" && mv "$F.tmp" "$F" ) >"$F.log" 2>&1 & echo "$F $! $(date +%s)"
+D="$(mktemp -d)"; ( ( <the verify command> ); echo $? >"$D/exit.tmp" && mv "$D/exit.tmp" "$D/exit" ) >"$D/log" 2>&1 & echo "$D $! $(date +%s)"
 ```
 
-Then wait, in one Bash call with `timeout: 600000`, re-issued until it prints an exit code (the
-deadline of one call lives in the command, as in `review-core.md` §10 step 3):
+Then wait, in one Bash call with `timeout: 600000`, re-issued until it prints `exit`, or `DEADLINE`
+(one call ends within 570 s, as in `review-core.md` §10 step 3; `<n>` is §20's Gate mode maximum
+minutes, written in as a number):
 
 ```bash
-end=$(( $(date +%s) + 570 )); until [ -s "<F>" ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; cat "<F>" 2>/dev/null || echo running
+lim=$(( <start> + <n> * 60 )); end=$(( $(date +%s) + 570 )); [ "$end" -gt "$lim" ] && end=$lim; until [ -s "<D>/exit" ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; if [ -s "<D>/exit" ]; then echo "exit $(cat "<D>/exit")"; tail -n 60 "<D>/log"; elif [ "$(date +%s)" -ge "$lim" ]; then echo DEADLINE; else echo running; fi
 ```
 
-The exit file exists only once the build has finished (`mv` is atomic), so a non-empty file is the
-result. When the time since `<start>` passes §20's Gate mode maximum minutes, run
-`pkill -P <pid>; kill <pid>` and return `gate-mode build exceeded <n> min`: the orchestrator
-classifies it an environment fault (§3.3), not a red. Never poll with `echo` calls: a subagent that
-polls spends most of its cost doing it. The brief of every agent that runs a gate-mode `verify` — the
-implementer, and the §3.4 verifier (its brief is the orchestrator's on the v1 pass and the §3.6
-driver's on v2) — pastes these two commands and §20's Gate mode row, and needs no other file for it.
+`exit <code>` is the result (`mv` is atomic, so the file exists only once the build has finished), and
+the scores are in the log tail; read more of `<D>/log` if a row is missing. On `DEADLINE`, kill the
+whole tree, in one Bash call:
+
+```bash
+tree() { echo "$1"; for c in $(pgrep -P "$1"); do tree "$c"; done; }; kill $(tree <pid>) 2>/dev/null
+```
+
+and return `gate-mode build exceeded <n> min`: the orchestrator classifies it an environment fault
+(§3.3), not a red. Never poll with `echo` calls: a subagent that polls spends most of its cost doing
+it. The brief of every agent that runs a gate-mode `verify` — the implementer, the §3.4 verifier
+(its brief is the orchestrator's on the v1 pass and the §3.6 driver's on v2) and `/adw-init`'s port
+author — pastes these commands and §20's Gate mode row, and needs no other file for it.
 
 ### 3.2 Gates (cheapest first, run in the worktree by the implementer)
 
@@ -603,19 +610,19 @@ Three properties hold in every repo, whatever that file declares:
   human-owned residue); the 3.4 verifier's re-run includes this check. This gate is
   what makes the thinner think-side depths (D0/D1) safe: it mechanizes the
   discriminating-verify property the D2+ critical pass provides by hand.
-  **Then iterate per file:** neutralise each changed production file ALONE and re-run
+  **Then iterate per file** (skipped only in a port unit's gate-mode fallback, above): neutralise each changed production file ALONE and re-run
   `verify` — a file whose lone neutralisation leaves verify green is mutation-blind;
   carry `· ⚠ mutation-blind: <path>` on the PR/run-report line. Aggregate-green stays the hard
   red; per-file blindness is a flag, not a bounce — some files (a CSS rule, a type
   union) have no test that can see them, and the flag says so honestly. `mutation-blind`
   fires on roughly a quarter of pipeline PRs — the check earns its keep routinely
   (design §10 v2.12).
-  Cost is `verify` × N files. **No clock may cut this check** — the per-file sweep is N
+  Cost is `verify` × N files. **No clock may cut this check** (a port unit's gate-mode fallback is the one flagged carve-out) — the per-file sweep is N
   first passes on N distinct files, not loop iterations, and design §5.2 credits the mutation-proof
   as the *sole* system-level detector of a lying gate ("not via the verifier, which re-runs
   the same blind gates") for the exact failure class the design exists to prevent. Trading
   it for a costing proxy inverts the deliverable. **Bound it by file count instead: mandatory
-  at D0/D1**; above **2 changed production files** (the count, not the depth — §3.1 lets a
+  at D0/D1** (a port unit's gate-mode fallback excepted); above **2 changed production files** (the count, not the depth — §3.1 lets a
   D1 unit exceed its ≤4 promise without bouncing) iterate **8 files** and report what you covered —
   `· ⚠ mutation per-file 8/31` — so the signal degrades gracefully at every diff size
   instead of dropping to zero above a threshold. **Select those 8 by inverse test
@@ -691,7 +698,7 @@ pipeline knows:
   sweeps it, both off `$REF`. Pass the same value to every `PASS` of the same unit.
 - **The mutation check.** The verifier's report must ALSO carry §3.2's red-then-restored
   pair, plus the per-file iteration where §3.2 makes it mandatory, and for a port unit the mode
-  the check ran in (`fast` or `gate`). It stays here rather
+  the check ran in (`fast` or `gate`; `gate` means the per-file sweep was skipped). It stays here rather
   than in `/pr-ready` because it is keyed on the unit's declared `verify` command — a
   contract field a generic PR does not have. A report missing it is a red, by the same
   rule as a missing gate row.
@@ -726,7 +733,7 @@ pipeline knows:
   ```
 
   A port unit's block reads `depth D1 · shape port`, its `cycles` row adds `rounds N` (the unit's total across fix cycles), its
-  `mutation` row ends `· fast` or `· gate` (the mode that graded discrimination), and its `gates`
+  `mutation` row ends `· fast` or `· gate` (the mode that graded discrimination; `gate` means the per-file sweep was skipped), and its `gates`
   field adds `render gate-mode <exit code>`, so the TRIAL (adw-core §3) leaves a record.
 
   `owner-wait` is the decisive one: it is the single bit that distinguishes a 21-hour

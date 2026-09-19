@@ -256,8 +256,8 @@ no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get thi
   build, then grades once in gate mode, which §20's Gate mode row bounds in minutes. The loop stops
   by §20's stop rule, which names a round cap. The
   mutation check, its per-file sweep and the §3.4 verifier's repeat of both run `verify` in fast
-  mode (gate mode when the fast one is not green on the unneutralised code); the verifier's own
-  `verify` run is gate mode. Port units render one at a time. A diff that leaves the surface or
+  mode; when the fast one is not green on the unneutralised code, the aggregate check runs in gate
+  mode and the sweep is skipped. The verifier's own `verify` run is gate mode. Port units render one at a time. A diff that leaves the surface or
   touches a trap domain bounces `blocked` (`shape escalation`), the same way a D0/D1 depth
   envelope does.
 
