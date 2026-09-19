@@ -418,9 +418,9 @@ out (adw-core §8's row for clearing a `Blocking`: it is the refutation step's j
 `review-core.md` §9 puts that step on the top tier). One agent for up to 4 findings; more than 4,
 two agents with the findings split evenly, as `review-core.md` §9 splits. Wait for them by
 `review-core.md` §10 — each brief ends with §10's report-file step, and the wait is the 20-minute
-form, not the verifier's long one. `NOT RUN` → return `REVIEW NOT COMPLETE — grader NOT RUN` as
-§10 step 5 says, then print `blocked`, reason `open-findings: NOT RUN`, with `default: re-run
-/pr-ready <N>` — never `open-findings: none`. Hand each the findings and `$VSHA` as a literal (§1). It reads code with `git show <sha>:<path>` and
+form, not the verifier's long one. `NOT RUN` → print `blocked` with §10 step 5's text as its
+reason, `REVIEW NOT COMPLETE — grader NOT RUN`, the line `open-findings: NOT RUN` above the machine
+line, and `default: re-run /pr-ready <N>` — never `open-findings: none`, never `clean`. Hand each the findings and `$VSHA` as a literal (§1). It reads code with `git show <sha>:<path>` and
 `git grep <pattern> <sha>`, never from the checkout it runs in — that checkout may be on base — and
 follows renames (`git log --follow`). Per finding it returns exactly one of:
 

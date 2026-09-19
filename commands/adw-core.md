@@ -458,7 +458,8 @@ note     <further run-level caveats — one line each, only when present>
 adw-build §3.6 (→ `/pr-ready` §5) fetches the PR's comments and reviews and requires one
 dated after the last production-code commit (NOT `$VSHA` — a docs-only amendment must not
 demand a re-review the void rule exempts). None → the line is `blocked`; so is any `[Blocking]` a
-review lists under `🔧 To fix` that `/pr-ready` §5's grader cannot close. One line per PR, ordered
+review lists under `🔧 To fix` that `/pr-ready` §5's grader cannot close, and so is a grade that did
+not run (`fetch failed`, `NOT RUN`). One line per PR, ordered
 ready → blocked → failed → unbuilt. These four keywords are the
 only PR states — a PR whose `ready` was voided by a post-review amendment (adw-build
 §3.6) prints on the `blocked` row, never as a fifth state and never as `failed`.
