@@ -114,7 +114,9 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 > 1. the unit cut per §3.1 — vertical by behaviour; a layer cut only when one layer
 >    contains the entire behaviour; the rule is symmetric (merge freely — five copy fixes
 >    are one unit); sweep-shaped work may legitimately be ONE unit;
-> 2. a depth per unit (D1–D3 per adw-core §3);
+> 2. a depth per unit (D1–D3 per adw-core §3). When `.claude/repo-profile.md` has a §20, cut
+>    visual parity apart from behaviour and propose `shape: port` for the render-only units
+>    (adw-core §3 Port shape);
 > 3. packaging per adw-core §4, with `after` edges — remember: a unit that reads another
 >    unit's output is NOT independent, no matter how disjoint the file lists look;
 > 4. a `verify` COMMAND per unit (adw-core §2 rules — never a prose sentence);
@@ -236,6 +238,10 @@ in, keeping the unit id, header and any plan. New units get the normal preamble 
 prior-unit table, so their specs can cite what shipped.
 
 **By depth:**
+- **Port (`shape: port`, adw-core §3):** "Render the reference and the current app for every
+  screen now, with `repo-profile §20`'s commands, and write each screen's baseline mismatch into
+  the `## Screens` table. Do not judge a baseline you did not render. Write the spec and stop: no
+  `## Implementation`, no plan." No critical pass.
 - **D0 (adw-core §3):** no fan-out — the triage agent's draft IS the spec;
   write it to the flat path, then straight to Phase 4. No plan, no critical pass.
 - **D1 (bug):** "Use superpowers:systematic-debugging to reach a reproduced root cause —
@@ -309,7 +315,7 @@ that pair collapsed on the reasoning that a merged artifact drops the second fil
 restatement of problem, ACs and context. Retune from run evidence, and until then treat a
 guard-rail breach as one `⚠ over-guard-rail` line and nothing else.
 
-**Critical passes** (D2: spec; D3: design + spec + plan) — for each artifact, dispatch a
+**Critical passes** (D2: spec; D3: design + spec + plan; none for a port unit) — for each artifact, dispatch a
 FRESH subagent **pinned `model: sonnet`**. A refute pass finds and reports; the orchestrator
 adjudicates. That makes it a finder, not an author, which is adw-core §8's line. All 12
 critical passes of the `team-active-seat-model` run were unpinned and so inherited Opus,
@@ -350,6 +356,8 @@ Fix in place on any failure, except where a bullet says it only reports:
   any other tool wraps in `bash -c '…'`;
 - **every D3 unit has a plan file; D0/D1/D2 units have none** — a plan file next to a D2
   spec is a contract violation, not a bonus (adw-core §3);
+- **every `shape: port` unit is D1, the profile has a §20, and its spec carries one
+  `## Screens` table** whose rows each have a measured baseline;
 - **every D2 spec carries a `## Implementation` section** — `grep -c '^## Implementation'`
   returns 1. A D2 spec without it has no build input and goes back to its authoring agent;
 - `wc -l` every **D2/D3** spec and plan against the artifact budget table (Phase 3) — the

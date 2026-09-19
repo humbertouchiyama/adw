@@ -27,7 +27,7 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 Nothing in `commands/` **reads** a repo-specific value. Every value that could differ between two
 repositories — paths, branch names, gate commands, trap domains, review emphasis — lives in a
 `repo-profile.md` **in the consuming repo**, cited from the contract as `repo-profile §N` against
-frozen anchors §1–§18. The test for whether a value belongs here is simple: could this sentence be
+frozen anchors §1–§18 (plus optional §19 and §20). The test for whether a value belongs here is simple: could this sentence be
 true in a repo with a different stack? If not, it names a value, and the value belongs in the
 profile.
 

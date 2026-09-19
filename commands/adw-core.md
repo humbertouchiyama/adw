@@ -6,7 +6,8 @@ description: "Shared ADW contract — spec headers, naming, depth ladder, packag
 
 **This file lives in the `adw` repository and is fetched, not copied** (§9). It is repo-agnostic:
 every command, path, branch and gate it needs is declared per-repo in the consuming repo's
-`.claude/repo-profile.md`, cited throughout as `repo-profile §N` against frozen anchors §1–§18.
+`.claude/repo-profile.md`, cited throughout as `repo-profile §N` against frozen anchors §1–§18,
+plus two optional ones a profile may omit: §19 (code-review lanes) and §20 (visual port loop, §3).
 Both `/adw-init` and `/adw-build` read that file at their Phase 0 alongside this one — it is not
 auto-included.
 
@@ -103,6 +104,7 @@ packaging: chain A / sub-PR 2     # or: independent · grouped independents: ind
 after: [u1, u2]                   # in-chain ordering; [] when independent
 verify: <a command per the rules below and repo-profile §5's allowlist>
 base: <a branch that exists on origin>   # OPTIONAL — omitted = repo-profile §3's default base
+shape: port                       # OPTIONAL — §3 Port shape; D1 only, needs repo-profile §20
 ```
 
 Rules:
@@ -120,6 +122,8 @@ Rules:
   bearing on the contract either way: the contract comes from its own repository (§9), not from any
   branch of this one. Three straight runs needed a non-default base; run-5 abandoned `/adw-build`
   for want of it — design §10 v2.8.
+- **`shape:` is optional, and `port` is its only value** (§3 Port shape). `/adw-build` refuses a
+  `shape: port` unit whose depth is not D1, or in a repo whose profile has no §20.
 - No spec, no build: `/adw-build` refuses a unit whose header is missing any of the six
   required fields.
 
@@ -208,6 +212,31 @@ flat spec in its one pass, the approval surface presents cut + spec together, an
 contract approval (no fan-out, no critical-pass subagent — the mutation gate carries
 the discriminating-verify property; AC completeness has no catcher but the approval glance —
 accepted at this tier). The do-side never thins at any depth.
+
+**Port shape (`shape: port`) — status: TRIAL, the first run under it is the proof.**
+A unit whose acceptance is **pixel parity with a design reference**, graded by `repo-profile §20`'s
+render loop. It exists because two costs came apart on one run (AXCMedApp `native-auth-flow`,
+2026-09-18): the refute passes on its logic units caught three defects no screenshot can show — an
+app-switcher privacy leak, a sign-up flag leaking to the next user, a double sign-in race — while
+its one pure reskin (two screens, D2) spent over two hours in a one-edit-per-build pixel loop that
+no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get this path.
+
+- **Cut.** A screen with behaviour is two units: the port unit (the render) and a D2+ unit for
+  state, actions, navigation and data. The port unit takes `after: [<behaviour unit>]` when it
+  renders a state shape that unit defines; a screen with no behaviour is a port unit alone.
+- **Depth.** Always `depth: D1` + `shape: port`. The D1 bound of ≤4 production files is replaced by
+  §20's **port surface**: the unit's production diff stays inside it and touches no `§11` trap
+  domain. There is no critical pass: the check that sees a port is the render, and a refute agent
+  cannot run it. Surfaces print the word `port`, never `spec`.
+- **Spec.** The problem, a `## Screens` table — snapshot name · reference route or state · test
+  class · baseline mismatch · ceiling — the fixture source and any declared divergence. The
+  baseline is **measured at init**, by rendering, never judged: specs that said "no change" were
+  wrong when the compare ran. Guard rail 150 lines.
+- **`verify`** scores every screen in the table in §20's gate mode, fail-closed as §20 states.
+- **Build** (adw-build §3.1, §3.2): the implementer loops in §20's fast mode, every screen per
+  build, then grades once in gate mode. The mutation check runs `verify` in fast mode; the §3.4
+  verifier runs it in gate mode. A diff that leaves the surface or touches a trap domain bounces
+  `blocked` (`shape escalation`), the same way a D0/D1 depth envelope does.
 
 ## 4. Packaging
 
@@ -737,7 +766,7 @@ and it names an unverified contract rather than a stale one it cannot do anythin
 failure with no cache at all is **exit 1**, and the run stops.
 
 **What is still per-repo.** `repo-profile.md`, authored in the consuming repo and never fetched.
-Every file above cites it as `repo-profile §N` with frozen anchors §1–§18. A contract file that
+Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19 and §20 optional). A contract file that
 needs a value which could differ between two repos is wrong: the value belongs in the profile. The
 failing test is always the same — could this exact sentence be true in a repo with a different
 stack? If not, it names a value, and the value moves.

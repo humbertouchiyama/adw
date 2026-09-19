@@ -4,7 +4,7 @@
 > repository ADW was built in: a full-stack TypeScript monorepo (React 19 + Vite, Hono + PostgreSQL
 > 16 + Drizzle, one shared npm workspace). Copy it to `.claude/repo-profile.md` in your repo and
 > replace **every** value. Keep the section numbers: the contract cites them as `repo-profile §N`
-> and the anchors §1–§18 are frozen.
+> and the anchors §1–§18 are frozen. §19 and §20 are optional; §20 is sketched at the end.
 
 Every repo-specific value the shared agent contract needs. One of these lives in each repo that
 runs `/adw-init`, `/adw-build`, `/pr-ready` or `/code-review`; the contract files themselves
@@ -602,3 +602,21 @@ docker exec plantaopro-db psql -U plantaopro_user -d postgres -tAc \
 
 `docker exec … psql` with a heredoc needs `-i`; without it the heredoc runs nothing and exits 0.
 The form above passes `-c`, so it is unaffected — keep it that way.
+
+## §20 — Visual port loop (optional)
+
+Absent → no unit may take `shape: port` (adw-core §3). This repository has no native render loop,
+so it has no §20. A repo that ports screens from a design reference declares:
+
+| | |
+|---|---|
+| **Renders** | one command that renders several screens in one build |
+| **Fast mode** | how to make the same command render fast (an env var), for rounds and the mutation check |
+| **Gate mode** | the same command without it: the only render a screen is graded on |
+| **Score** | the compare command, its exit codes and its threshold |
+| **References** | how the design reference is rendered, once per screen |
+| **Port surface** | the path globs a port unit's production diff must stay inside |
+
+Plus a fail-closed `verify` template: delete the previous render first, `&&`-chain every step up to
+the score capture, and exit 1 on an empty score.
+

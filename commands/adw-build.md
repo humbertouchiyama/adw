@@ -511,6 +511,13 @@ shipped trap. Count **production** files only, as adw-core §3 does. A diff exce
 does not bounce — it carries `· ⚠ depth envelope: N source files (spec promised ≤4)` on
 its run-report PR line (size is a proxy; the trap list is the risk).
 
+**Port units (`shape: port`, adw-core §3).** The implementer's brief carries `repo-profile §20`
+and the spec's `## Screens` table, and this loop: render every screen in one fast-mode build,
+score them all, fix every independent cause the images show, repeat until each screen passes or
+stops by the repo's own stop rule; then one gate-mode round, which is the grade. The envelope
+check swaps the file bound for §20's port surface: a production path outside it, or any trap
+domain, halts `blocked` — `shape escalation — diff touched <path>; re-cut the behaviour as a D2 unit`.
+
 ### 3.2 Gates (cheapest first, run in the worktree by the implementer)
 
 The gate list and its ordering live in `repo-profile §5`; which gates a given diff obligates lives
@@ -543,6 +550,9 @@ Three properties hold in every repo, whatever that file declares:
   `$VSHA`) · `D` → delete again. (File-level neutralisation is deliberately coarser
   than design §2.2(5)'s line-scoped wording; for grouped same-file units it conflates
   the units' changes — accepted, the check asserts only that each verify CAN fail.)
+  **A port unit runs this check, and the per-file sweep, with its `verify` in `repo-profile §20`'s
+  fast mode** — each run is then about a minute, not the gate mode's 5–10, so the sweep stays
+  affordable; §3.4's verifier still runs the `verify` once in gate mode.
   A verify still green against neutralised code is vacuous — feed it to the implementer
   as a genuine red (the test, not the code, is wrong; it counts as a fix cycle). Skip
   only for verify forms with no test to mutate (tsc/grep proofs — design §5.2's
