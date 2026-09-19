@@ -128,7 +128,7 @@ Rules:
   repo whose profile has no **complete §20**: every row holds a value, not the EXAMPLE's description —
   a command in backticks (Renders, Score), a command or env var (Fast mode), a number of minutes
   (Gate mode), a path or command (References), path globs (Port surface), a number of rounds (Stop
-  rule).
+  rule) — and the fail-closed `verify` template below the table.
 - No spec, no build: `/adw-build` refuses a unit whose header is missing any of the six
   required fields.
 
@@ -228,7 +228,7 @@ no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get thi
 
 - **Cut.** A screen with behaviour is two units: the port unit (the render) and a D2+ unit for
   state, actions, navigation and data. The port unit takes `after: [<behaviour unit>]`. A screen with
-  no behaviour is a port unit alone. A port unit never shares a sub-PR: its envelope is the port
+  no behaviour is a port unit alone. A port unit never shares a PR or sub-PR: its envelope is the port
   surface, which a neighbour's diff would break. Where §4's rules would group it with any unit, chain
   them instead, adding `after:` on that unit unless one of the two already orders them.
 - **Depth.** Always `depth: D1` + `shape: port`, never D0 (D0 has no fan-out, and the fan-out is
@@ -241,9 +241,9 @@ no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get thi
   check that does is the render. Surfaces print the word `port`, never `spec`.
 - **Spec.** The problem, a `## Screens` table — snapshot name (only `[A-Za-z0-9_-]`) · reference
   route or state · test class · baseline mismatch · ceiling — the fixture source and any declared
-  divergence. The baseline is **measured at init**, by rendering, never judged. A row whose state an
-  `after:` unit defines cannot render yet: its baseline is `deferred — <the state that unit
-  defines>`, its ceiling is §20's Score threshold (never a guess), and the implementer measures the
+  divergence. The baseline is **measured at init**, by rendering, never judged. A row that cannot render at init —
+  its state is defined by an `after:` unit, or its render timed out — has baseline `deferred —
+  <reason>` and §20's Score threshold as its ceiling (never a guess); the implementer measures the
   baseline in one gate-mode render before its first edit. The spec follows adw-init Phase 3's D0/D1
   budget (guard rail 200, hard stop 400).
 - **`verify`** renders every screen in the table in ONE gate-mode build, then `&&`-chains one
@@ -277,7 +277,7 @@ Units MAY be independent when each is independently correct, independently merge
 independently revertible — no shared files, no ordering hazard, **no consumption of another
 unit's output** (disjoint file lists do NOT prove independence).
 
-One exception: a port unit never shares a sub-PR (§3 Port shape); it chains instead.
+One exception: a port unit never shares a PR or sub-PR (§3 Port shape); it chains instead.
 
 Default when it could go either way: **group**. A separate base-targeting PR is earned,
 never chosen — each costs the owner +1 review, +1 local preview, +1 merge consent.

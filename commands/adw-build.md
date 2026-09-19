@@ -527,19 +527,37 @@ into the table, committed on its own as `docs(spec): baselines` after the spec-c
 every screen in one fast-mode build, score them all, fix every independent cause the images show,
 repeat until each screen passes, or §20's stop rule (which names a round cap) stops the loop; then
 one gate-mode round, which is the grade. The implementer returns the number of rounds it ran across
-all fix cycles, for the evidence block. **Every gate-mode `verify` run of a port unit** — the
-baseline render, the grade round, §3.2's mutation fallback and per-file sweep, and §3.4's verifier
-run — can outlast the `Bash` timeout (600000 ms): run it as a background command that writes its
-exit code to a fresh file (`mktemp`, never a reused path), then wait for that file with
-`review-core.md` §10 step 3's one blocking call (its deadline in the command, the exit file in place
-of the `<OUT>` count), re-issued until §20's Gate mode maximum minutes have passed. Past them, kill
-the build and return `gate-mode build exceeded <n> min`: the orchestrator classifies it an
-environment fault (§3.3). Never poll with `echo` calls: a subagent that polls spends most of its
-cost doing it. A screen still over its ceiling after the grade round halts `blocked` — `port not
-converged — <screen> <mismatch> over ceiling <c>; fix the render, or edit that ceiling in the
-unit's spec and re-run /adw-build`, an owner decision, not a fix cycle. The envelope check swaps
+all fix cycles, for the evidence block. **Every gate-mode `verify` run of a port unit** — the baseline render, the grade round, §3.2's
+mutation fallback and per-file sweep, and §3.4's verifier run — goes through the gate-mode wait
+below. A screen still over its ceiling after the grade round halts `blocked` — `port not
+converged — <screen> <mismatch> over ceiling <c>; default: raise that ceiling in the unit's spec on
+the PR branch, then /pr-ready <N>`, an owner decision, not a fix cycle. The envelope check swaps
 the file bound for §20's port surface: a production path outside it, or any trap
 domain, halts `blocked` — `shape escalation — diff touched <path>; re-cut the behaviour as a D2 unit`.
+
+**The gate-mode wait.** A gate-mode build can outlast the `Bash` timeout (600000 ms), so it runs in
+the background and its exit code is read from a file. Launch, in one Bash call that prints the exit
+file, the pid and the start time — copy all three as literals into every later call, since shell
+variables do not survive between calls:
+
+```bash
+F="$(mktemp -u)"; ( ( <the verify command> ); echo $? >"$F.tmp" && mv "$F.tmp" "$F" ) >"$F.log" 2>&1 & echo "$F $! $(date +%s)"
+```
+
+Then wait, in one Bash call with `timeout: 600000`, re-issued until it prints an exit code (the
+deadline of one call lives in the command, as in `review-core.md` §10 step 3):
+
+```bash
+end=$(( $(date +%s) + 570 )); until [ -s "<F>" ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; cat "<F>" 2>/dev/null || echo running
+```
+
+The exit file exists only once the build has finished (`mv` is atomic), so a non-empty file is the
+result. When the time since `<start>` passes §20's Gate mode maximum minutes, run
+`pkill -P <pid>; kill <pid>` and return `gate-mode build exceeded <n> min`: the orchestrator
+classifies it an environment fault (§3.3), not a red. Never poll with `echo` calls: a subagent that
+polls spends most of its cost doing it. The brief of every agent that runs a gate-mode `verify` — the
+implementer, and the §3.4 verifier (its brief is the orchestrator's on the v1 pass and the §3.6
+driver's on v2) — pastes these two commands and §20's Gate mode row, and needs no other file for it.
 
 ### 3.2 Gates (cheapest first, run in the worktree by the implementer)
 
@@ -576,8 +594,9 @@ Three properties hold in every repo, whatever that file declares:
   **A port unit runs this check, and the per-file sweep, with its `verify` in `repo-profile §20`'s
   fast mode**, so the sweep stays affordable. Run the fast-mode `verify` on the unneutralised code
   first: if it is not green there, a red after neutralising proves nothing — run the whole check in
-  gate mode instead (each gate-mode run waited on as §3.1 says). §3.4's verifier repeats the check
-  the same way and still runs the unit's `verify` once in gate mode, waited on the same way.
+  gate mode instead, aggregate check only: the per-file sweep is skipped and the PR line carries
+  `· ⚠ sweep skipped (gate mode)`. §3.4's verifier repeats the check the same way and still runs the
+  unit's `verify` once in gate mode. Each gate-mode run uses §3.1's wait.
   A verify still green against neutralised code is vacuous — feed it to the implementer
   as a genuine red (the test, not the code, is wrong; it counts as a fix cycle). Skip
   only for verify forms with no test to mutate (tsc/grep proofs — design §5.2's
@@ -630,6 +649,8 @@ fault, no fix cycle spent):
 
 - any fault in the per-repo list at `repo-profile §10` — dependency/link resolution failures, a
   database or service that is down, a missing env file, a served-build or port unavailable
+- a port unit's gate-mode build that outlasts §20's Gate mode minutes (`gate-mode build exceeded <n>
+  min`, §3.1)
 - a gate red that REPRODUCES at `<BASE>` (when in doubt, a `model: sonnet` relay runs the
   failing gate once against a base checkout and returns the exit code — the orchestrator runs
   no gate, §3) — a baseline fault, not the unit's; report it in the PR body as
@@ -675,9 +696,9 @@ pipeline knows:
   contract field a generic PR does not have. A report missing it is a red, by the same
   rule as a missing gate row.
 - **A port unit's render grade.** The verifier's report must ALSO carry the unit's `verify` run
-  once in gate mode at `$VSHA`, with its exit code, waited on as §3.1 says with the `review-core.md`
-  path and §20's Gate mode row from its brief. A report missing it is
-  a red, by the same rule as a missing gate row.
+  once in gate mode at `$VSHA`, with its exit code, waited on with §3.1's wait block and §20's Gate
+  mode row, both pasted in its brief. A report missing it is a red, by the same rule as a missing
+  gate row — except `gate-mode build exceeded <n> min`, which is an environment fault (§3.3).
 - **Where the evidence lands: the PR body, not only a comment.** Copy the per-gate table
   and the mutation row into the PR body at 3.5 (re-pass → edit the body). A review comment
   is the wrong home for the one artifact that has to outlive the run: three PRs across two
@@ -805,8 +826,8 @@ semantic-conflict risk.
 
 **Dispatch ONE `model: sonnet` review driver per PR** (adw-core §8's Drive row). Its brief
 carries "wait for every agent you dispatch by `review-core.md` §10, never by polling" (for a port
-unit also the absolute path of `review-core.md` and `repo-profile §20`'s Gate mode row, which the
-driver hands the verifier for its gate-mode `verify`, §3.1), and:
+unit also §3.1's wait block and `repo-profile §20`'s Gate mode row, which the driver pastes into the
+verifier's brief for its gate-mode `verify`), and:
 run `/pr-ready <N> apply` with `BASE`, `PASS=v2` and `REF` set to 3.4's values, carrying the
 unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and return
 **Layer 2 only, plus the open-findings lines below** (`/pr-ready` §7 — suppress Layer 1 in the

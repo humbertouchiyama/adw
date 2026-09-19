@@ -38,7 +38,7 @@ optional §19 and §20 where a profile carries them. Do not renumber. Add new se
 | §17 | Convention doc routing | code-review Phase 6.2 |
 | §18 | Disposable state | cleanup Phase 3, 5 |
 | §19 | Review-lane map, layer to angle (optional; absent → derived) | code-review lane table |
-| §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2 |
+| §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2/§3.4/§3.6 |
 
 ---
 

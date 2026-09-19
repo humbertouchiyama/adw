@@ -119,7 +119,7 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    (adw-core §3 Port shape) — an exception to item 1's vertical cut;
 > 3. packaging per adw-core §4, with `after` edges — remember: a unit that reads another
 >    unit's output is NOT independent, no matter how disjoint the file lists look. A port unit
->    never shares a sub-PR (adw-core §3);
+>    never shares a PR or sub-PR (adw-core §3);
 > 4. a `verify` COMMAND per unit (adw-core §2 rules — never a prose sentence);
 > 5. spec criteria covered by no unit — mandatory, print `none` explicitly if none;
 > 6. **three separate lists, split by you, not by the renderer** — questions, hazards, fyi.
@@ -252,18 +252,19 @@ prior-unit table, so their specs can cite what shipped.
 **By depth:**
 - **Port (`shape: port`, adw-core §3) — replaces the D1 bullet below for this unit:** "Write
   `shape: port` in the header. Render the reference for every screen, and the current app for every
-  screen it can show, with `repo-profile §20`'s commands in GATE mode. Wait for each build as
-  adw-build §3.1 says (`review-core.md` §10 step 3, at its path in the main checkout's
-  `.claude/adw/cache/commands/`, for §20's Gate mode minutes); past them, kill the build and write
-  `deferred — render timed out` for its rows. Write the `## Screens` table with the columns adw-core
-  §3 lists (snapshot names only `[A-Za-z0-9_-]`), each baseline mismatch measured; a row whose state
-  an `after:` unit defines cannot show yet: write `deferred — <the state that unit defines>`, with
-  §20's Score threshold as its ceiling. Do not judge a baseline you did not render. The approved
-  `verify` is §20's template as triage instantiated it: repeat every per-row part of it for each row
-  you wrote, drop those of a row you did not write, and change nothing else. Follow the D0/D1 budget
-  (Phase 3). Write the spec and stop: no `## Implementation`, no plan." An `amend:` that adds a row
-  gets the same render for that row. Render output is disposable state (`repo-profile §18`). A
-  `render timed out` row is one owner question in Phase 5's `needs you`. No critical pass.
+  screen it can show, with `repo-profile §20`'s commands in GATE mode, each run through the wait
+  below. Write the `## Screens` table with the columns adw-core §3 lists (snapshot names only
+  `[A-Za-z0-9_-]`), each baseline mismatch measured. A row that cannot render — its state is defined
+  by an `after:` unit, or its render passed §20's Gate mode minutes and you killed it — gets baseline
+  `deferred — <reason>` and §20's Score threshold as its ceiling. Do not judge a baseline you did
+  not render. The approved `verify` is §20's template as triage instantiated it: repeat every
+  per-row part of it for each row you wrote, drop those of a row you did not write, and change
+  nothing else. Keep the spec near 200 lines (guard rail; hard stop 400). Write the spec and stop:
+  no `## Implementation`, no plan." The orchestrator pastes after that prompt adw-build §3.1's
+  gate-mode wait (its two commands) and §20's Gate mode row, read from the cache at
+  `.claude/adw/cache/commands/adw-build.md`. An `amend:` that adds a row gets the same render for
+  that row. Render output is disposable state (`repo-profile §18`). A `render timed out` row is one
+  owner question in Phase 5's `needs you`. No critical pass.
 - **D0 (adw-core §3):** no fan-out — the triage agent's draft IS the spec;
   write it to the flat path, then straight to Phase 4. No plan, no critical pass.
 - **D1 (bug):** "Use superpowers:systematic-debugging to reach a reproduced root cause —
@@ -384,9 +385,10 @@ Fix in place on any failure, except where a bullet says it only reports:
   an `after:` unit's state defines, or a render that timed out), and whose `verify` scores every row:
   split the `verify:` value on `&&`, and each snapshot name must appear as a whole token (the
   characters on both sides are outside `[A-Za-z0-9_-]`; `login` does not count inside `login-error`)
-  in a segment that begins with §20's Score command, after any `bash -c '` wrapper. A `verify` that
-  misses a row goes back to its authoring agent to repeat the template's per-row parts; no other
-  edit to an approved `verify`;
+  in a segment that contains §20's Score command (the render and delete segments do not). A
+  `verify` that misses a row goes back to its authoring agent once, to repeat the template's
+  per-row parts; a second miss is one owner question in `needs you`; no other edit to an approved
+  `verify`;
 - **every D2 spec carries a `## Implementation` section** — `grep -c '^## Implementation'`
   returns 1. A D2 spec without it has no build input and goes back to its authoring agent;
 - `wc -l` every **D2/D3** spec and plan, and every port spec (D0/D1 row), against the artifact
