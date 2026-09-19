@@ -114,9 +114,12 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 > 1. the unit cut per §3.1 — vertical by behaviour; a layer cut only when one layer
 >    contains the entire behaviour; the rule is symmetric (merge freely — five copy fixes
 >    are one unit); sweep-shaped work may legitimately be ONE unit;
-> 2. a depth per unit (D1–D3 per adw-core §3);
+> 2. a depth per unit (D1–D3 per adw-core §3). When `.claude/repo-profile.md` has a complete §20 (adw-core §2), cut
+>    visual parity apart from behaviour and propose `shape: port` for the render-only units
+>    (adw-core §3 Port shape) — an exception to item 1's vertical cut;
 > 3. packaging per adw-core §4, with `after` edges — remember: a unit that reads another
->    unit's output is NOT independent, no matter how disjoint the file lists look;
+>    unit's output is NOT independent, no matter how disjoint the file lists look. A port unit
+>    never shares a PR or sub-PR (adw-core §3);
 > 4. a `verify` COMMAND per unit (adw-core §2 rules — never a prose sentence);
 > 5. spec criteria covered by no unit — mandatory, print `none` explicitly if none;
 > 6. **three separate lists, split by you, not by the renderer** — questions, hazards, fyi.
@@ -135,7 +138,8 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    where the human decides that targeting, and they cannot decide it from a line the
 >    brief surface hides);
 > 8. depth rationale — one line per unit (`why-<word>`, the §3 depth word), naming which
->    D1 criteria (adw-core §3) hold or fail. A single-unit intent meeting every D1
+>    D1 criteria (adw-core §3) hold or fail (a port unit: `why-port`, naming the trap-domain check
+>    and §20's port surface instead). A single-unit intent meeting every D1
 >    criterion is proposed `express` (D0) when D0 is active (adw-core §3 status line) —
 >    then include the draft
 >    flat spec (header + body per adw-core §2) in the proposal itself; its code
@@ -173,7 +177,7 @@ Do not proceed without an answer.
 
 ## Phase 2 — the human gate
 
-- `approve` → freeze the proposal (units, depths, packaging, `after`, `verify`) → Phase 3,
+- `approve` → freeze the proposal (units, depths, `shape`, packaging, `after`, `verify`) → Phase 3,
   then Phase 5 prints the handoff and **continues straight into `/adw-build <slug>` in the
   same session, same turn** (Phase 5 step 3 — that step, not this sentence, is what
   executes it). Gated on a clean exit: a handoff carrying a non-empty `needs you` stops
@@ -185,7 +189,13 @@ Do not proceed without an answer.
   (adw-core §7). Not an exit — the gate stays open.
 - `re-cut "<instruction>"` → send the instruction to the SAME triage agent
   (SendMessage — context intact), re-render the approval surface.
-- `regroup` / `depth` → apply mechanically, re-render the approval surface.
+- `regroup` / `depth` → apply mechanically, re-render the approval surface. `regroup` refuses to put
+  a port unit in a shared PR or sub-PR, and to put another unit in a port unit's.
+- `shape "u4→port"` / `shape "u4→none"` → set or clear a unit's `shape: port` (adw-core §3 Port
+  shape). `port` also sets `depth: D1`, refuses when the profile has no complete §20 (adw-core §2),
+  and first chains the unit out of a shared PR or sub-PR; `none` leaves the depth at D1 until a
+  `depth` verb moves it. Re-render the approval surface. `depth` never takes `port`, and refuses a
+  `shape: port` unit: clear the shape first.
 - `new intent` (extend mode only) → drop the extension, cut a fresh slug, re-render the approval surface.
 
 Any number of rounds. Only `approve` / `specs only` exits the gate.
@@ -203,7 +213,10 @@ across re-cut rounds the gate total accumulates and the re-render itself is mach
 ## Phase 3 — fan-out (parallel, one subagent per unit)
 
 Dispatch all unit agents in a single message (they are independent — documents only, main
-tree, distinct files). Each prompt is composed from the frozen proposal:
+tree, distinct files), except port units, which run one at a time: they render in the shared main
+tree, and §20's `verify` template deletes the previous renders first. The first port unit's agent goes
+in that message and each later one is dispatched when the previous one returns.
+Each prompt is composed from the frozen proposal:
 
 **Pin each unit agent by the unit's own `depth:` (adw-core §8):** `model: opus` at D3,
 `model: sonnet` at D0–D2. Depth is per unit, not per intent — a mixed intent dispatches
@@ -222,7 +235,8 @@ with the most to discover), so blocking on it is a pure loss every time.
 > You are producing the contract for unit `uNN` of intent `<slug>`. Write documents only —
 > never code, never a branch. Spec path: `<exact path per adw-core §1>`. The spec MUST
 > open with the exact header block (adw-core §2):
-> `unit / intent / depth / packaging / after / verify` — values as approved. The spec body
+> `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`
+> when the unit was approved as `port`. The spec body
 > states: the problem, the change, acceptance criteria, and (bugs) root cause with
 > evidence. Reference only plugin skills (`superpowers:*`) or tracked commands.
 > Code snippets in the spec/plan MUST follow the repo comment rule (`repo-profile §2`): one
@@ -236,6 +250,24 @@ in, keeping the unit id, header and any plan. New units get the normal preamble 
 prior-unit table, so their specs can cite what shipped.
 
 **By depth:**
+- **Port (`shape: port`, adw-core §3) — replaces the D1 bullet below for this unit:** "Write
+  `shape: port` in the header. Render the reference for every screen, and the current app for every
+  screen it can show, with `repo-profile §20`'s commands in GATE mode, each run through the wait
+  below. Write the `## Screens` table with the columns adw-core §3 lists (snapshot names only
+  `[A-Za-z0-9_-]`), each baseline mismatch measured. A row that cannot render gets §20's Score
+  threshold as its ceiling and a baseline of `deferred — <the state an `after:` unit defines>`, or,
+  when its render passed §20's Gate mode minutes and was killed, `deferred — render timed out`. Do
+  not judge a baseline you did not render. The approved `verify` is §20's template as triage
+  instantiated it: repeat every per-row part of it for each row you wrote, drop those of a row you
+  did not write, and change nothing else. Keep the spec near 200 lines (guard rail; hard stop 400).
+  Write the spec and stop: no `## Implementation`, no plan." The orchestrator pastes after that
+  prompt adw-build §3.1's gate-mode wait (both commands and the paragraph after them, read from
+  `.claude/adw/cache/commands/adw-build.md`) and `repo-profile §20`'s Gate mode row (read from
+  `.claude/repo-profile.md`); for the author, the block's `return gate-mode build exceeded <n> min`
+  means: write `deferred — render timed out` for the rows that render covers, and go on. An `amend:`
+  that adds a row gets the same render for that row. Render output is disposable state
+  (`repo-profile §18`). A `deferred — render timed out` row is one owner question in Phase 5's
+  `needs you`. No critical pass.
 - **D0 (adw-core §3):** no fan-out — the triage agent's draft IS the spec;
   write it to the flat path, then straight to Phase 4. No plan, no critical pass.
 - **D1 (bug):** "Use superpowers:systematic-debugging to reach a reproduced root cause —
@@ -309,7 +341,7 @@ that pair collapsed on the reasoning that a merged artifact drops the second fil
 restatement of problem, ACs and context. Retune from run evidence, and until then treat a
 guard-rail breach as one `⚠ over-guard-rail` line and nothing else.
 
-**Critical passes** (D2: spec; D3: design + spec + plan) — for each artifact, dispatch a
+**Critical passes** (D2: spec; D3: design + spec + plan; none for a port unit) — for each artifact, dispatch a
 FRESH subagent **pinned `model: sonnet`**. A refute pass finds and reports; the orchestrator
 adjudicates. That makes it a finder, not an author, which is adw-core §8's line. All 12
 critical passes of the `team-active-seat-model` run were unpinned and so inherited Opus,
@@ -350,9 +382,21 @@ Fix in place on any failure, except where a bullet says it only reports:
   any other tool wraps in `bash -c '…'`;
 - **every D3 unit has a plan file; D0/D1/D2 units have none** — a plan file next to a D2
   spec is a contract violation, not a bonus (adw-core §3);
+- **every unit approved as `port` is D1, carries `shape: port` in its header, shares no PR or
+  sub-PR with another unit, and the profile has a complete §20 (adw-core §2); its spec carries one
+  `## Screens` table** whose rows each have a measured baseline (`deferred — <state>` only for a row
+  an `after:` unit's state defines, otherwise `deferred — render timed out`; a `render timed out`
+  row adds one owner question to `needs you`, whoever wrote it), and whose `verify` scores every row:
+  split the `verify:` value on `&&`, and each snapshot name must appear as a whole token (the
+  characters on both sides are outside `[A-Za-z0-9_-]`; `login` does not count inside `login-error`)
+  in a segment that contains §20's Score command (the render and delete segments do not). A
+  `verify` that misses a row goes back to its authoring agent once, to repeat the template's
+  per-row parts; a second miss is one owner question in `needs you`; no other edit to an approved
+  `verify`;
 - **every D2 spec carries a `## Implementation` section** — `grep -c '^## Implementation'`
   returns 1. A D2 spec without it has no build input and goes back to its authoring agent;
-- `wc -l` every **D2/D3** spec and plan against the artifact budget table (Phase 3) — the
+- `wc -l` every **D2/D3** spec and plan, and every port spec (D0/D1 row), against the artifact
+  budget table (Phase 3) — the
   guard rail, then the hard stop, and at D3 also spec < plan (ratio). The artifact-vs-diff
   ratio cannot be checked here (no diff yet); adw-build §3.5 measures it. Only a **ratio
   inversion or a hard-stop breach** goes back to its OWN authoring agent to fit — never trim

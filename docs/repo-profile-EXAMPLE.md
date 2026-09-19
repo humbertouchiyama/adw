@@ -4,7 +4,7 @@
 > repository ADW was built in: a full-stack TypeScript monorepo (React 19 + Vite, Hono + PostgreSQL
 > 16 + Drizzle, one shared npm workspace). Copy it to `.claude/repo-profile.md` in your repo and
 > replace **every** value. Keep the section numbers: the contract cites them as `repo-profile §N`
-> and the anchors §1–§18 are frozen.
+> and the anchors §1–§18 are frozen. §19 and §20 are optional; §20 is sketched at the end.
 
 Every repo-specific value the shared agent contract needs. One of these lives in each repo that
 runs `/adw-init`, `/adw-build`, `/pr-ready` or `/code-review`; the contract files themselves
@@ -14,8 +14,8 @@ runs `/adw-init`, `/adw-build`, `/pr-ready` or `/code-review`; the contract file
 The format is prose and tables, not a parsed config. The reader is an agent, so precision matters
 more than syntax.
 
-**Section anchors are frozen** — the contract files cite `repo-profile §1`…`§18` by number. Do not
-renumber. Add new sections at the end.
+**Section anchors are frozen** — the contract files cite `repo-profile §1`…`§18` by number, and the
+optional §19 and §20 where a profile carries them. Do not renumber. Add new sections at the end.
 
 | § | Section | Read by |
 |---|---|---|
@@ -37,6 +37,8 @@ renumber. Add new sections at the end.
 | §16 | Project rule tables | code-review Phase 5.2, 5.3 |
 | §17 | Convention doc routing | code-review Phase 6.2 |
 | §18 | Disposable state | cleanup Phase 3, 5 |
+| §19 | Review-lane map, layer to angle (optional; absent → derived) | code-review lane table |
+| §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2/§3.3/§3.4/§3.6 |
 
 ---
 
@@ -602,3 +604,26 @@ docker exec plantaopro-db psql -U plantaopro_user -d postgres -tAc \
 
 `docker exec … psql` with a heredoc needs `-i`; without it the heredoc runs nothing and exits 0.
 The form above passes `-c`, so it is unaffected — keep it that way.
+
+## §20 — Visual port loop (optional)
+
+A profile that keeps this section declares a render loop, and `/adw-init` then proposes
+`shape: port` units (adw-core §3). **Delete the whole section unless the repo has one**: absent →
+no unit may take `shape: port`. A repo that ports screens from a design reference fills every row
+below with a value, not with the description (adw-core §2 calls that a complete §20):
+
+| | |
+|---|---|
+| **Renders** | one command that renders several screens in one build; add its output path to §18 (disposable state) |
+| **Fast mode** | how to make the same command render fast (an env var), for rounds and the mutation check |
+| **Gate mode** | the same command without it: the only render a screen is graded on; and the most minutes it may take (`/adw-build` waits that long, then kills it) |
+| **Score** | the compare command, its exit codes and its threshold |
+| **References** | how the design reference is rendered, once per screen, into a path that a linked worktree and a fresh verify worktree (§4) also read |
+| **Port surface** | the path globs a port unit's production diff must stay inside |
+| **Stop rule** | when a round loop stops without a pass (plateau, thrash), and **a maximum number of rounds**: required, an incomplete §20 refuses every port unit (adw-core §2) |
+
+Plus a fail-closed `verify` template for several screens: delete the previous renders, render
+them all in one build, then `&&`-chain one score per screen, each exiting 1 on an empty score. Every part
+that names a screen (its score, and any per-screen delete or filter) is a per-row part that
+`/adw-init` repeats for each row. Its first token must be on §5's allowlist (adw-init Phase 4); wrap it in `bash -c '…'` otherwise.
+

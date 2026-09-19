@@ -6,7 +6,8 @@ description: "Shared ADW contract — spec headers, naming, depth ladder, packag
 
 **This file lives in the `adw` repository and is fetched, not copied** (§9). It is repo-agnostic:
 every command, path, branch and gate it needs is declared per-repo in the consuming repo's
-`.claude/repo-profile.md`, cited throughout as `repo-profile §N` against frozen anchors §1–§18.
+`.claude/repo-profile.md`, cited throughout as `repo-profile §N` against frozen anchors §1–§18,
+plus two optional ones a profile may omit: §19 (code-review lanes) and §20 (visual port loop, §3).
 Both `/adw-init` and `/adw-build` read that file at their Phase 0 alongside this one — it is not
 auto-included.
 
@@ -103,6 +104,7 @@ packaging: chain A / sub-PR 2     # or: independent · grouped independents: ind
 after: [u1, u2]                   # in-chain ordering; [] when independent
 verify: <a command per the rules below and repo-profile §5's allowlist>
 base: <a branch that exists on origin>   # OPTIONAL — omitted = repo-profile §3's default base
+shape: port                       # OPTIONAL — §3 Port shape; D1 only, needs a complete repo-profile §20 (below)
 ```
 
 Rules:
@@ -111,7 +113,7 @@ Rules:
   hits proves a deletion. Where a real test can express it, emit the test. The first token must be
   on `repo-profile §5`'s allowlist, and `repo-profile §12`'s single-test traps bind the form.
 - `after` names only units of the same intent; the graph must be acyclic.
-- **`base:` is the one OPTIONAL field** — the branch the whole intent forks from and its
+- **`base:` is optional** (so is `shape:`, below) — the branch the whole intent forks from and its
   PRs target. Omitted = `repo-profile §3`'s default base. Intent-wide: every spec of one intent
   carries the same value or none (`/adw-build` refuses a mixed set), and the branch must exist on
   origin. It substitutes for the default base throughout `/adw-build` (chain open, unit branches,
@@ -120,6 +122,13 @@ Rules:
   bearing on the contract either way: the contract comes from its own repository (§9), not from any
   branch of this one. Three straight runs needed a non-default base; run-5 abandoned `/adw-build`
   for want of it — design §10 v2.8.
+- **`shape:` is optional, and `port` is its only value** (§3 Port shape). `/adw-build` refuses a
+  `shape: port` unit whose depth is not D1, that shares a PR or sub-PR with another unit (its
+  `packaging:` value ends `/ PR N` or `/ sub-PR N` and another unit carries the same value), or in a
+  repo whose profile has no **complete §20**: every row holds a value, not the EXAMPLE's description —
+  a command in backticks (Renders, Score), a command or env var (Fast mode), a number of minutes
+  (Gate mode), a path or command (References), path globs (Port surface), a number of rounds (Stop
+  rule) — and the fail-closed `verify` template below the table.
 - No spec, no build: `/adw-build` refuses a unit whose header is missing any of the six
   required fields.
 
@@ -209,6 +218,50 @@ contract approval (no fan-out, no critical-pass subagent — the mutation gate c
 the discriminating-verify property; AC completeness has no catcher but the approval glance —
 accepted at this tier). The do-side never thins at any depth.
 
+**Port shape (`shape: port`) — status: TRIAL, the first run under it is the proof.**
+A unit whose acceptance is **pixel parity with a design reference**, graded by `repo-profile §20`'s
+render loop. It exists because two costs came apart on one run (AXCMedApp `native-auth-flow`,
+2026-09-18): the refute passes on its logic units caught three defects no screenshot can show — an
+app-switcher privacy leak, a sign-up flag leaking to the next user, a double sign-in race — while
+its one pure reskin (two screens, D2) spent over two hours in a one-edit-per-build pixel loop that
+no refute finding changed by a pixel. Behaviour keeps the ladder. Pixels get this path.
+
+- **Cut.** A screen with behaviour is two units: the port unit (the render) and a D2+ unit for
+  state, actions, navigation and data. The port unit takes `after: [<behaviour unit>]`. A screen with
+  no behaviour is a port unit alone. A port unit never shares a PR or sub-PR: its envelope is the port
+  surface, which a neighbour's diff would break. Where §4's rules would group it with any unit, chain
+  them instead, adding `after:` on that unit unless one of the two already orders them.
+- **Depth.** Always `depth: D1` + `shape: port`, never D0 (D0 has no fan-out, and the fan-out is
+  where baselines are rendered). Of the four D1 criteria, only the trap-domain one
+  applies as written. The root-cause one does not apply (there is no bug). The ≤4-production-file
+  bound is replaced by §20's **port surface**: the unit's production diff stays inside it. The
+  verify-home criterion is met by §20's render-and-score command, whose red-on-revert the mutation
+  check measures as for any verify. A port unit never escalates to D2 for failing the criteria this
+  bullet replaces. There is no critical pass: a refute pass over prose cannot see pixels, and the
+  check that does is the render. Surfaces print the word `port`, never `spec`.
+- **Spec.** The problem, a `## Screens` table — snapshot name (only `[A-Za-z0-9_-]`) · reference
+  route or state · test class · baseline mismatch · ceiling — the fixture source and any declared
+  divergence. The baseline is **measured at init**, by rendering, never judged. A row that cannot render at init —
+  its state is defined by an `after:` unit, or its render timed out — has baseline `deferred —
+  <the state that unit defines>` or `deferred — render timed out`, and §20's Score threshold as its
+  ceiling (never a guess); the implementer measures the baseline with one gate-mode run of §20's
+  Renders and Score commands before its first edit. The spec follows adw-init Phase 3's D0/D1
+  budget (guard rail 200, hard stop 400).
+- **`verify`** renders every screen in the table in ONE gate-mode build, then `&&`-chains one
+  fail-closed score per row (§20's template). A row the `verify` does not score is a Phase 4 failure.
+  The approved `verify` is that template as triage instantiated it; the spec's author repeats every
+  per-row part of it for each row it wrote (one score per row included), drops those of a row it
+  did not write, and changes nothing else. The baseline in the table is measured in gate mode too, since
+  that is what `verify` grades.
+- **Build** (adw-build §3.1, §3.2): the implementer loops in §20's fast mode, every screen per
+  build, then grades once in gate mode, which §20's Gate mode row bounds in minutes. The loop stops
+  by §20's stop rule, which names a round cap. The
+  mutation check, its per-file sweep and the §3.4 verifier's repeat of both run `verify` in fast
+  mode; when the fast one is not green on the unneutralised code, the aggregate check runs in gate
+  mode and the sweep is skipped. The verifier's own `verify` run is gate mode. Port units render one at a time. A diff that leaves the surface or
+  touches a trap domain bounces `blocked` (`shape escalation`), the same way a D0/D1 depth
+  envelope does.
+
 ## 4. Packaging
 
 Two shapes: **independent** (unit or grouped units → one PR targeting the intent's base; grouped
@@ -224,6 +277,8 @@ Units MUST share a sub-PR (or PR) when any holds:
 Units MAY be independent when each is independently correct, independently mergeable, and
 independently revertible — no shared files, no ordering hazard, **no consumption of another
 unit's output** (disjoint file lists do NOT prove independence).
+
+One exception: a port unit never shares a PR or sub-PR (§3 Port shape); it chains instead.
 
 Default when it could go either way: **group**. A separate base-targeting PR is earned,
 never chosen — each costs the owner +1 review, +1 local preview, +1 merge consent.
@@ -294,7 +349,8 @@ Three rules (owner feedback, structural after prose failed twice):
 3. **Decisions read plainly** — one sentence a non-engineer can act on, recommended
    default first. Engineering detail one level down (spec or `<details>` fold).
 4. **Depth renders as its §3 word** — `express` / `spec` / `plan` / `design` — on every
-   surface and in every `note` line. `D<N>` is the contract's code and the spec header's
+   surface and in every `note` line. A `shape: port` unit renders as `port` instead of `spec`.
+   `D<N>` is the contract's code and the spec header's
    value; it is never printed to a human.
 
 ### approval — the human gate (interactive, `/adw-init`)
@@ -322,7 +378,7 @@ cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · 
    uncharted territory>                    ← these print only when they exist
 
 approve → cut + build · specs only → stop after specs · detail · re-cut "<instruction>" ·
-regroup "u3→sub-PR 1" · depth "u4→spec"
+regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port"   ← `shape` only when repo-profile has a complete §20 (§2)
 
                         ← nothing follows this block: no summary, no narration
 ```
@@ -350,7 +406,7 @@ pipeline, and the pre-v2.8 shape buried both the cut and the asks under rational
   decided with its default applied is `fyi` (hidden). `⚠` is the one zone that grew when
   `approve` started building — see the verb semantics below.
 - **The cut line prints the depth WORD** (§3), never `D<N>`. `detail` prints `why-<word>:`
-  to match.
+  to match (`why-port` for a port unit).
 - **Anything that needs an answer is a numbered `QN`, never an fyi bullet.** A line
   containing "confirm", "your call", or a question mark inside `fyi` is a contract
   violation — run-6 buried its base-branch override there as concern #1 of ten. Q ids
@@ -738,7 +794,7 @@ and it names an unverified contract rather than a stale one it cannot do anythin
 failure with no cache at all is **exit 1**, and the run stops.
 
 **What is still per-repo.** `repo-profile.md`, authored in the consuming repo and never fetched.
-Every file above cites it as `repo-profile §N` with frozen anchors §1–§18. A contract file that
+Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19 and §20 optional). A contract file that
 needs a value which could differ between two repos is wrong: the value belongs in the profile. The
 failing test is always the same — could this exact sentence be true in a repo with a different
 stack? If not, it names a value, and the value moves.

@@ -120,8 +120,10 @@ gate file to get green · let a subagent create its own worktree.
    extended single-unit intent, the flat file being its first unit's spec (adw-core §1.1)
    — parse both into one manifest.
 4. Parse every spec header (adw-core §2). Any missing required field, duplicate unit id,
-   an `intent:` value that does not equal the slug, an `after` cycle, or a `base:`
-   present on some units but not all (or with differing values) → refuse the whole
+   an `intent:` value that does not equal the slug, an `after` cycle, a `base:`
+   present on some units but not all (or with differing values), or a `shape: port` unit
+   whose depth is not D1, that shares a PR or sub-PR with another unit, or whose repo profile
+   has no complete §20 (adw-core §2) → refuse the whole
    run, print what to fix, stop. No partial builds on a broken manifest.
 5. **Base resolution:** `INTENT_BASE` = the intent's `base:` header value, default
    `repo-profile §3`'s default base; `git ls-remote --heads origin <INTENT_BASE>` must return it,
@@ -237,16 +239,18 @@ gate file to get green · let a subagent create its own worktree.
   fault; charging the owner's real 90 minutes to the machine hides a schedulable halt. Only
   the stamps separate them, which is the whole reason adw-core §7.1 defines them.
 - **Independent PRs build in parallel** — one worktree each; never two agents in one
-  working tree.
+  working tree — except port units, which build one at a time with each other (adw-core §3).
 - **Chains build by DAG level, not in a line.** `after:` (adw-core §2) is a graph the init
   phase already validated acyclic — schedule against it. Units whose `after:` sets are all
   satisfied are **siblings** and build concurrently, one worktree and one unit branch each,
-  all cut from `origin/adw/<slug>`. Two exclusions, checked before a level starts:
+  all cut from `origin/adw/<slug>`. Three exclusions, checked before a level starts:
   - **Migration siblings serialize**, where the repo has migrations at all. Two units that both
     author one share whatever ordering key the migration runner reads — a shared high-water mark
     that must not be raced. Build the lower unit id
     first; the other joins the next level. `team-active-seat-model`'s u4 says this in its own
     spec — its `after: [u1]` is a *migration* dependency, nothing in it reads u1's column.
+  - **Port siblings serialize** (adw-core §3), a TRIAL default: each render loop is a run of full
+    builds. Build the lower unit id first; the other joins the next level.
   - **File-overlap siblings serialize.** `after:` declares a *logical* dependency; it does
     not promise disjoint files. Plans here are dense with `path:line` references, so
     intersect them:
@@ -428,7 +432,8 @@ waiting for a hand-back that never arrives, and a wait has no timeout — so no 
 kind runs, and this ceiling is evaluated at the *next* boundary, as a post-hoc `failed`
 classification rather than a live trigger. It genuinely bounds a phase built of many
 returning calls; it does **not** bound a true hang. A hung *gate* is already bounded — the
-`Bash` timeout maxes at 600000 ms. If a live bound on subagent hangs is ever wanted, the
+`Bash` timeout maxes at 600000 ms, and a port unit's backgrounded gate-mode build by its own
+deadline (§3.1). If a live bound on subagent hangs is ever wanted, the
 mechanism is a `Monitor` poll from this top-level session (`review-core.md` §10 exempts it), not
 a number in this paragraph.
 **Precautionary, not evidenced** — no run has yet produced a hung subagent.
@@ -515,6 +520,58 @@ shipped trap. Count **production** files only, as adw-core §3 does. A diff exce
 does not bounce — it carries `· ⚠ depth envelope: N source files (spec promised ≤4)` on
 its run-report PR line (size is a proxy; the trap list is the risk).
 
+**Port units (`shape: port`, adw-core §3).** This replaces the D0/D1 depth-envelope check above
+for a port unit. The implementer's brief carries `repo-profile §20` and the spec's `## Screens`
+table, and this loop: if the table has `deferred` rows, first one gate-mode run of §20's Renders
+command and then its Score command on each of those rows (joined with `;`, never the fail-closed
+`verify`, which stops at its first miss) measures each into the table (a row whose score is missing
+from the log stays `deferred`, never a guessed number), committed on its own as
+`docs(spec): baselines` after the spec-copy commit; then render
+every screen in one fast-mode build, score them all, fix every independent cause the images show,
+repeat until each screen passes, or §20's stop rule (which names a round cap) stops the loop; then
+one gate-mode round, which is the grade. The implementer returns the number of rounds it ran across
+all fix cycles, for the evidence block. **Every gate-mode run of a port unit** — the baseline measurement, the grade round's `verify`,
+§3.2's mutation fallback (aggregate check) and §3.4's verifier run — goes through the gate-mode wait
+below (`<the verify command>` there is whichever command that run is). A screen still over its ceiling after the grade round halts `blocked` — `port not
+converged — <every screen over its ceiling, with its mismatch and ceiling>; default: re-run
+/adw-init to extend this intent with a fix-up unit for those screens`, an owner decision, not a fix
+cycle. To name every such screen, run §20's Score command on each row once more, joined with `;`
+(the fail-closed `verify` stops at its first miss); a row whose score is missing from the log is
+unmeasured, and the halt says so instead of guessing a number. The
+envelope check swaps the file bound for §20's port surface: a production path outside it, or any
+trap domain, halts `blocked` — `shape escalation — diff touched <path>; re-cut the behaviour as a D2 unit`.
+
+**The gate-mode wait.** A gate-mode build can outlast the `Bash` timeout (600000 ms), so it runs in
+the background and its exit code is read from a file. Launch, in one Bash call that prints the
+directory, the pid and the start time — copy all three as literals into every later call, since shell
+variables do not survive between calls:
+
+```bash
+D="$(mktemp -d)"; ( ( <the verify command> ); echo $? >"$D/exit.tmp" && mv "$D/exit.tmp" "$D/exit" ) >"$D/log" 2>&1 & echo "$D $! $(date +%s)"
+```
+
+Then wait, in one Bash call with `timeout: 600000`, re-issued until it prints `exit`, or `DEADLINE`
+(one call ends within 570 s, as in `review-core.md` §10 step 3; `<n>` is §20's Gate mode maximum
+minutes, written in as a number):
+
+```bash
+lim=$(( <start> + <n> * 60 )); end=$(( $(date +%s) + 570 )); [ "$end" -gt "$lim" ] && end=$lim; until [ -s "<D>/exit" ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; if [ -s "<D>/exit" ]; then echo "exit $(cat "<D>/exit")"; tail -n 60 "<D>/log"; elif [ "$(date +%s)" -ge "$lim" ]; then echo DEADLINE; else echo running; fi
+```
+
+`exit <code>` is the result (`mv` is atomic, so the file exists only once the build has finished), and
+the scores are in the log tail; read more of `<D>/log` if a row is missing. On `DEADLINE`, kill the
+whole tree, in one Bash call:
+
+```bash
+tree() { echo "$1"; for c in $(pgrep -P "$1"); do tree "$c"; done; }; kill $(tree <pid>) 2>/dev/null
+```
+
+and return `gate-mode build exceeded <n> min`: the orchestrator classifies it an environment fault
+(§3.3), not a red. Never poll with `echo` calls: a subagent that polls spends most of its cost doing
+it. The brief of every agent that runs a gate-mode build — the implementer, the §3.4 verifier
+(its brief is the orchestrator's on the v1 pass and the §3.6 driver's on v2) and `/adw-init`'s port
+author — pastes these commands and §20's Gate mode row, and needs no other file for it.
+
 ### 3.2 Gates (cheapest first, run in the worktree by the implementer)
 
 The gate list and its ordering live in `repo-profile §5`; which gates a given diff obligates lives
@@ -547,25 +604,31 @@ Three properties hold in every repo, whatever that file declares:
   `$VSHA`) · `D` → delete again. (File-level neutralisation is deliberately coarser
   than design §2.2(5)'s line-scoped wording; for grouped same-file units it conflates
   the units' changes — accepted, the check asserts only that each verify CAN fail.)
+  **A port unit runs this check, and the per-file sweep, with its `verify` in `repo-profile §20`'s
+  fast mode**, so the sweep stays affordable. Run the fast-mode `verify` on the unneutralised code
+  first: if it is not green there, a red after neutralising proves nothing — run the whole check in
+  gate mode instead, aggregate check only: the per-file sweep is skipped and the PR line carries
+  `· ⚠ sweep skipped (gate mode)`. §3.4's verifier repeats the check the same way and still runs the
+  unit's `verify` once in gate mode. Each gate-mode run uses §3.1's wait.
   A verify still green against neutralised code is vacuous — feed it to the implementer
   as a genuine red (the test, not the code, is wrong; it counts as a fix cycle). Skip
   only for verify forms with no test to mutate (tsc/grep proofs — design §5.2's
   human-owned residue); the 3.4 verifier's re-run includes this check. This gate is
   what makes the thinner think-side depths (D0/D1) safe: it mechanizes the
   discriminating-verify property the D2+ critical pass provides by hand.
-  **Then iterate per file:** neutralise each changed production file ALONE and re-run
+  **Then iterate per file** (skipped only in a port unit's gate-mode fallback, above): neutralise each changed production file ALONE and re-run
   `verify` — a file whose lone neutralisation leaves verify green is mutation-blind;
   carry `· ⚠ mutation-blind: <path>` on the PR/run-report line. Aggregate-green stays the hard
   red; per-file blindness is a flag, not a bounce — some files (a CSS rule, a type
   union) have no test that can see them, and the flag says so honestly. `mutation-blind`
   fires on roughly a quarter of pipeline PRs — the check earns its keep routinely
   (design §10 v2.12).
-  Cost is `verify` × N files. **No clock may cut this check** — the per-file sweep is N
+  Cost is `verify` × N files. **No clock may cut this check** (a port unit's gate-mode fallback is the one flagged carve-out) — the per-file sweep is N
   first passes on N distinct files, not loop iterations, and design §5.2 credits the mutation-proof
   as the *sole* system-level detector of a lying gate ("not via the verifier, which re-runs
   the same blind gates") for the exact failure class the design exists to prevent. Trading
   it for a costing proxy inverts the deliverable. **Bound it by file count instead: mandatory
-  at D0/D1**; above **2 changed production files** (the count, not the depth — §3.1 lets a
+  at D0/D1** (a port unit's gate-mode fallback excepted); above **2 changed production files** (the count, not the depth — §3.1 lets a
   D1 unit exceed its ≤4 promise without bouncing) iterate **8 files** and report what you covered —
   `· ⚠ mutation per-file 8/31` — so the signal degrades gracefully at every diff size
   instead of dropping to zero above a threshold. **Select those 8 by inverse test
@@ -599,6 +662,8 @@ fault, no fix cycle spent):
 
 - any fault in the per-repo list at `repo-profile §10` — dependency/link resolution failures, a
   database or service that is down, a missing env file, a served-build or port unavailable
+- a port unit's gate-mode build that outlasts §20's Gate mode minutes (`gate-mode build exceeded <n>
+  min`, §3.1)
 - a gate red that REPRODUCES at `<BASE>` (when in doubt, a `model: sonnet` relay runs the
   failing gate once against a base checkout and returns the exit code — the orchestrator runs
   no gate, §3) — a baseline fault, not the unit's; report it in the PR body as
@@ -638,10 +703,15 @@ pipeline knows:
   PR, so `/pr-ready` §1's default `<N>` does not exist yet; §4.3 names the worktree and §8
   sweeps it, both off `$REF`. Pass the same value to every `PASS` of the same unit.
 - **The mutation check.** The verifier's report must ALSO carry §3.2's red-then-restored
-  pair, plus the per-file iteration where §3.2 makes it mandatory. It stays here rather
+  pair, plus the per-file iteration where §3.2 makes it mandatory, and for a port unit the mode
+  the check ran in (`fast` or `gate`; `gate` means the per-file sweep was skipped). It stays here rather
   than in `/pr-ready` because it is keyed on the unit's declared `verify` command — a
   contract field a generic PR does not have. A report missing it is a red, by the same
   rule as a missing gate row.
+- **A port unit's render grade.** The verifier's report must ALSO carry the unit's `verify` run
+  once in gate mode at `$VSHA`, with its exit code, waited on with §3.1's wait block and §20's Gate
+  mode row, both pasted in its brief. A report missing it is a red, by the same rule as a missing
+  gate row — except `gate-mode build exceeded <n> min`, which is an environment fault (§3.3).
 - **Where the evidence lands: the PR body, not only a comment.** Copy the per-gate table
   and the mutation row into the PR body at 3.5 (re-pass → edit the body). A review comment
   is the wrong home for the one artifact that has to outlive the run: three PRs across two
@@ -667,6 +737,10 @@ pipeline knows:
   artifact   plan 260L / diff 71L = 3.66x
   open-findings none — read 4 comments
   ```
+
+  A port unit's block reads `depth D1 · shape port`, its `cycles` row adds `rounds N` (the unit's total across fix cycles), its
+  `mutation` row ends `· fast` or `· gate` (the mode that graded discrimination; `gate` means the per-file sweep was skipped), and its `gates`
+  field adds `render gate-mode <exit code>`, so the TRIAL (adw-core §3) leaves a record.
 
   `owner-wait` is the decisive one: it is the single bit that distinguishes a 21-hour
   owner gate from a 21-hour stalled pipeline. Git already exposes the *gap* via commit
@@ -755,13 +829,18 @@ semantic-conflict risk.
   diff.` · D0/D1 (no critical pass runs at these
   depths): `… = the unit's contract, authored at init and
   approval-approved — review surface is the code diff; verify discrimination is carried by
-  the mutation gate.` Never claim a critical pass a depth did not run. Without the line a
+  the mutation gate.` A port unit takes that line with "the mutation gate" replaced by "the
+  render score, and the mutation check ran in `<fast|gate>` mode" (the mode its `mutation` row
+  records). Never claim a critical pass a depth did
+  not run. Without the line a
   reviewer treats already-reviewed contract text as findings fodder (design §10 v2.5).
 
 ### 3.6 Review loop — dispatched, never run in this session
 
 **Dispatch ONE `model: sonnet` review driver per PR** (adw-core §8's Drive row). Its brief
-carries "wait for every agent you dispatch by `review-core.md` §10, never by polling", and:
+carries "wait for every agent you dispatch by `review-core.md` §10, never by polling" (for a port
+unit also §3.1's wait block and `repo-profile §20`'s Gate mode row, which the driver pastes into the
+verifier's brief for its gate-mode `verify`), and:
 run `/pr-ready <N> apply` with `BASE`, `PASS=v2` and `REF` set to 3.4's values, carrying the
 unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and return
 **Layer 2 only, plus the open-findings lines below** (`/pr-ready` §7 — suppress Layer 1 in the
