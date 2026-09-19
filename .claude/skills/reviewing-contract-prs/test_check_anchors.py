@@ -112,6 +112,15 @@ class Checker(Case):
         self.assertEqual(code, 1)
         self.assertIn("adw-x §2", out)
 
+    def test_a_cite_of_a_renamed_command_file_is_reported(self):
+        self.commit({}, append=[("README.md", "See `review-core §9`.\n")], branch="main")
+        sh(self.d, "git", "checkout", "-q", "-b", "pr")
+        sh(self.d, "git", "mv", "commands/review-core.md", "commands/rc.md")
+        sh(self.d, "git", "commit", "-q", "-m", "rename")
+        code, out = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("review-core §9", out)
+
     def test_bare_number_bold_lead_is_not_an_anchor_but_a_phase_lead_is(self):
         self.pr(("README.md", "See `design §61` and `cleanup Phase 0`.\n"))
         code, out = self.check()

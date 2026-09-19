@@ -95,17 +95,20 @@ def cites(text, cre):
                 t = TAIL_RE.match(text, t.end())
 
 
-def broken(ref):
-    """{(file, form+number): [(site label, (path, citing line text))]} for cites that do not resolve."""
+def broken(ref, names):
+    """{(file, form+number): [(site label, (path, citing line text))]} for cites that do not resolve.
+
+    names: every file name a citation may use, from the base and the head, so a cite of a
+    file the PR renamed or deleted is parsed and reported instead of silently skipped."""
     fmap = files(ref)
-    cre = cite_re(fmap)
-    heads = {k: anchors(show(ref, p) or "") for k, p in fmap.items()}
+    cre = cite_re(names)
+    heads = {k: anchors(show(ref, fmap[k]) or "") if k in fmap else set() for k in names}
     bad = {}
     for path in scan_paths(ref):
         text = show(ref, path) or ""
         lines = text.split("\n")
         for pos, key, form, num in cites(text, cre):
-            if fmap[key] == path:
+            if fmap.get(key) == path:
                 continue  # self-citation by name: headings may be phrased differently
             if num not in heads[key]:
                 n = text.count("\n", 0, pos) + 1
@@ -131,7 +134,9 @@ def main():
     merge_base = git("merge-base", base_ref, head_ref)
     if merge_base is None:
         fail(f"no merge-base for {base_ref} and {head_ref}")
-    base, head = broken(merge_base.strip()), broken(head_ref)
+    merge_base = merge_base.strip()
+    names = set(files(merge_base)) | set(files(head_ref))
+    base, head = broken(merge_base, names), broken(head_ref, names)
     # NEW when the PR adds a citing line, even to an anchor that was already broken.
     new, old = {}, {}
     for key, sites in head.items():

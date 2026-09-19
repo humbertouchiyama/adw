@@ -67,17 +67,18 @@ that proves nothing. Each brief is this text, with the lane's question from the 
 >
 > Return as your final message: (1) any table your question asks for; (2) claims, one per line:
 > `SEVERITY | file:line | consequence, one sentence | reachable scenario`, where SEVERITY is
-> `Blocking` (a run breaks, loops, degrades silently, or a gate lies) or `Warning`; (3) one line:
-> `VERDICT: holds` or `VERDICT: does not hold`.
+> `Blocking` (a run breaks, loops, degrades silently, or a gate lies) or `Warning`; (3) any closing
+> lines your question asks for; (4) last, one line: `VERDICT: holds` or `VERDICT: does not hold`.
 
 | Lane | Question |
 |---|---|
 | **A — ripple** | List every rule this diff adds, removes or changes. For each one, search the **whole repo at the PR head** (`commands/`, `install/`, `README.md`, `docs/00-design.md`, `docs/repo-profile-EXAMPLE.md`, `.claude/skills/`) for every site that states, quotes, depends on or should now carry it. Use `grep -rn <pattern> <pr dir>/<paths>`. Quoted `>` prompt blocks count as sites: an agent copies them verbatim, so a requirement missing from one is missing at runtime. Return a table: site `file:line` · consistent / stale / missing. Also report contradictions inside one file. |
 | **B — literal execution** | You are a `sonnet` driver. Walk every changed procedure step by step, as written, by reading it. To test whether a command works, run it read-only, or in a scratch repo under `$TMPDIR`. Where do you stall, spin, wait forever, time out, read a field no template ever writes, branch on a fact you cannot know in a fresh session, or silently skip work while the report still claims it ran? Name any dispatch with no pinned `model:`. For each hit give `file:line` and the concrete run that breaks. |
-| **C — claims and context** | (1) Match the PR body to the diff, per commit (`git log --stat`): work in the diff the body never names, and body claims the diff does not make. (2) Mark every number and every "X does not work" or "X is ignored" claim as re-derived (show how) or unverified. (3) List repo-specific values a run would consume, added to `commands/`: repo names, paths, branch names, stack nouns. They belong in `repo-profile`. A PR number or repo name cited as the evidence for a rule is provenance, not a value (`README.md`, "The split"): leave it out. (4) For every other open PR `<M>`: `git merge-tree --write-tree pr/<N> pr/<M>` (two branches only; exit 1 is a conflict, report it), then read both diffs. Does one reintroduce what the other removes, or depend on text the other changes? (5) Is `docs/00-design.md` now wrong? End your report with two lines: `PRS CHECKED: <the #M whose merge-tree ran>` and `UNVERIFIED: <the body claims you marked unverified, or none>`. |
+| **C — claims and context** | (1) Match the PR body to the diff, per commit (`git log --stat origin/<base>..pr/<N>`): work in the diff the body never names, and body claims the diff does not make. (2) Mark every number and every "X does not work" or "X is ignored" claim as re-derived (show how) or unverified. (3) List repo-specific values a run would consume, added to `commands/`: repo names, paths, branch names, stack nouns. They belong in `repo-profile`. A PR number or repo name cited as the evidence for a rule is provenance, not a value (`README.md`, "The split"): leave it out. (4) For every other open PR `<M>`: `git merge-tree --write-tree pr/<N> pr/<M>` (two branches only; exit 1 is a conflict, report it), then read both diffs. Does one reintroduce what the other removes, or depend on text the other changes? (5) Is `docs/00-design.md` now wrong? Before your `VERDICT:` line, write two lines: `PRS CHECKED: <the #M whose merge-tree ran>` and `UNVERIFIED: <the body claims you marked unverified, or none>`. |
 
-A lane that errors, returns no `VERDICT:` line, or returns `does not hold` with no claim line is
-dispatched once more. If it fails again, Coverage says `failed` for it.
+A lane that errors, returns no `VERDICT:` line (for lane C, also no `PRS CHECKED:` line), or
+returns `does not hold` with no claim line is dispatched once more. If it fails again, Coverage
+says `failed` for it.
 
 **3. Refute.** After all lanes have reported, number every claim: `P1`, `P2`, … for defects and
 `N1`, … for assurances. Merge duplicates across lanes first. **Never hand over the lane's
@@ -121,9 +122,9 @@ Warning
 Refuted (<n>)
 - file:line — claim — the line that breaks it
 Coverage
-- anchors: <n> NEW, <n> OLD, <n> OPT (output lines of check-anchors.py), or `failed` · lanes: A <ran|failed> B <ran|failed> C <ran|failed> · refuter <ran|failed> · open PRs checked: <lane C's PRS CHECKED line>
+- anchors: <n> NEW, <n> OLD, <n> OPT (output lines of check-anchors.py), or `failed` · lanes: A <ran|failed> B <ran|failed> C <ran|failed> · refuter <ran|failed> · open PRs checked: <lane C's PRS CHECKED line, or `none: C failed`>
 - OLD and OPT lines: <the lines from check-anchors.py, verbatim, or none>
-- unverified claims in the PR body: <lane C's UNVERIFIED line>
+- unverified claims in the PR body: <lane C's UNVERIFIED line, or `none: C failed`>
 ```
 
 `merge` means no `Blocking` survived and nothing `failed`. `fix first` means at least one
