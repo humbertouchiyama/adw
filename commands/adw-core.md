@@ -487,6 +487,8 @@ labelling by bare unit id** — the owner answers by number (`1- …`, `Q3: no`)
 repeated unit labels give them nothing to reference (runs 3 and 6 both shipped
 `u1 · / u1 · / u2 ·` shapes; both times the answers came back by guessed position).
 The same `QN` ids carry into the specs where defaults are recorded.
+Only `ask` items from the decide pass (adw-init Phase 2) are numbered here; `decided` ones print
+on one `decided  Q2 yes · Q3 …` line under `needs you` and keep their `QN` for the spec.
 Unanswered items ship with the recommended default, recorded in the spec. A single-unit
 (flat-file) intent prints its spec's flat path on the `specs` line instead of a folder.
 

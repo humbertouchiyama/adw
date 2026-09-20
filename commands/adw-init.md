@@ -177,6 +177,20 @@ Do not proceed without an answer.
 
 ## Phase 2 — the human gate
 
+**Decide pass — before the first render, not at the gate.** Measured over 96 gates in 30 days
+(Plantoes-app, AXCMedApp): 42% came back as "critically decide" or "didn't understand", 20% as bare
+`approve`, and only ~23% carried an owner decision. Every candidate `needs you` question therefore
+goes through ONE `model: opus` pass (`model: sonnet` when every unit is D0–D1) that gets the
+candidate list, the specs' evidence and the repo profile, and returns per question either
+`decided: <answer> — <one-clause reason>` or `ask`. **`ask` only when** the answer is a product or
+scope call the code cannot settle, changes money, data or a public contract, or is hard to reverse.
+UX taste, naming, "which sheets/rows/copy" and anything with a defensible default are `decided`.
+Every `ask` is rewritten in plain words: one sentence, no identifiers the owner has to look up,
+the default and its consequence in a clause. `decided` items print as ONE line under `needs you`
+(`decided  Q2 yes · Q3 pick-lists only — reopen by number`) and are recorded in the spec like any
+default; `reopen Q<N>` turns one back into a question. When nothing is `ask`, `needs you  none`
+and `approve` builds straight through.
+
 - `approve` → freeze the proposal (units, depths, `shape`, packaging, `after`, `verify`) → Phase 3,
   then Phase 5 prints the handoff and **continues straight into `/adw-build <slug>` in the
   same session, same turn** (Phase 5 step 3 — that step, not this sentence, is what
