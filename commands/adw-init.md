@@ -28,8 +28,8 @@ ref. Empty → ask for the intent and stop.
   the session — do not read this rule as a reason to stop there. (It is stated this way
   because the v2.15 contract said "documents only" at the top and "continue into build"
   at the bottom, and the top won every time.)
-- Nothing expensive runs before the human approves the cut (triage and the one decide pass are
-  the only pre-gate dispatches) — the per-unit fan-out can
+- Nothing expensive runs before the human approves the cut (triage and the decide pass, one call
+  per gate round, are the only pre-gate dispatches) — the per-unit fan-out can
   cost more than the implementation it produces; burning it on a mis-cut is the failure
   the gate exists to prevent. Since v2.16 the same approval also releases the build, so
   the cut is the only gate in front of the whole run: everything the human might act on
@@ -182,11 +182,10 @@ Do not proceed without an answer.
 **Decide pass — runs at the end of Phase 1, before the first render, not at the gate.** Measured
 over 96 gates in 30 days (Plantoes-app, AXCMedApp): 42% came back as "critically decide" or "didn't
 understand", 20% as bare `approve`, and only ~23% carried an owner decision. Every candidate question
-from triage therefore goes through ONE read-only dispatch (it must not write) on `model: opus`
-(`model: sonnet` when every unit is D0–D1) that gets the question list, the proposal (with the D0
-draft spec when there is one) and the repo profile, and returns one line per question id:
-`decided: <answer> — <one-clause reason>` or `ask`. An id it omits, or a reply it cannot parse, is
-`ask`. **A question is `ask` when ANY of these holds**, even if it has a default: the answer is a
+from triage therefore goes through ONE read-only dispatch per gate round (it must not write) on
+`model: opus` (`model: sonnet` when every unit is D0–D1) that gets the question list, the proposal
+(with the D0 draft spec when there is one) and the repo profile, and returns one line per question
+id: `decided: <answer>` or `ask`. An id it omits, or a reply it cannot parse, is `ask`. **A question is `ask` when ANY of these holds**, even if it has a default: the answer is a
 product or scope call the code cannot settle, changes money, data or a public contract, is hard to
 reverse, or is the `base:` branch. Only a question matching none of them is `decided` (UX taste,
 naming, which items or copy, a defensible default). Every `ask` is rewritten in plain words: one
@@ -194,10 +193,20 @@ sentence, no identifiers the owner has to look up, the default and its consequen
 Ids come from triage's list and are never renumbered, so `ask` rows can skip a number.
 `decided` items print as ONE line under `needs you`
 (`decided  Q2 cap refunds: yes · Q3 export: pick-lists only — reopen by number`), a few words of the
-question then the answer. `reopen Q<N>` turns one back into an `ask` with its default. After a
-`re-cut`, run the pass again on the new question list; a `decided` id stays `decided` unless reopened.
+question then the answer. `reopen Q<N>` turns one back into an `ask` with triage's default. After a
+`re-cut`, run the pass again on the new question list: a question keeps its id and its `decided`
+answer only when its text is unchanged, and new questions take ids after the highest so far.
 When nothing is `ask`, `needs you  none` and `approve` builds straight through the gate; a
-critical-pass question raised later (Phase 3–4) still stops the handoff (Phase 5 step 1).
+critical-pass question raised later (Phase 3–4) still stops the handoff (Phase 5 step 1). An `ask`
+row left blank at the gate takes its default when the owner types `approve` (adw-core §7,
+`blank = defaults`): it was on the surface with that default, and it is recorded in the spec.
+
+The orchestrator composes the pass's prompt from this text:
+
+> Read-only: do not write. Intent `<slug>`. First read the proposal, the D0 draft spec if any, and
+> `.claude/repo-profile.md`. For each question below return one line: `Q<N> | decided: <answer>` or
+> `Q<N> | ask`. It is `ask` when <the `ask` criteria above, pasted>; a question you cannot judge is `ask`.
+> `<Q<N> — question — triage's default>`, one per line
 
 - `approve` → freeze the proposal (units, depths, `shape`, packaging, `after`, `verify`, and every
   `QN` answer: `decided` ones, gate answers, `ask` defaults) → Phase 3,
@@ -210,8 +219,8 @@ critical-pass question raised later (Phase 3–4) still stops the handoff (Phase
   ends. This is the verb for reading the specs before any code exists.
 - `detail` → re-render the approval surface with its `detail` and `fyi` blocks appended
   (adw-core §7). Not an exit — the gate stays open.
-- `reopen Q<N>` → turn a `decided` question back into an `ask` with its default, re-render the
-  approval surface.
+- `reopen Q<N>` → turn a `decided` question back into an `ask` with triage's default, re-render
+  the approval surface.
 - `re-cut "<instruction>"` → send the instruction to the SAME triage agent
   (SendMessage — context intact), re-render the approval surface.
 - `regroup` / `depth` → apply mechanically, re-render the approval surface. `regroup` refuses to put
@@ -261,8 +270,9 @@ with the most to discover), so blocking on it is a pure loss every time.
 > never code, never a branch. Spec path: `<exact path per adw-core §1>`. The spec MUST
 > open with the exact header block (adw-core §2):
 > `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`
-> when the unit was approved as `port`. Approved answers for this intent: `<QN → answer, one per
-> line>`. Follow each one that touches this unit and record it in the spec under its `QN` id. The spec body
+> when the unit was approved as `port`. Approved answers for this intent, one per line as
+> `QN — <question>: <answer> (uNN or all)`: `<list>`. Follow each one that touches this unit and
+> record it in the spec under its `QN` id. The spec body
 > states: the problem, the change, acceptance criteria, and (bugs) root cause with
 > evidence. Reference only plugin skills (`superpowers:*`) or tracked commands.
 > Code snippets in the spec/plan MUST follow the repo comment rule (`repo-profile §2`): one
@@ -272,8 +282,8 @@ with the most to discover), so blocking on it is a pure loss every time.
 
 **Extend mode:** an `amend: uNN` item is not a new unit — dispatch its agent against the
 EXISTING spec (unbuilt by construction, so the main-tree file is there) to fold the delta
-in, keeping the unit id, header and any plan. New units get the normal preamble plus the
-prior-unit table, so their specs can cite what shipped.
+in, keeping the unit id, header and any plan, and give it the preamble's approved-answers line. New
+units get the normal preamble plus the prior-unit table, so their specs can cite what shipped.
 
 **By depth:**
 - **Port (`shape: port`, adw-core §3) — replaces the D1 bullet below for this unit:** "Write
@@ -294,8 +304,9 @@ prior-unit table, so their specs can cite what shipped.
   that adds a row gets the same render for that row. Render output is disposable state
   (`repo-profile §18`). A `deferred — render timed out` row is one owner question in Phase 5's
   `needs you`. No critical pass.
-- **D0 (adw-core §3):** no fan-out — the triage agent's draft IS the spec;
-  write it to the flat path, then straight to Phase 4. No plan, no critical pass.
+- **D0 (adw-core §3):** no fan-out — the triage agent's draft IS the spec. First apply every
+  approved `QN` answer that touches it to the draft and record it under its `QN` id, then write it
+  to the flat path and go straight to Phase 4. No plan, no critical pass.
 - **D1 (bug):** "Use superpowers:systematic-debugging to reach a reproduced root cause —
   no fix without a failing observation; your diagnosis is load-bearing, the spec goes
   straight to build. Then write the spec."
@@ -489,8 +500,8 @@ Three ordered steps, no discretion:
    into a halt with a `ready` sub-PR left human-owned. Carrying init's spec text into build
    buys nothing and pays that cost directly.
 
-Unanswered `needs you` items ship with the recommended default, recorded in the spec — but
-note that an unanswered item is exactly what step 1 stops on, so this applies to a later
+Unanswered `needs you` items on the handoff ship with the recommended default, recorded in the
+spec — but note that an unanswered item is exactly what step 1 stops on, so this applies to a later
 `/adw-build` the human starts after reading them.
 Extend mode: the `specs` line counts only the units THIS run added or amended, and names
 the intent's total (`3 new · u1–u5 prior`) — `/adw-build` skips the merged ones anyway.

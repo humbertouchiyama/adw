@@ -412,8 +412,9 @@ pipeline, and the pre-v2.8 shape buried both the cut and the asks under rational
 - **Anything that needs an answer is a numbered `QN`, never an fyi bullet.** A line
   containing "confirm", "your call", or a question mark inside `fyi` is a contract
   violation — run-6 buried its base-branch override there as concern #1 of ten. Q ids
-  are run-wide and START at the approval surface: the handoff continues the sequence, and a question answered at
-  the gate keeps its id and does not reprint.
+  are run-wide and start at triage's list (some are settled by the decide pass, so `ask` rows can skip a
+  number): the handoff continues after the highest id, and a question answered at the gate keeps its id
+  and does not reprint.
 - `why-<word>` and `verify` live only in `detail`, ONE line each — still the anchor the
   human is invited to challenge (run-1: an unchallenged D2 cost a 307-line plan for a
   24-line diff; run-7 stretched the one-liner to four lines). Brief-by-default does not
