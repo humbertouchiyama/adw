@@ -29,7 +29,7 @@ ref. Empty → ask for the intent and stop.
   because the v2.15 contract said "documents only" at the top and "continue into build"
   at the bottom, and the top won every time.)
 - Nothing expensive runs before the human approves the cut (triage and the decide pass, one call
-  per gate round, are the only pre-gate dispatches) — the per-unit fan-out can
+  at the first render plus one per `re-cut`, are the only pre-gate dispatches) — the per-unit fan-out can
   cost more than the implementation it produces; burning it on a mis-cut is the failure
   the gate exists to prevent. Since v2.16 the same approval also releases the build, so
   the cut is the only gate in front of the whole run: everything the human might act on
@@ -182,10 +182,11 @@ Do not proceed without an answer.
 **Decide pass — runs at the end of Phase 1, before the first render, not at the gate.** Measured
 over 96 gates in 30 days (Plantoes-app, AXCMedApp): 42% came back as "critically decide" or "didn't
 understand", 20% as bare `approve`, and only ~23% carried an owner decision. Every candidate question
-from triage therefore goes through ONE read-only dispatch per gate round (it must not write) on
-`model: opus` (`model: sonnet` when every unit is D0–D1) that gets the question list, the proposal
-(with the D0 draft spec when there is one) and the repo profile, and returns one line per question
-id: `decided: <answer>` or `ask`. An id it omits, or a reply it cannot parse, is `ask`. **A question is `ask` when ANY of these holds**, even if it has a default: the answer is a
+from triage therefore goes through ONE read-only dispatch (it must not write) on `model: opus`
+(`model: sonnet` when every unit is D0–D1) that gets the question list, the proposal (with the D0
+draft spec when there is one) and the repo profile, and returns one line per question id:
+`decided: <answer>` or `ask`. An id it omits, or a reply it cannot parse, is `ask`.
+**A question is `ask` when ANY of these holds**, even if it has a default: the answer is a
 product or scope call the code cannot settle, changes money, data or a public contract, is hard to
 reverse, or is the `base:` branch. Only a question matching none of them is `decided` (UX taste,
 naming, which items or copy, a defensible default). Every `ask` is rewritten in plain words: one
@@ -193,9 +194,12 @@ sentence, no identifiers the owner has to look up, the default and its consequen
 Ids come from triage's list and are never renumbered, so `ask` rows can skip a number.
 `decided` items print as ONE line under `needs you`
 (`decided  Q2 cap refunds: yes · Q3 export: pick-lists only — reopen by number`), a few words of the
-question then the answer. `reopen Q<N>` turns one back into an `ask` with triage's default. After a
-`re-cut`, run the pass again on the new question list: a question keeps its id and its `decided`
-answer only when its text is unchanged, and new questions take ids after the highest so far.
+question then the answer. A `decided` answer applies to its question's unit, or to `all` units when
+the question names none. `reopen Q<N>` turns one back into an `ask` with triage's default. Only a
+`re-cut` reruns the pass, and only over questions with no status yet (new or reworded ones): a
+question keeps its id and its status (`decided`, answered at the gate, reopened) while its text is
+unchanged, and new questions take ids after the highest so far. `detail`, `reopen`, `regroup`,
+`depth` and `shape` never rerun it.
 When nothing is `ask`, `needs you  none` and `approve` builds straight through the gate; a
 critical-pass question raised later (Phase 3–4) still stops the handoff (Phase 5 step 1). An `ask`
 row left blank at the gate takes its default when the owner types `approve` (adw-core §7,
@@ -222,7 +226,8 @@ The orchestrator composes the pass's prompt from this text:
 - `reopen Q<N>` → turn a `decided` question back into an `ask` with triage's default, re-render
   the approval surface.
 - `re-cut "<instruction>"` → send the instruction to the SAME triage agent
-  (SendMessage — context intact), re-render the approval surface.
+  (SendMessage — context intact), run the decide pass over its new or reworded questions (first
+  paragraph of this phase), re-render the approval surface.
 - `regroup` / `depth` → apply mechanically, re-render the approval surface. `regroup` refuses to put
   a port unit in a shared PR or sub-PR, and to put another unit in a port unit's.
 - `shape "u4→port"` / `shape "u4→none"` → set or clear a unit's `shape: port` (adw-core §3 Port
