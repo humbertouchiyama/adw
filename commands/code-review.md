@@ -647,7 +647,7 @@ Phase 7 always runs.
 
 **`apply` is the commit+push consent → review-core §8 declared auto-ship.** Step 4 (commit + push) runs automatically once §4 verification is green — no gate, no "shall I push?" (step 5's comment follows it). **The merge (steps 6–7) is NOT covered**: only the explicit word "merge" (or the Merge option under `interactive`) authorizes it. A declared no-browser skip routes visual QA to the human and blocks only the merge, never the apply/commit/push. A §7 safety stop overrides all of this → fall back to comment-only (7b) and say why.
 
-1. **Apply fixes** in `$WT`. **If `toFix` is empty** (a clean PR run with `apply`): skip steps 1–5 (an empty index would make `git commit` error), and go straight to the merge gate (steps 6–7); if any §7 blast-radius path or unresolved escalation is in play, fall back to the review-comment path (7b) instead. For each `toFix`: edit, then re-run the relevant Phase 5 detection to confirm the violation is gone. If a fix balloons in scope, re-adjudicate it to *escalate* and note why.
+1. **Apply fixes** in `$WT`. **If `toFix` is empty** (a clean PR run with `apply`): there is nothing to apply, verify, commit or push — skip the rest of steps 1–5 (an empty index would make `git commit` error) — but **still post a comment**, then go to the merge gate (steps 6–7). The comment is 7b's "No findings → collapse" template, header exactly `### Code review`, with one extra line in the `👍 OK` bucket: `- Reviewed at <short-sha>`, where `<short-sha>` is the `headRefOid` short SHA re-read here and confirmed equal to the one read in Phase 1 (mismatch ⟹ the branch moved under you → re-fetch and re-review, §7). **A clean review is never silent**: with no comment, the PR carries no evidence it was reviewed at all, and `/pr-ready` §5's timestamp floor reads the cleanest PRs as unreviewed and returns `blocked` (Plantoes-app PR #1318, 2026-09-21). The SHA is what lets Phase 1's "already reviewed at this SHA" check match on a re-run. If any §7 blast-radius path or unresolved escalation is in play, fall back to the review-comment path (7b) instead. For each `toFix`: edit, then re-run the relevant Phase 5 detection to confirm the violation is gone. If a fix balloons in scope, re-adjudicate it to *escalate* and note why.
 
 2. **Verify → review-core §4** (smart verification — branches on `layers[]`). Stage the touched files first (`git -C "$WT" add <files>`) — the audit's staged mode reads only the index; step 4 commits exactly that set. Run from inside the worktree; each gate must pass with zero errors before push. **A docs / `.claude` / `.agent`-only remediation reports `verification: N/A — docs-only` (§4) — never a fabricated green.** Any failure → safety stop (§7).
 
@@ -736,7 +736,7 @@ EOF
 
 `/pr-ready` §5 collects the `- **[Blocking]**` lines of this template from every `### Code review` comment: keep that exact prefix.
 
-No findings → collapse to the OK + empty-decision buckets: `### Code review` / `**👍 OK** — no issues. Checked <the same list as above>.` / `**⏳ Your decision** — none.`
+**No findings → collapse** to the OK + empty-decision buckets: `### Code review` / `**👍 OK** — no issues. Checked <the same list as above>.` / `**⏳ Your decision** — none.` **7a's empty-`toFix` path posts this same template**, plus the `- Reviewed at <short-sha>` line 7a step 1 specifies — so a clean run leaves a visible comment on either branch.
 
 **Every path** posts this one template — `light`, `full` and `panel` alike. There is no second
 reviewer comment to supplement or defer to.
