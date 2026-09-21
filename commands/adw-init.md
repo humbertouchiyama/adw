@@ -29,7 +29,8 @@ ref. Empty → ask for the intent and stop.
   because the v2.15 contract said "documents only" at the top and "continue into build"
   at the bottom, and the top won every time.)
 - Nothing expensive runs before the human approves the cut (triage and the decide pass, one call
-  at the first render plus one per `re-cut`, are the only pre-gate dispatches) — the per-unit fan-out can
+  at the first render plus one per `re-cut` or `new intent`, are the only pre-gate dispatches) — the
+  per-unit fan-out can
   cost more than the implementation it produces; burning it on a mis-cut is the failure
   the gate exists to prevent. Since v2.16 the same approval also releases the build, so
   the cut is the only gate in front of the whole run: everything the human might act on
@@ -194,12 +195,12 @@ sentence, no identifiers the owner has to look up, the default and its consequen
 Ids come from triage's list and are never renumbered, so `ask` rows can skip a number.
 `decided` items print as ONE line under `needs you`
 (`decided  Q2 cap refunds: yes · Q3 export: pick-lists only — reopen by number`), a few words of the
-question then the answer. A `decided` answer applies to its question's unit, or to `all` units when
-the question names none. `reopen Q<N>` turns one back into an `ask` with triage's default. Only a
-`re-cut` reruns the pass, and only over questions with no status yet (new or reworded ones): a
-question keeps its id and its status (`decided`, answered at the gate, reopened) while its text is
-unchanged, and new questions take ids after the highest so far. `detail`, `reopen`, `regroup`,
-`depth` and `shape` never rerun it.
+question then the answer. A `decided` answer goes to every unit author, who follows the ones that
+touch its unit. `reopen Q<N>` turns a `decided` question back into an `ask` with triage's default;
+on any other question it does nothing. Only `re-cut` and `new intent` rerun the pass, and only over
+the questions triage marks `new` (none new, no dispatch): every other question keeps its id and its
+status (`ask`, `decided`, answered at the gate, reopened), and new questions take ids after the
+highest so far. `detail`, `reopen`, `regroup`, `depth` and `shape` never rerun it.
 When nothing is `ask`, `needs you  none` and `approve` builds straight through the gate; a
 critical-pass question raised later (Phase 3–4) still stops the handoff (Phase 5 step 1). An `ask`
 row left blank at the gate takes its default when the owner types `approve` (adw-core §7,
@@ -226,8 +227,9 @@ The orchestrator composes the pass's prompt from this text:
 - `reopen Q<N>` → turn a `decided` question back into an `ask` with triage's default, re-render
   the approval surface.
 - `re-cut "<instruction>"` → send the instruction to the SAME triage agent
-  (SendMessage — context intact), run the decide pass over its new or reworded questions (first
-  paragraph of this phase), re-render the approval surface.
+  (SendMessage — context intact), adding: "Keep every question your change does not touch
+  verbatim with its id; mark each new question `new`." Run the decide pass over the questions it
+  marks `new` (first paragraph of this phase), re-render the approval surface.
 - `regroup` / `depth` → apply mechanically, re-render the approval surface. `regroup` refuses to put
   a port unit in a shared PR or sub-PR, and to put another unit in a port unit's.
 - `shape "u4→port"` / `shape "u4→none"` → set or clear a unit's `shape: port` (adw-core §3 Port
@@ -235,7 +237,8 @@ The orchestrator composes the pass's prompt from this text:
   and first chains the unit out of a shared PR or sub-PR; `none` leaves the depth at D1 until a
   `depth` verb moves it. Re-render the approval surface. `depth` never takes `port`, and refuses a
   `shape: port` unit: clear the shape first.
-- `new intent` (extend mode only) → drop the extension, cut a fresh slug, re-render the approval surface.
+- `new intent` (extend mode only) → drop the extension, cut a fresh slug, run the decide pass over
+  its questions (first paragraph of this phase), re-render the approval surface.
 
 Any number of rounds. Only `approve` / `specs only` exits the gate.
 
@@ -276,7 +279,7 @@ with the most to discover), so blocking on it is a pure loss every time.
 > open with the exact header block (adw-core §2):
 > `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`
 > when the unit was approved as `port`. Approved answers for this intent, one per line as
-> `QN — <question>: <answer> (uNN or all)`: `<list>`. Follow each one that touches this unit and
+> `QN — <question>: <answer>`: `<list>`. Follow each one that touches this unit and
 > record it in the spec under its `QN` id. The spec body
 > states: the problem, the change, acceptance criteria, and (bugs) root cause with
 > evidence. Reference only plugin skills (`superpowers:*`) or tracked commands.
