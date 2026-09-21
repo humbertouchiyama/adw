@@ -363,6 +363,7 @@ extends <slug> · u1–u6: merged u1 u2 u3 u5 · open u4 (#820) · unbuilt u6   
 needs you  2                               ← or: none — answer by number; blank = defaults
   Q1 (u4) — <one plain-language question>? default: <recommended default>
   Q2 — <question>? default: <recommended default>
+decided  Q3 <few words>: <answer> · Q4 <few words>: <answer> — reopen by number   ← only when the decide pass decided any (adw-init Phase 2)
 
 cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · u6
   u1  plan     <unit title>
@@ -378,7 +379,7 @@ cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · 
    uncharted territory>                    ← these print only when they exist
 
 approve → cut + build · specs only → stop after specs · detail · re-cut "<instruction>" ·
-regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port"   ← `shape` only when repo-profile has a complete §20 (§2)
+regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port" · reopen Q3   ← `shape` only when repo-profile has a complete §20 (§2); `reopen` only when a `decided` line prints
 
                         ← nothing follows this block: no summary, no narration
 ```
@@ -403,15 +404,17 @@ pipeline, and the pre-v2.8 shape buried both the cut and the asks under rational
   shared-file hazards and uncharted territory alongside settled decisions; brief mode
   would hide exactly those. The split is mechanical, decided when the line is written,
   not at render: anything a human might act on is `⚠` (always printed), anything already
-  decided with its default applied is `fyi` (hidden). `⚠` is the one zone that grew when
+  decided with its default applied is `fyi` (hidden) — except a triage question the decide
+  pass settled, which prints on the `decided` line. `⚠` is the one zone that grew when
   `approve` started building — see the verb semantics below.
 - **The cut line prints the depth WORD** (§3), never `D<N>`. `detail` prints `why-<word>:`
   to match (`why-port` for a port unit).
 - **Anything that needs an answer is a numbered `QN`, never an fyi bullet.** A line
   containing "confirm", "your call", or a question mark inside `fyi` is a contract
   violation — run-6 buried its base-branch override there as concern #1 of ten. Q ids
-  are run-wide and START at the approval surface: the handoff continues the sequence, and a question answered at
-  the gate keeps its id and does not reprint.
+  are run-wide and start at triage's list (some are settled by the decide pass, so `ask` rows can skip a
+  number): the handoff continues after the highest id, and a question answered at the gate keeps its id
+  and does not reprint.
 - `why-<word>` and `verify` live only in `detail`, ONE line each — still the anchor the
   human is invited to challenge (run-1: an unchallenged D2 cost a 307-line plan for a
   24-line diff; run-7 stretched the one-liner to four lines). Brief-by-default does not
@@ -487,6 +490,11 @@ labelling by bare unit id** — the owner answers by number (`1- …`, `Q3: no`)
 repeated unit labels give them nothing to reference (runs 3 and 6 both shipped
 `u1 · / u1 · / u2 ·` shapes; both times the answers came back by guessed position).
 The same `QN` ids carry into the specs where defaults are recorded.
+Ids are given to every triage question before the decide pass (adw-init Phase 2) and never
+renumbered: only `ask` items are rows under `needs you`, so a gate can show `Q1` and `Q4`, and the
+handoff's new questions continue after the highest id. `decided` ones print on the approval
+surface's `decided` line only, never on the handoff, and the `decided` line is not counted in
+`needs you N` or in the stopping test above.
 Unanswered items ship with the recommended default, recorded in the spec. A single-unit
 (flat-file) intent prints its spec's flat path on the `specs` line instead of a folder.
 
@@ -707,6 +715,7 @@ important the unit is:
 | **Look up** — read a file or a history and answer a bounded question | `haiku` |
 | **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file | `sonnet` |
 | **Author** — write a spec, a plan, or production code | **keyed on the unit's `depth:`** — `opus` at D3, `sonnet` at D0–D2 |
+| **Decide** — settle each gate question or hand it to the owner (`adw-init.md` Phase 2) | `opus`; `sonnet` when every unit is D0–D1. A wrong `decided` builds unseen |
 | **Drive** — run `/pr-ready <N> apply` end to end for one PR (tier, review cycles, the post-review re-pass, evidence, verdict, cleanup) and return its machine line | `sonnet` |
 | **Adjudicate** — triage a returned finding against `review-core.md` §3.1's bar (`code-review.md` Phase 6) | the tier of the session running `/code-review` — the §3.6 driver, `sonnet`. It is a check against a written bar, a Find job. A finding the bar does not dispose of clears the escalation gate and goes to the **human** as `blocked` with a default; no tier is dispatched to decide it, and no rule in `code-review.md` or `review-core.md` dispatches one |
 
