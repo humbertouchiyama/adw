@@ -28,7 +28,8 @@ ref. Empty → ask for the intent and stop.
   the session — do not read this rule as a reason to stop there. (It is stated this way
   because the v2.15 contract said "documents only" at the top and "continue into build"
   at the bottom, and the top won every time.)
-- Nothing expensive runs before the human approves the cut — the per-unit fan-out can
+- Nothing expensive runs before the human approves the cut (triage and the one decide pass are
+  the only pre-gate dispatches) — the per-unit fan-out can
   cost more than the implementation it produces; burning it on a mis-cut is the failure
   the gate exists to prevent. Since v2.16 the same approval also releases the build, so
   the cut is the only gate in front of the whole run: everything the human might act on
@@ -172,26 +173,34 @@ the triage re-diagnoses shipped code and mints blind neighbours:
 > shared file, shared query, one's design assuming the other's absence. That class is
 > invisible to every gate and is the whole reason extension beats a fresh slug.
 
-Render the **approval surface exactly** (adw-core §7) from the proposal and end the turn on the verb menu.
+Run the **decide pass** (first paragraph of Phase 2) on the proposal's questions, THEN render the
+**approval surface exactly** (adw-core §7) from the proposal and end the turn on the verb menu.
 Do not proceed without an answer.
 
 ## Phase 2 — the human gate
 
-**Decide pass — before the first render, not at the gate.** Measured over 96 gates in 30 days
-(Plantoes-app, AXCMedApp): 42% came back as "critically decide" or "didn't understand", 20% as bare
-`approve`, and only ~23% carried an owner decision. Every candidate `needs you` question therefore
-goes through ONE `model: opus` pass (`model: sonnet` when every unit is D0–D1) that gets the
-candidate list, the specs' evidence and the repo profile, and returns per question either
-`decided: <answer> — <one-clause reason>` or `ask`. **`ask` only when** the answer is a product or
-scope call the code cannot settle, changes money, data or a public contract, or is hard to reverse.
-UX taste, naming, "which sheets/rows/copy" and anything with a defensible default are `decided`.
-Every `ask` is rewritten in plain words: one sentence, no identifiers the owner has to look up,
-the default and its consequence in a clause. `decided` items print as ONE line under `needs you`
-(`decided  Q2 yes · Q3 pick-lists only — reopen by number`) and are recorded in the spec like any
-default; `reopen Q<N>` turns one back into a question. When nothing is `ask`, `needs you  none`
-and `approve` builds straight through.
+**Decide pass — runs at the end of Phase 1, before the first render, not at the gate.** Measured
+over 96 gates in 30 days (Plantoes-app, AXCMedApp): 42% came back as "critically decide" or "didn't
+understand", 20% as bare `approve`, and only ~23% carried an owner decision. Every candidate question
+from triage therefore goes through ONE read-only dispatch (it must not write) on `model: opus`
+(`model: sonnet` when every unit is D0–D1) that gets the question list, the proposal (with the D0
+draft spec when there is one) and the repo profile, and returns one line per question id:
+`decided: <answer> — <one-clause reason>` or `ask`. An id it omits, or a reply it cannot parse, is
+`ask`. **A question is `ask` when ANY of these holds**, even if it has a default: the answer is a
+product or scope call the code cannot settle, changes money, data or a public contract, is hard to
+reverse, or is the `base:` branch. Only a question matching none of them is `decided` (UX taste,
+naming, which items or copy, a defensible default). Every `ask` is rewritten in plain words: one
+sentence, no identifiers the owner has to look up, the default and its consequence in a clause.
+Ids come from triage's list and are never renumbered, so `ask` rows can skip a number.
+`decided` items print as ONE line under `needs you`
+(`decided  Q2 cap refunds: yes · Q3 export: pick-lists only — reopen by number`), a few words of the
+question then the answer. `reopen Q<N>` turns one back into an `ask` with its default. After a
+`re-cut`, run the pass again on the new question list; a `decided` id stays `decided` unless reopened.
+When nothing is `ask`, `needs you  none` and `approve` builds straight through the gate; a
+critical-pass question raised later (Phase 3–4) still stops the handoff (Phase 5 step 1).
 
-- `approve` → freeze the proposal (units, depths, `shape`, packaging, `after`, `verify`) → Phase 3,
+- `approve` → freeze the proposal (units, depths, `shape`, packaging, `after`, `verify`, and every
+  `QN` answer: `decided` ones, gate answers, `ask` defaults) → Phase 3,
   then Phase 5 prints the handoff and **continues straight into `/adw-build <slug>` in the
   same session, same turn** (Phase 5 step 3 — that step, not this sentence, is what
   executes it). Gated on a clean exit: a handoff carrying a non-empty `needs you` stops
@@ -201,6 +210,8 @@ and `approve` builds straight through.
   ends. This is the verb for reading the specs before any code exists.
 - `detail` → re-render the approval surface with its `detail` and `fyi` blocks appended
   (adw-core §7). Not an exit — the gate stays open.
+- `reopen Q<N>` → turn a `decided` question back into an `ask` with its default, re-render the
+  approval surface.
 - `re-cut "<instruction>"` → send the instruction to the SAME triage agent
   (SendMessage — context intact), re-render the approval surface.
 - `regroup` / `depth` → apply mechanically, re-render the approval surface. `regroup` refuses to put
@@ -250,7 +261,8 @@ with the most to discover), so blocking on it is a pure loss every time.
 > never code, never a branch. Spec path: `<exact path per adw-core §1>`. The spec MUST
 > open with the exact header block (adw-core §2):
 > `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`
-> when the unit was approved as `port`. The spec body
+> when the unit was approved as `port`. Approved answers for this intent: `<QN → answer, one per
+> line>`. Follow each one that touches this unit and record it in the spec under its `QN` id. The spec body
 > states: the problem, the change, acceptance criteria, and (bugs) root cause with
 > evidence. Reference only plugin skills (`superpowers:*`) or tracked commands.
 > Code snippets in the spec/plan MUST follow the repo comment rule (`repo-profile §2`): one
