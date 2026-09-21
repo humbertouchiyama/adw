@@ -1373,7 +1373,8 @@ also date order.
   the `### Code review` comment carrying the reviewed head SHA — and was wrong twice over,
   caught only by reading `/code-review` rather than assuming it. The SHA reaches that
   comment **only** through finding permalinks, so a clean review carries none; and Phase 7
-  has branches that post no project comment at all, letting the plugin's own comment stand.
+  had branches that post no project comment at all, letting the plugin's own comment stand
+  (since closed: every Phase 7 branch now posts).
   A header-and-SHA match would therefore have blocked precisely the PRs that passed
   cleanest. Timestamps are shape-independent and survive both. A third error was caught by
   the owner asking whether re-review is unconditional: dating the evidence on `$VSHA`
@@ -1393,7 +1394,9 @@ also date order.
   (code-review.md Phase 1) exits "already reviewed at this SHA" when a prior comment
   body contains the current head SHA — which, per the same two facts above, a clean
   review never does. That guard is dead for exactly the reviews it should short-circuit,
-  and the fix is to stamp the head unconditionally in the comment footer. Out of scope
+  and the fix is to stamp the head unconditionally in the comment footer. Partly closed:
+  the clean `apply` path now stamps `Reviewed at <short-sha>`; a clean 7b run and a
+  findings comment still carry none. Out of scope
   for an adw erratum; recorded so the next `/code-review` pass has it.
   This is the third mechanical-evidence conversion in this erratum (`wc -l`, artifact
   ratio, review comment) and they share a shape worth naming: each replaces a judgment
