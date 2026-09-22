@@ -604,7 +604,9 @@ Three properties hold in every repo, whatever that file declares:
   (repo-global, shared across worktrees)"), and for a unit with no commit yet it
   also empties `git diff --name-status <BASE>...HEAD` below, which skips the check
   outright instead of protecting the WIP. Commit the unit's current state instead —
-  a throwaway `wip:`-prefixed commit is fine (squash or amend later; the `wip:`
+  a throwaway `wip:`-prefixed commit is fine (squash or amend it into the unit's
+  implementation commit before §3.4 derives `$VSHA` — never after, or the rewrite
+  mismatches the pinned head and the unit goes `blocked` at merge; the `wip:`
   prefix keeps it out of the `fix-attempt-N` / `fix(review):` counters). This has
   already cost a unit its own file: a one-commit-at-the-end port unit ran this
   check pre-commit, the bare checkout replayed `<BASE>`, and the file had to be
