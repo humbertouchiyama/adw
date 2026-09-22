@@ -595,8 +595,25 @@ Three properties hold in every repo, whatever that file declares:
 - **A gate that inspected nothing is not a pass.** Where a repo's audit-style gate can be handed an
   empty scope, `repo-profile §5` states how to opt in explicitly. Reaching for that opt-in to turn a
   real code change green reinstates the exact lie the exit code exists to close.
-- **Mutation check (design §2.2(5)) — the unit's `verify` must be able to fail.** Once
-  the gates first go green, neutralise the unit's changed PRODUCTION files (tests stay),
+- **Mutation check (design §2.2(5)) — the unit's `verify` must be able to fail.**
+  **Commit first — never neutralise uncommitted work.** The restore step
+  below is `git checkout <unit-branch> -- <path>`, which replays a real commit; run
+  it against a `<unit-branch>` that never received the WIP and it silently replays
+  `<BASE>` instead, discarding the uncommitted edit with nothing left to recover.
+  `git stash` is not the fix: it is already banned above ("**Never:** `git stash`
+  (repo-global, shared across worktrees)"), and for a unit with no commit yet it
+  also empties `git diff --name-status <BASE>...HEAD` below, which skips the check
+  outright instead of protecting the WIP. Commit the unit's current state instead —
+  a throwaway `wip:`-prefixed commit is fine (squash or amend it into the unit's
+  implementation commit before §3.4 derives `$VSHA` — never after, or the rewrite
+  mismatches the pinned head and the unit goes `blocked` at merge; the `wip:`
+  prefix keeps it out of the `fix-attempt-N` / `fix(review):` counters). This has
+  already cost a unit its own file: a one-commit-at-the-end port unit ran this
+  check pre-commit, the bare checkout replayed `<BASE>`, and the file had to be
+  rebuilt from memory and spec fragments rather than recovered (run-log 2026-09-22,
+  native-assistant-redesign u7, `AssistantChatScreen.kt`). Once the gates first go
+  green **and the unit's current state is committed**, neutralise the unit's
+  changed PRODUCTION files (tests stay),
   scoped by `git diff --name-status <BASE>...HEAD`: `M`/`D` paths →
   `git checkout <BASE> -- <path>` · `A` paths → delete the file (it does not exist at
   `<BASE>`; a plain `checkout <BASE> --` pathspec-errors on it and can leave a partial
