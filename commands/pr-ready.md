@@ -445,8 +445,11 @@ rather than assumed:
 - `%cI` emits the committer's local offset while `gh` returns UTC `Z`. jq's `>` on strings
   is lexicographic, so unnormalised, a UTC−3 commit reads ~3h early and passes a review
   that predates the code.
-- Keyed on **timestamp, not comment shape**, deliberately: `/code-review` has branches
-  that post no project comment at all (an `apply` run with an empty `toFix`), so a header match would block precisely the cleanest reviews. The grading above keys on the header only to *find* findings: no header, no findings, nothing blocked — the floor stays the timestamp count.
+- Keyed on **timestamp, not comment shape**, deliberately: the floor asks whether the PR
+  was reviewed after the last code commit, and a header match would instead ask whether
+  `/code-review` wrote it — discounting a human review, a third-party tool, and any future
+  comment shape. (`/code-review` itself always posts a `### Code review` comment, clean runs
+  included — 7a step 1.) The grading above keys on the header only to *find* findings: no header, no findings, nothing blocked — the floor stays the timestamp count.
 
 Dating on the code head rather than `$VSHA` is what keeps this consistent with §6: a
 docs-only amendment moves the head, no review post-dates it, and keyed on `$VSHA` the PR

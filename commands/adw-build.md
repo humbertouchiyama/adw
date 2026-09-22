@@ -401,7 +401,8 @@ Any one fires → finish the phase in flight, then abort →
    pass that pushed. It inherits the carve-out below: a first pass is a completion, and a
    completion legitimately changes nothing. On a green zero-finding unit the triple is
    *supposed* to sit still — `verify` commits nothing, and `/code-review` with an empty
-   `toFix` skips its apply steps entirely — so an unscoped condition 5 fires on the
+   `toFix` applies, commits and pushes nothing (it posts its clean review comment, which
+   moves none of the three) — so an unscoped condition 5 fires on the
    **clean happy path** (gates→verify unchanged, then review→re-verify unchanged) and
    ships the ideal run as `failed`. Nothing else in the six is this easy to invert.
 6. **Boundary cap: 16 boundary crossings for one PR** → `blocked` (not `failed` — the work
