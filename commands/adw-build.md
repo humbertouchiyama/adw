@@ -726,7 +726,7 @@ against a base checkout and returns its failing ids — the orchestrator runs no
 Run that relay once per gate per `<BASE>`, and paste `known baseline red: <gate> — <failing ids>`
 into every later brief that runs gates (implementer, 3.4 verifier, 3.6 driver), so no agent proves
 it again. After a sub-PR merges, `<BASE>` is the new integration tip: run the relay again for
-any gate on the list before pasting. The same condition used to end three ways — `ready` on one PR, `blocked` on four, and the
+any gate on the list before pasting, and drop the line for a gate that is green there. The same condition used to end three ways — `ready` on one PR, `blocked` on four, and the
 `failed` this section prescribed on none — and eight sessions re-proved one red (2026-09-20 to
 10-01).
 
@@ -1044,7 +1044,7 @@ that label alone.
    `adw/<slug>` and head equal to the expected sha. For a `ready` sub-PR that is `$VSHA`. For a
    carried `blocked` sub-PR it is `$VSHA`, and the driver must have returned `verified <sha7>`
    (a port unit that is `port not converged` returns one too). A `blocked` sub-PR whose driver
-   returned no `verified <sha7>` (a driver that returned without its log, a stale-base abort) has no sha to compare: it is not carried, the chain
+   returned no `verified <sha7>` (a void such as `REVIEW NOT COMPLETE`, a driver that returned without its log, a stale-base abort) has no sha to compare: it is not carried, the chain
    halts `blocked`, never merge. Any mismatch → the chain halts `blocked`, never merge.
 2. The merge, alone in its own Bash call, with the sha written out as a literal:
    `gh pr merge <n> --squash --match-head-commit <full sha>`. No `cd`, no `&&`, no `;`, no pipe,
@@ -1075,7 +1075,7 @@ unless one of these holds — then the chain halts at it:
 
 After the merge, edit the sub-PR body's `Next:` line to the carried form (adw-core §7), so an
 unmerged PR never claims it was merged, and keep the `adw:blocked` label: the label on a merged
-sub-PR is the record Phase 4 reads. If the edit fails, the label alone is the record. The run does
+sub-PR is the record Phase 4 reads. If the edit fails or the run ends before it, the label alone is the record and Phase 4 repairs the line. The run does
 not print the block as a question and does not end its turn on it. Review cap with Warnings
 left, an escalated finding, a gate-file diff, open findings `/pr-ready` §5 could not close: all
 carried. A carried gate-file diff is still in the final PR's diff, so §3.4's gate-file tripwire
@@ -1149,7 +1149,7 @@ as its own commit (a default the owner accepts needs none). An answer commit tha
 code moves the head the final PR's `ready` was earned at, so the Phase 3 loop (3.4 verify
 against `origin/<INTENT_BASE>` and 3.6's review) runs again on the new head before the next
 step, once per answer commit, with fresh review-cycle and boundary counters. A docs-only answer
-commit needs no re-pass. If a re-pass ends `blocked`, the final PR stays `blocked` with that
+commit needs the 3.4 verify alone and no review cycle (`/pr-ready` §6: any commit voids `ready`). If a re-pass ends `blocked`, the final PR stays `blocked` with that
 reason on its body and the owner decides; the carried lines stay. Then
 `gh pr edit <n> --remove-label adw:blocked` on that sub-PR; the final PR leaves `blocked` when
 the list is empty and its own loop, at the current head, is `ready`. The escalation rate

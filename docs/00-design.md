@@ -748,7 +748,7 @@ its unbuilt units in the halting sub-PR's body (§4.1).
 |---|---|---|
 | Worktree count | `git worktree list` | free |
 | PR size / count | `gh` | free |
-| Escalation rate | **the `blocked` PR label** | free once the label is the store |
+| Escalation rate | **`carried #<n>` lines on final PRs** (the `blocked` label is cleared when the owner answers) | free once the final PR body is the store |
 | Failed-exit rate | **the `failed` PR label** | free once the label is the store |
 | Gate red/green | exit codes | free **after** the `audit.sh` exit-0 fix (§2.2) |
 | ~~Apply/escalate ratio~~ | — | **dropped.** `.agent/review-calibration.md` logs *overrides only* — it has no denominator, making the ratio as unmeasurable as token burn. And `review-core.md:171` records this channel silently failing in this repo (a path-with-space parse bug left two lines recorded and unread), so it is also an unreliable store. Bar erosion is detected by the canary in §5.3 instead |

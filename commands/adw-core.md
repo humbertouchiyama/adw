@@ -344,7 +344,7 @@ was given when the owner typed `approve` on a cut that shows the chain (§7). So
   carried block with its default (adw-build §3.7, Phase 4). The owner answers them all there, once.
 - **What still stops a chain:** a `failed` sub-PR; a `blocked` sub-PR the next unit cannot build
   on (adw-build §3.7 names three cases: a `depth escalation` or `shape escalation`, whose
-  default replaces the unit, a red gate on the pushed head, and a driver that returned no
+  default replaces the unit, a red gate on the pushed head (but a port unit that is `port not converged` is carried), and a driver that returned no
   `verified <sha7>`); a sub-PR whose provenance this
   session did not establish (adw-build, Session-boundary provenance); and a merge-time assertion
   mismatch (adw-build §3.7). Each of these is a line on the run report, not a question.
