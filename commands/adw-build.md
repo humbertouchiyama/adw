@@ -1041,10 +1041,11 @@ that label alone.
 
 1. Re-assert provenance: `gh pr view <n> --json baseRefName,headRefOid` must show base still
    `adw/<slug>` and head equal to the expected sha. For a `ready` sub-PR that is `$VSHA`. For a
-   carried `blocked` sub-PR it is `$VSHA` when the driver returned `verified <sha7>`; when no
-   verified sha exists (a port unit that is `port not converged`), there is nothing to compare,
-   and the `headRefOid` this call returns is the sha step 2 pins the merge to. Any mismatch →
-   the chain halts `blocked`, never merge.
+   carried `blocked` sub-PR it is `$VSHA`, and the driver must have returned `verified <sha7>`
+   (a port unit that is `port not converged` returns one too). A `blocked` sub-PR whose driver
+   returned no `verified <sha7>` (a void such as `REVIEW NOT COMPLETE`, a driver that returned
+   without its log, a stale-base abort) has no sha to compare: it is not carried, the chain
+   halts `blocked`, never merge. Any mismatch → the chain halts `blocked`, never merge.
 2. The merge, alone in its own Bash call, with the sha written out as a literal:
    `gh pr merge <n> --squash --match-head-commit <full sha>`. No `cd`, no `&&`, no `;`, no pipe,
    no loop, no variable; when the session's cwd is not the repo, add `-R <owner>/<repo>` instead
@@ -1068,7 +1069,8 @@ unless one of these holds — then the chain halts at it:
 - its reason is a `depth escalation` or a `shape escalation` (§3.1): the default replaces the
   unit, so the next unit would build on code the default throws away;
 - a gate is red on its pushed head. One exception: a port unit that is `port not converged`
-  (§3.1) is carried — its default is a fix-up unit, which builds on this one.
+  (§3.1) is carried — its default is a fix-up unit, which builds on this one;
+- the driver returned no `verified <sha7>`: there is no sha the merge can be pinned to.
 
 Before the merge, edit the sub-PR body's `Next:` line to the carried form (adw-core §7) and keep
 the `adw:blocked` label: the label on a merged sub-PR is the record Phase 4 reads. The run does
@@ -1141,9 +1143,11 @@ Add `adw:blocked` to it, and put one line per carried sub-PR at the top of its b
 run-report line: `carried #<n> <unit> — <the one-sentence reason>; default: <default>`. This is
 the chain's one stop: the owner answers every carried block and gives the merge consent in the
 same place. When the owner answers a carried block, apply the answer on the integration branch
-as its own commit (a default the owner accepts needs none), then
-`gh pr edit <n> --remove-label adw:blocked` on that sub-PR; the final PR leaves `blocked` when
-the list is empty and its own loop is `ready`. Of 13 owner stops for a sub-PR merge, 8 were a
+as its own commit (a default the owner accepts needs none). An answer commit that changes
+code moves the head the final PR's `ready` was earned at, so the Phase 3 loop (3.4 verify
+against `origin/<INTENT_BASE>` and 3.6's review) runs again on the new head before the next
+step. Then `gh pr edit <n> --remove-label adw:blocked` on that sub-PR; the final PR leaves
+`blocked` when the list is empty and its own loop, at the current head, is `ready`. Of 13 owner stops for a sub-PR merge, 8 were a
 `blocked` sub-PR and the owner answered every one "merge" (adw-core §6).
 
 **The composition review is not waivable, and "every unit was already reviewed" is not a
