@@ -321,10 +321,38 @@ never chosen — each costs the owner +1 review, +1 local preview, +1 merge cons
 
 The pipeline may merge ONLY: a sub-PR **it opened itself**, for a unit of the **current
 intent**, whose base is that intent's **integration branch**, whose loop reached
-**`ready`**. Provenance is the authority — a PR that merely targets some `adw/*` branch
+**`ready`** or **`blocked`** (a blocked sub-PR merges as a *carried block*, below). Provenance
+is the authority — a PR that merely targets some `adw/*` branch
 does not qualify. Any PR targeting the default base, the production branch (`repo-profile §3`),
 or the intent's `base:` branch (§2) requires explicit human consent, always — a `base:` override
-does not open a consent side-door. The carve-out never widens.
+does not open a consent side-door. The carve-out never widens past the integration branch.
+
+**A chain asks the owner once, at the final PR.** The consent for every sub-PR merge of a chain
+was given when the owner typed `approve` on a cut that shows the chain (§7). So:
+
+- **Never ask before a sub-PR merge.** "May I merge #N into `adw/<slug>`?" is not a question this
+  contract has. Merge it (adw-build §3.7) and build the next unit.
+- **A standing no-merge instruction does not reach a sub-PR.** A memory, a CLAUDE.md line or a
+  brief that says "never merge without my word" or "do not merge anything" is about PRs into the
+  intent's base, the default base and the production branch: the one consent this section keeps
+  for the owner. It stops a sub-PR merge only when it names sub-PRs or the integration branch
+  ("do not merge sub-PRs", "stop after each unit"). A session that writes a brief for another
+  session never adds a no-merge line of its own.
+- **A `blocked` sub-PR does not stop the chain. It is carried.** The sub-PR keeps its
+  `adw:blocked` label and its PR body, is merged into the integration branch, and the chain builds
+  on its recommended default. The final PR then lands `blocked`, never `ready`, and lists every
+  carried block with its default (adw-build §3.7, Phase 4). The owner answers them all there, once.
+- **What still stops a chain:** a `failed` sub-PR; a `blocked` sub-PR the next unit cannot build
+  on (adw-build §3.7 names the two cases: a `depth escalation` or `shape escalation`, whose
+  default replaces the unit, and a red gate on the pushed head); a sub-PR whose provenance this
+  session did not establish (adw-build, Session-boundary provenance); and a merge-time assertion
+  mismatch (adw-build §3.7). Each of these is a line on the run report, not a question.
+
+Thirteen sub-PR merge questions reached the owner in twelve days of runs (2026-09-20 to 10-01):
+eight for a `blocked` sub-PR, two from a no-merge line a dispatching session wrote into a brief,
+two from a permission denial, one from a session restart. All thirteen were answered "merge",
+and the owner gave the standing order ten times ("build all the chain, don't stop at every unit
+merge").
 
 ## 7. Surfaces — the format contract
 
@@ -442,7 +470,8 @@ reading the specs before any code exists. Two consequences the surface must own:
   `approve → cut + build`, why every hazard is a `⚠` line the brief surface still prints,
   and why the `⚠` split above is not cosmetic. The merge carve-out (§6) does not move:
   sub-PRs still merge only into the intent's own integration branch, and the PR to
-  `base:` still needs explicit human consent.
+  `base:` still needs explicit human consent. On a cut with a chain, `approve` is also the
+  consent for every sub-PR merge of that chain (§6): the run does not ask again per sub-PR.
 - **The collapse is gated on a clean exit.** A non-empty `needs you` on the handoff stops
   there exactly as `specs only` would — a pending critical-pass question is the whole
   reason the round-trip existed, and auto-defaulting it sight-unseen would bake the answer
@@ -595,8 +624,10 @@ Nothing else is printed.
 
 First line `Next:` (what to decide or fix) · then the one-sentence reason with recommended
 default (`blocked`) or the last red gate output (`failed`) · then, when the PR halts a
-chain, the remaining unbuilt units and why the chain stopped · everything else under a
-`<details>` fold, never above the decision line.
+chain (`failed`, or `blocked` and not merged: §6), the remaining unbuilt units and why the
+chain stopped · everything else under a
+`<details>` fold, never above the decision line. A `blocked` sub-PR that is carried (§6) says so
+on its `Next:` line: `Next: answer on the final PR — merged into adw/<slug> as a carried block`.
 
 ### 7.1 The `⏱ run` line — machine time vs gate time
 
