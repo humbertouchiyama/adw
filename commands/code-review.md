@@ -83,7 +83,7 @@ avoidable: nothing in Phases 1–8 has to happen in the caller's window.
   > open-finding lines included, then `Phases: 1 — exited at the eligibility gate`.
   > The contract was fetched at `<CONTRACT_SHA>` with `fetch.sh` exit `<0|2>`; on exit 2 the report
   > must carry `⚠ contract from cache, not verified against origin (<sha>)`.
-  > Wait for every agent you dispatch by `review-core.md` §10 (one blocking call), never by polling;
+  > Wait for every agent you dispatch by `review-core.md` §10 (one blocking call, re-issued per its step 4), never by polling;
   > end every brief you write with `review-core.md` §11's lines, pasted;
   > if §10 step 5 applies, return its `REVIEW NOT COMPLETE` text instead of the report.
   > End the report with one `Phases:` line — `Phases: 1-8 complete`, or naming every phase that did
@@ -329,7 +329,7 @@ because Y" returns Y and reads as confirmation, while the lane's independent wor
 #### Step 3 — Dispatch
 
 **Launch 3 Agents in ONE message** (`subagent_type: general-purpose`, `model: sonnet`) so they run
-in parallel, then wait for all three with **one** blocking call by `review-core.md` §10 — each brief
+in parallel, then wait for all three by `review-core.md` §10 (one blocking call, re-issued per its step 4) — each brief
 ends with "write your final report to `<OUT>/<lane>.md`", and the wait is one Bash call with
 `timeout: 600000` and its deadline inside the command (§10 step 3, with `-ge 3`). Every brief this
 file dispatches, in any phase, ends with `review-core.md` §11's brief floor, pasted.

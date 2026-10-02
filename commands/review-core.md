@@ -451,8 +451,8 @@ So every dispatcher below the top level — a driver, a verifier, a lane — doe
    stop waiting for its file. If some agent has neither a file nor a hand-back, issue the call
    again, with `<N>` cut to the files already present plus the agents that still have neither.
    Re-issue it at most 4 times: 5 calls, about 22 minutes. After the fifth miss, use what you have
-   and record each agent with neither as `NOT RUN — no report after 20 min`.
-   **The verifier is the exception to the 20 minutes.** Its gates can legitimately run ~90 minutes
+   and record each agent with neither as `NOT RUN — no report after 22 min`.
+   **The verifier is the exception to the 22 minutes.** Its gates can legitimately run ~90 minutes
    (`adw-build.md` §3 sizes its single-phase ceiling at 4 hours). A verifier wave re-issues the call
    until its file or hand-back arrives, at most 54 calls; only then is it
    `NOT RUN — no report after 4 h`.
@@ -476,7 +476,7 @@ they are. A dispatched agent has only its brief: each line is a rule that subage
 > - Wait only with `review-core.md` §10's one blocking call. Never `sleep <n>; cat <file>`. Never
 >   write a lock file or a lock script: when a gate must not run beside another, your caller
 >   orders the runs.
-> - Shell: quote every glob (`--include='*.kt'`). Write `"${B}:path"`, never `$B:path`. Never print
+> - Shell: quote every glob (`--include='<glob>'`). Write `"${B}:path"`, never `$B:path`. Never print
 >   a line that starts with `=`. Do not call `timeout`. Give the Read tool the raw path, with no
 >   backslash before a space.
 > - Output that ends in a truncation notice (`+N more`, `see remaining`) is incomplete. Get the

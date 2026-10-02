@@ -723,9 +723,10 @@ against a base checkout and returns its failing ids — the orchestrator runs no
   `blocked`, never a fix cycle;
 - an id that does not fail at `<BASE>` is the unit's own: a genuine red, fed back as one.
 
-Run that relay once per gate per run, and paste `known baseline red: <gate> — <failing ids>` into
-every later brief that runs gates (implementer, 3.4 verifier, 3.6 driver), so no agent proves it
-again. The same condition used to end three ways — `ready` on one PR, `blocked` on four, and the
+Run that relay once per gate per `<BASE>`, and paste `known baseline red: <gate> — <failing ids>`
+into every later brief that runs gates (implementer, 3.4 verifier, 3.6 driver), so no agent proves
+it again. After a sub-PR merges, `<BASE>` is the new integration tip: run the relay again for
+any gate on the list before pasting, and drop the line for a gate that is green there. The same condition used to end three ways — `ready` on one PR, `blocked` on four, and the
 `failed` this section prescribed on none — and eight sessions re-proved one red (2026-09-20 to
 10-01).
 
@@ -913,7 +914,7 @@ carries "wait for every agent you dispatch by `review-core.md` §10, never by po
 brief you write with `review-core.md` §11's lines" (for a port
 unit also §3.1's wait block and `repo-profile §20`'s Gate mode row, which the driver pastes into the
 verifier's brief for its gate-mode `verify`), and:
-run `/pr-ready <N> apply` with `BASE`, `PASS=v2` and `REF` set to 3.4's values, carrying the
+run `/pr-ready <N> apply` with `BASE`, `PASS=v2` (the next `PASS` id when 3.4 already used `v2`) and `REF` set to 3.4's values, carrying the
 unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and return
 **Layer 2 only, plus the open-findings lines below** (`/pr-ready` §7 — suppress Layer 1 in the
 brief): the `ready|blocked` machine
@@ -999,7 +1000,7 @@ consent — and adds:
   A blocked sub-PR is carried, not asked about: §3.7 merges it and the chain builds on the
   default.
 - **After the review loop's LAST push, 3.4 runs in full against the PUSHED head** — inside the
-  driver, as `/pr-ready` §4 and §5 with `PASS=v2`, which is why the brief carries the unit's `verify`
+  driver, as `/pr-ready` §4 and §5 with `PASS=v2` (the next id on a re-run), which is why the brief carries the unit's `verify`
   and the mutation obligation. `/code-review apply` verifies in its own worktree — not the
   clean checkout with gate files restored — so without this re-pass a reviewer edit to
   `package.json` would be the one unchecked path into `ready`. **The orchestrator asserts the
@@ -1043,8 +1044,7 @@ that label alone.
    `adw/<slug>` and head equal to the expected sha. For a `ready` sub-PR that is `$VSHA`. For a
    carried `blocked` sub-PR it is `$VSHA`, and the driver must have returned `verified <sha7>`
    (a port unit that is `port not converged` returns one too). A `blocked` sub-PR whose driver
-   returned no `verified <sha7>` (a void such as `REVIEW NOT COMPLETE`, a driver that returned
-   without its log, a stale-base abort) has no sha to compare: it is not carried, the chain
+   returned no `verified <sha7>` (a void such as `REVIEW NOT COMPLETE`, a driver that returned without its log, a stale-base abort) has no sha to compare: it is not carried, the chain
    halts `blocked`, never merge. Any mismatch → the chain halts `blocked`, never merge.
 2. The merge, alone in its own Bash call, with the sha written out as a literal:
    `gh pr merge <n> --squash --match-head-commit <full sha>`. No `cd`, no `&&`, no `;`, no pipe,
@@ -1057,7 +1057,7 @@ that label alone.
 A permission denial of the merge call in that bare form → the chain halts `blocked` with
 `default: run ! gh pr merge <n> --squash --match-head-commit <full sha>, then re-run /adw-build
 <slug>`. Never re-shape the command to get a denied merge through. Transient `gh pr merge`
-failure → retry once, then `blocked` (PR body names the gh error). After the merge,
+failure → retry once, then the chain halts `blocked` (PR body names the gh error). After the merge,
 `git fetch origin` — the chain continues from `origin/adw/<slug>` (the merge advanced origin
 only; the local ref is never a source of truth). Squash (or `repo-profile §3`'s merge
 convention) keeps the integration branch linear (Phase 4's ≤5-commit rebase rule counts
@@ -1069,11 +1069,13 @@ unless one of these holds — then the chain halts at it:
 - its reason is a `depth escalation` or a `shape escalation` (§3.1): the default replaces the
   unit, so the next unit would build on code the default throws away;
 - a gate is red on its pushed head. One exception: a port unit that is `port not converged`
-  (§3.1) is carried — its default is a fix-up unit, which builds on this one;
+  (§3.1) is carried for that unconverged parity result — its default is a fix-up unit, which
+  builds on this one. Any other red gate on that unit still halts;
 - the driver returned no `verified <sha7>`: there is no sha the merge can be pinned to.
 
-Before the merge, edit the sub-PR body's `Next:` line to the carried form (adw-core §7) and keep
-the `adw:blocked` label: the label on a merged sub-PR is the record Phase 4 reads. The run does
+After the merge, edit the sub-PR body's `Next:` line to the carried form (adw-core §7), so an
+unmerged PR never claims it was merged, and keep the `adw:blocked` label: the label on a merged
+sub-PR is the record Phase 4 reads. If the edit fails or the run ends before it, the label alone is the record. The run does
 not print the block as a question and does not end its turn on it. Review cap with Warnings
 left, an escalated finding, a gate-file diff, open findings `/pr-ready` §5 could not close: all
 carried. A carried gate-file diff is still in the final PR's diff, so §3.4's gate-file tripwire
@@ -1121,7 +1123,7 @@ to an inclusive bound. Let the shell take the branch.
 A conflicting sync is **judgement work, never resolved unattended**: abort the sync
 (`git rebase --abort` / `git merge --abort`), then **still open the final PR** from the
 unsynced integration branch, non-draft, labelled `adw:blocked`, PR body naming the
-conflict — the abandoned-integration-branch shape is the most expensive abandonment and
+conflict and listing every carried block as below — the abandoned-integration-branch shape is the most expensive abandonment and
 must not have the weakest reporting channel (a terminal line nobody reads). "Unattended"
 means *without the owner*, not *without care*: a correct resolution is still a breach, and
 the one recorded instance resolved a conflict in repasse-share logic — trap-domain money
@@ -1146,9 +1148,14 @@ same place. When the owner answers a carried block, apply the answer on the inte
 as its own commit (a default the owner accepts needs none). An answer commit that changes
 code moves the head the final PR's `ready` was earned at, so the Phase 3 loop (3.4 verify
 against `origin/<INTENT_BASE>` and 3.6's review) runs again on the new head before the next
-step. Then `gh pr edit <n> --remove-label adw:blocked` on that sub-PR; the final PR leaves
-`blocked` when the list is empty and its own loop, at the current head, is `ready`. Of 13 owner stops for a sub-PR merge, 8 were a
-`blocked` sub-PR and the owner answered every one "merge" (adw-core §6).
+step, once per answer commit, with fresh review-cycle and boundary counters. A docs-only answer
+commit needs the 3.4 verify alone, §4 and §5 at the new head with the next `PASS` id, and no review cycle (`/pr-ready` §6: any commit voids `ready`). If a re-pass ends `blocked`, the final PR stays `blocked` with that
+reason on its body and the owner decides; the carried lines stay. Then
+`gh pr edit <n> --remove-label adw:blocked` on that sub-PR; the final PR leaves `blocked` when
+the list is empty and its own loop, at the current head, is `ready`. The escalation rate
+(design §5.1) counts `carried #<n>` lines on final PRs, not labels still on. Of 13 owner stops
+for a sub-PR merge, 8 were a `blocked` sub-PR and the owner answered every one "merge"
+(adw-core §6).
 
 **The composition review is not waivable, and "every unit was already reviewed" is not a
 reason — it is the reason it is mandatory.** Chain close is the only place code exists that

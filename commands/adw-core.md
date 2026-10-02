@@ -344,7 +344,7 @@ was given when the owner typed `approve` on a cut that shows the chain (§7). So
   carried block with its default (adw-build §3.7, Phase 4). The owner answers them all there, once.
 - **What still stops a chain:** a `failed` sub-PR; a `blocked` sub-PR the next unit cannot build
   on (adw-build §3.7 names three cases: a `depth escalation` or `shape escalation`, whose
-  default replaces the unit, a red gate on the pushed head, and a driver that returned no
+  default replaces the unit, a red gate on the pushed head (but a port unit that is `port not converged` is carried), and a driver that returned no
   `verified <sha7>`); a sub-PR whose provenance this
   session did not establish (adw-build, Session-boundary provenance); and a merge-time assertion
   mismatch (adw-build §3.7). Each of these is a line on the run report, not a question.
@@ -580,7 +580,10 @@ run-wide (`machine = (T3 − T0) − gate`): the per-PR number must not charge t
 latency to the unit. It is **reported, never a trigger** — v2.12 replaced the wall-clock
 bound with adw-build §3's progress conditions — and it is durable only because adw-build
 §3.4 lands it in the PR body; the terminal line does not survive the session. A PR line may carry trailing `· ⚠ <flag>`
-annotations (e.g. `· ⚠ no trustworthy gate sees this unit`); the `note` row carries
+annotations (e.g. `· ⚠ no trustworthy gate sees this unit`, `· ⚠ baseline red: <gate>`); a final PR
+landed `blocked` by a carry adds one line per carried sub-PR, `carried #<n> <unit> — <reason>;
+default: <default>` (adw-build Phase 4); every user-visible PR body carries a `Smoke` list
+(adw-build §3.5); the `note` row carries
 run-level caveats (non-default `base:`, extend-mode's prior-unit summary, a
 `· ⚠ mutation per-file <covered>/<total>` ratio). The first `note` line is
 unconditional: `note  contract <short-sha>` — the commit the loaded contract came from:
