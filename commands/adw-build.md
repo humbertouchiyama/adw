@@ -914,7 +914,7 @@ carries "wait for every agent you dispatch by `review-core.md` §10, never by po
 brief you write with `review-core.md` §11's lines" (for a port
 unit also §3.1's wait block and `repo-profile §20`'s Gate mode row, which the driver pastes into the
 verifier's brief for its gate-mode `verify`), and:
-run `/pr-ready <N> apply` with `BASE`, `PASS=v2` and `REF` set to 3.4's values, carrying the
+run `/pr-ready <N> apply` with `BASE`, `PASS=v2` (the next `PASS` id when 3.4 already used `v2`) and `REF` set to 3.4's values, carrying the
 unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and return
 **Layer 2 only, plus the open-findings lines below** (`/pr-ready` §7 — suppress Layer 1 in the
 brief): the `ready|blocked` machine
@@ -1000,7 +1000,7 @@ consent — and adds:
   A blocked sub-PR is carried, not asked about: §3.7 merges it and the chain builds on the
   default.
 - **After the review loop's LAST push, 3.4 runs in full against the PUSHED head** — inside the
-  driver, as `/pr-ready` §4 and §5 with `PASS=v2`, which is why the brief carries the unit's `verify`
+  driver, as `/pr-ready` §4 and §5 with `PASS=v2` (the next id on a re-run), which is why the brief carries the unit's `verify`
   and the mutation obligation. `/code-review apply` verifies in its own worktree — not the
   clean checkout with gate files restored — so without this re-pass a reviewer edit to
   `package.json` would be the one unchecked path into `ready`. **The orchestrator asserts the
@@ -1149,7 +1149,7 @@ as its own commit (a default the owner accepts needs none). An answer commit tha
 code moves the head the final PR's `ready` was earned at, so the Phase 3 loop (3.4 verify
 against `origin/<INTENT_BASE>` and 3.6's review) runs again on the new head before the next
 step, once per answer commit, with fresh review-cycle and boundary counters. A docs-only answer
-commit needs the 3.4 verify alone and no review cycle (`/pr-ready` §6: any commit voids `ready`). If a re-pass ends `blocked`, the final PR stays `blocked` with that
+commit needs the 3.4 verify alone, §4 and §5 at the new head with the next `PASS` id, and no review cycle (`/pr-ready` §6: any commit voids `ready`). If a re-pass ends `blocked`, the final PR stays `blocked` with that
 reason on its body and the owner decides; the carried lines stay. Then
 `gh pr edit <n> --remove-label adw:blocked` on that sub-PR; the final PR leaves `blocked` when
 the list is empty and its own loop, at the current head, is `ready`. The escalation rate
