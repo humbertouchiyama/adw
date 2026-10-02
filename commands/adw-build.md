@@ -67,13 +67,19 @@ reference in a future edit of this file.
 provenance THIS session established. After any session boundary — compaction that loses
 the run state, crash, or a fresh invocation — every already-open adw PR is human-owned:
 resume may build the next units, but it never merges a PR the current session did not
-itself open and carry to `ready`. **This binds hardest on a `ready` sub-PR still awaiting
+itself open and carry to `ready` (or, for a carried block, to `blocked`: §3.7). **This binds
+hardest on a `ready` or `blocked` sub-PR still awaiting
 its §3.7 merge: if run state was lost, do not merge it — halt the chain and report it on
 the run report as human-owned.** Long runs compact (the 10-unit `subscription-locks` run did, 8 times);
 compaction is not schedulable from inside the loop, so the durable defences are the ones
 that survive it — §3.4's evidence block in the PR body, the `fix-attempt-N`/`fix(review):`
 prefixes step 7 recovers counts from, and re-deriving `$VSHA` and the base rather than
 trusting a remembered value.
+
+**After a compaction, re-read this file's Phase 3 (§3 to §3.7) before the next dispatch.** A
+summary keeps what the run did and drops what the contract told it to do next. Of the PRs opened
+after a compaction, 15 of 45 had no evidence block (§3.4); before one, 6 of 160. Four of the seven
+runs that compacted mid-run never read this file again (2026-09-20 to 10-01).
 
 **Never:** `git stash` (repo-global, shared across worktrees) · draft PRs (permanently
 review-ineligible) · merge anything targeting the default or production branch
@@ -222,7 +228,10 @@ gate file to get green · let a subagent create its own worktree.
   Any mid-run halt for an owner answer stamps its own T1/T2 pair into the gate total.
 - **Halt only where §6 binds, and batch what you halt for.** The run stops for exactly two
   things: a merge outside adw-core §6's consent carve-out, and an escalation the owner alone
-  can settle (§3.6 → `blocked`). **A progress report is not a halt** — print it and keep
+  can settle (§3.6 → `blocked`). **In a chain neither one stops the run before the final PR:**
+  a sub-PR merge is inside the carve-out and is never asked about, and a `blocked` sub-PR is
+  merged as a carried block and answered on the final PR (adw-core §6, §3.7). **A progress
+  report is not a halt** — print it and keep
   building; the owner reads the run report at the end. When two or more units are ready to ask something,
   ask once with every question numbered (adw-core's approval-surface shape): on
   `team-active-seat-model` one halt cost **90 minutes** and was answered `proceed with
@@ -274,6 +283,17 @@ gate file to get green · let a subagent create its own worktree.
   (implement in parallel, gate one unit at a time) — `repo-profile §10` §Parallel-gate isolation
   states what this repo's worktrees do and do not share. Raise the cap only after a run reports no
   cross-unit gate flake.
+
+  **The orchestrator is the lock.** Where `repo-profile §10` says a gate shares state between
+  worktrees, at most one gate-running agent is in flight at a time, and this session orders them by
+  dispatch. A level sibling's implementer brief says `implement, commit, then return before you
+  run any gate`; the orchestrator then resumes one sibling at a time (SendMessage: `run the gates
+  now`), and it does not dispatch a 3.4 verifier or a 3.6 driver while another unit's implementer,
+  verifier or driver is still running gates. Where §10 says the gates isolate themselves per
+  worktree, nothing is serialised. **Never a lock file, a lock script, `flock` or a wait-for-lock
+  loop**, in this session or in any brief. The rule above named no mechanism, so each run wrote
+  its own: 581 lock commands across 9 sessions, four permission denials and 12 hours of owner time
+  on one PR, and a three-hour stall on another when a verifier died holding the lock.
 
   **A sibling that merges first leaves its twin behind, and that is fine — do not rebase
   it.** Both branched from the same `origin/adw/<slug>`; when the first merges, the second is
@@ -437,7 +457,8 @@ returning calls; it does **not** bound a true hang. A hung *gate* is already bou
 deadline (§3.1). If a live bound on subagent hangs is ever wanted, the
 mechanism is a `Monitor` poll from this top-level session (`review-core.md` §10 exempts it), not
 a number in this paragraph.
-**Precautionary, not evidenced** — no run has yet produced a hung subagent.
+**Evidenced once:** five subagents were stopped as `stalled: no progress for 600s` on 2026-09-26,
+and each was dispatched again. No run has yet needed the `Monitor` bound.
 
 Every run-report PR line still carries `· ⏱ <N>m`, and §3.4 lands it in the **PR body** where it
 survives the session (adw-core §7.2). Reported, not enforced.
@@ -487,7 +508,8 @@ One implementer subagent per PR, working in the provisioned worktree, **pinned b
 unit's `depth:` per adw-core §8** — `model: opus` at D3, `model: sonnet` at D0–D2. Its brief
 carries the same wait line as 3.6's driver brief ("wait for every agent you dispatch by
 `review-core.md` §10, never by polling") and the **absolute path** of `review-core.md` in the main
-checkout's `.claude/adw/cache/commands/`, since the implementer works from its worktree. A
+checkout's `.claude/adw/cache/commands/`, since the implementer works from its worktree. It ends,
+like every brief this file dispatches, with `review-core.md` §11's brief floor, pasted (adw-core §8). A
 grouped sub-PR takes the tier of its deepest unit. D3 → follow the plan file; D2 → follow
 the spec's `## Implementation` section (adw-core §3); D0/D1 → implement from the spec.
 Units sharing a sub-PR: **one commit each, dependency order**. Keep the SAME implementer across fix cycles via SendMessage — the ORCHESTRATOR
@@ -536,7 +558,10 @@ all fix cycles, for the evidence block. **Every gate-mode run of a port unit** �
 below (`<the verify command>` there is whichever command that run is). A screen still over its ceiling after the grade round halts `blocked` — `port not
 converged — <every screen over its ceiling, with its mismatch and ceiling>; default: re-run
 /adw-init to extend this intent with a fix-up unit for those screens`, an owner decision, not a fix
-cycle. To name every such screen, run §20's Score command on each row once more, joined with `;`
+cycle. **It does not skip the review.** The unit goes on through 3.4, 3.5 and 3.6 like any unit. Its
+render gate is red by construction: that red is never fed back as a fix cycle and never classified
+by 3.3, and the unit lands `blocked` with this reason whatever the verifier and the driver return.
+Three such PRs merged with no review comment at all (2026-09-24), because the halt came before 3.6. To name every such screen, run §20's Score command on each row once more, joined with `;`
 (the fail-closed `verify` stops at its first miss); a row whose score is missing from the log is
 unmeasured, and the halt says so instead of guessing a number. The
 envelope check swaps the file bound for §20's port surface: a production path outside it, or any
@@ -552,11 +577,11 @@ D="$(mktemp -d)"; ( ( <the verify command> ); echo $? >"$D/exit.tmp" && mv "$D/e
 ```
 
 Then wait, in one Bash call with `timeout: 600000`, re-issued until it prints `exit`, or `DEADLINE`
-(one call ends within 570 s, as in `review-core.md` §10 step 3; `<n>` is §20's Gate mode maximum
+(one call ends within 270 s, as in `review-core.md` §10 step 3; `<n>` is §20's Gate mode maximum
 minutes, written in as a number):
 
 ```bash
-lim=$(( <start> + <n> * 60 )); end=$(( $(date +%s) + 570 )); [ "$end" -gt "$lim" ] && end=$lim; until [ -s "<D>/exit" ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; if [ -s "<D>/exit" ]; then echo "exit $(cat "<D>/exit")"; tail -n 60 "<D>/log"; elif [ "$(date +%s)" -ge "$lim" ]; then echo DEADLINE; else echo running; fi
+lim=$(( <start> + <n> * 60 )); end=$(( $(date +%s) + 270 )); [ "$end" -gt "$lim" ] && end=$lim; until [ -s "<D>/exit" ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; if [ -s "<D>/exit" ]; then echo "exit $(cat "<D>/exit")"; tail -n 60 "<D>/log"; elif [ "$(date +%s)" -ge "$lim" ]; then echo DEADLINE; else echo running; fi
 ```
 
 `exit <code>` is the result (`mv` is atomic, so the file exists only once the build has finished), and
@@ -615,11 +640,14 @@ Three properties hold in every repo, whatever that file declares:
   green **and the unit's current state is committed**, neutralise the unit's
   changed PRODUCTION files (tests stay),
   scoped by `git diff --name-status <BASE>...HEAD`: `M`/`D` paths →
-  `git checkout <BASE> -- <path>` · `A` paths → delete the file (it does not exist at
-  `<BASE>`; a plain `checkout <BASE> --` pathspec-errors on it and can leave a partial
-  revert). Re-run the unit's `verify` command — it MUST go red. Then restore the mirror
+  `git checkout <BASE> -- <path>` · `A` paths → `git -C <worktree path> rm -qf -- <path>` (the file
+  does not exist at `<BASE>`; a plain `checkout <BASE> --` pathspec-errors on it and can leave a
+  partial revert). Re-run the unit's `verify` command — it MUST go red. Then restore the mirror
   image: `M`/`A` → `git checkout <unit-branch> -- <path>` (in a verify worktree:
-  `$VSHA`) · `D` → delete again. (File-level neutralisation is deliberately coarser
+  `$VSHA`) · `D` → `git -C <worktree path> rm -qf -- <path>` again. After the restore,
+  `git -C <worktree path> status --porcelain` must print nothing. **Write the worktree path out as
+  a literal, and never delete with `rm`:** `rm "$VAR/<path>"` is refused by a permission check
+  whenever the variable is one it cannot resolve, which stopped this check 34 times in 16 sessions. (File-level neutralisation is deliberately coarser
   than design §2.2(5)'s line-scoped wording; for grouped same-file units it conflates
   the units' changes — accepted, the check asserts only that each verify CAN fail.)
   **A port unit runs this check, and the per-file sweep, with its `verify` in `repo-profile §20`'s
@@ -662,8 +690,9 @@ Three properties hold in every repo, whatever that file declares:
   to the touched surfaces rather than dropping the gate** (design §4.2), and carry
   `· ⚠ e2e narrowed to <specs>` so a shrunk surface leaves a trace — the mutation skip has
   always been flagged and this one never was. Baseline-red e2e
-  (the red reproduces at `<BASE>`) ⇒ skip the e2e gate for this unit and carry
-  `· ⚠ no trustworthy gate sees this unit's correctness` — the approval gate already approved
+  (the red reproduces at `<BASE>`, by §3.3's test) ⇒ skip the e2e gate for this unit and carry
+  `· ⚠ no trustworthy gate sees this unit's correctness` beside §3.3's `· ⚠ baseline red` flag —
+  the approval gate already approved
   the targeting (design §2.1/§2.2); a baseline-broken suite never terminates a unit.
 - Gate commands with `cd` run as subshells against the worktree path — never a bare persistent
   `cd`. `repo-profile §5` writes each one in that form.
@@ -682,11 +711,23 @@ fault, no fix cycle spent):
   database or service that is down, a missing env file, a served-build or port unavailable
 - a port unit's gate-mode build that outlasts §20's Gate mode minutes (`gate-mode build exceeded <n>
   min`, §3.1)
-- a gate red that REPRODUCES at `<BASE>` (when in doubt, a `model: sonnet` relay runs the
-  failing gate once against a base checkout and returns the exit code — the orchestrator runs
-  no gate, §3) — a baseline fault, not the unit's; report it in the PR body as
-  such. Exception: the e2e gate — a baseline-red e2e suite skips the gate and the unit
-  proceeds with the `⚠ no trustworthy gate` flag (3.2), never `failed`
+
+**A baseline red is neither a fault nor a fix cycle: the unit goes on.** A gate is *baseline red*
+when it is red at `<BASE>` too and the unit added nothing to it: every failing test id in the
+unit's run (for a gate with no test ids, every error line, normalised as §3 condition 2
+normalises) also fails at `<BASE>`. To know, a `model: sonnet` relay runs that one gate once
+against a base checkout and returns its failing ids — the orchestrator runs no gate, §3. Then:
+
+- every id also fails at `<BASE>` → skip that gate for this unit and carry
+  `· ⚠ baseline red: <gate>` on the PR's run-report line and in its body. Never `failed`, never
+  `blocked`, never a fix cycle;
+- an id that does not fail at `<BASE>` is the unit's own: a genuine red, fed back as one.
+
+Run that relay once per gate per run, and paste `known baseline red: <gate> — <failing ids>` into
+every later brief that runs gates (implementer, 3.4 verifier, 3.6 driver), so no agent proves it
+again. The same condition used to end three ways — `ready` on one PR, `blocked` on four, and the
+`failed` this section prescribed on none — and eight sessions re-proved one red (2026-09-20 to
+10-01).
 
 These wear a test-failure disguise — connection-refused output reads like a red test.
 The classifier is the orchestrator's job, not the implementer's.
@@ -838,6 +879,18 @@ semantic-conflict risk.
   because this is the section that enumerates what a body contains, and a rule defined only
   at 3.4 is a rule a reader of 3.5 never applies. On `blocked`/`failed` PRs both go inside
   the PR body `<details>` fold, never above the decision line.
+  **Check it, do not remember it** — right after `gh pr create`, and again after the 3.6 driver
+  returns and the block's `cycles` and `phases` rows are edited to what the driver reported:
+  ```bash
+  gh pr view <N> --json body --jq .body | grep -cE '^[[:space:]]*contract +[0-9a-f]{7}' || true   # must print 1
+  ```
+  `0` → write the block now, before any other step. 13 of 28 final PRs had no block, and 36 blocks
+  still read `review 0/2` on PRs that carry `fix(review):` commits (2026-09-20 to 10-01).
+- **Every adw PR body whose change a user can see or trigger carries a `Smoke` list:** one to five
+  steps a person performs to see the change work, written from the spec's acceptance criteria
+  (`open <screen> → do <action> → expect <result>`). The final PR's list is its units' lists, in
+  order. A unit with nothing to see says `Smoke: none — <why>`. Gates were green on three fixes the
+  owner then found still broken on the device, and the owner asked six runs for this list by hand.
 - Every adw PR body carries one depth-conditional line, naming the spec/plan dirs
   (`repo-profile §2`) — D3:
   `<specs-dir>/<plans-dir> in this PR = the unit's contract, authored and critical-passed
@@ -856,7 +909,8 @@ semantic-conflict risk.
 ### 3.6 Review loop — dispatched, never run in this session
 
 **Dispatch ONE `model: sonnet` review driver per PR** (adw-core §8's Drive row). Its brief
-carries "wait for every agent you dispatch by `review-core.md` §10, never by polling" (for a port
+carries "wait for every agent you dispatch by `review-core.md` §10, never by polling, and end every
+brief you write with `review-core.md` §11's lines" (for a port
 unit also §3.1's wait block and `repo-profile §20`'s Gate mode row, which the driver pastes into the
 verifier's brief for its gate-mode `verify`), and:
 run `/pr-ready <N> apply` with `BASE`, `PASS=v2` and `REF` set to 3.4's values, carrying the
@@ -942,7 +996,8 @@ consent — and adds:
   count comes from the evidence block §3.4 writes into the PR body, not from counting these
   (Phase 0 step 7).
 - **Escalation → `blocked`**: label, PR body carrying the question + recommended default.
-  A blocked sub-PR halts its chain.
+  A blocked sub-PR is carried, not asked about: §3.7 merges it and the chain builds on the
+  default.
 - **After the review loop's LAST push, 3.4 runs in full against the PUSHED head** — inside the
   driver, as `/pr-ready` §4 and §5 with `PASS=v2`, which is why the brief carries the unit's `verify`
   and the mutation obligation. `/code-review apply` verifies in its own worktree — not the
@@ -973,9 +1028,56 @@ consent — and adds:
 
 | State | Action |
 |---|---|
-| **ready** | independent/final PR: leave open, run report lists it — the human reviews, previews, merges. Sub-PR: re-assert provenance at merge time — `gh pr view <n> --json baseRefName,headRefOid` must show base still `adw/<slug>` and head equal to `$VSHA` — then `gh pr merge <n> --squash --match-head-commit "$VSHA"` (adw-core §6 carve-out; any mismatch → `blocked`, never merge). Transient `gh pr merge` failure → retry once, then `blocked` (PR body names the gh error). After the merge, `git fetch origin` — the chain continues from `origin/adw/<slug>` (the merge advanced origin only; the local ref is never a source of truth). Squash (or `repo-profile §3`'s merge convention) keeps the integration branch linear (Phase 4's ≤5-commit rebase rule counts cleanly); the `feat` + `fix-attempt-N` commits stay reviewable inside the sub-PR itself |
-| **blocked** | label `adw:blocked`, PR body. Sub-PR → chain halts; the halting PR's body lists every unbuilt unit of its chain |
+| **ready** | independent/final PR: leave open, run report lists it — the human reviews, previews, merges. Sub-PR: merge it now, without asking (adw-core §6) — the merge procedure below, with `$VSHA` as the head |
+| **blocked** | label `adw:blocked`, PR body. Independent/final PR: leave open. Sub-PR → **carried**: merge it by the procedure below and build the next unit on its recommended default; the final PR answers for it (Phase 4). Sub-PR that cannot be carried (below) → chain halts; the halting PR's body lists every unbuilt unit of its chain |
 | **failed** | label `adw:failed`, PR body with the last red gate output, non-draft. Sub-PR → chain halts, same bookkeeping |
+
+**A `blocked` or `failed` PR wears its label, checked.** After `gh pr edit <n> --add-label`,
+`gh pr view <n> --json labels --jq '[.labels[].name] | join(" ")'` must print the label. Five PRs
+were reported `blocked` with no label (2026-09-20 to 10-01), and Phase 4 finds a carried block by
+that label alone.
+
+**Sub-PR merge procedure (adw-core §6 carve-out).** Two Bash calls, never one:
+
+1. Re-assert provenance: `gh pr view <n> --json baseRefName,headRefOid` must show base still
+   `adw/<slug>` and head equal to the expected sha. For a `ready` sub-PR that is `$VSHA`. For a
+   carried `blocked` sub-PR it is `$VSHA`, and the driver must have returned `verified <sha7>`
+   (a port unit that is `port not converged` returns one too). A `blocked` sub-PR whose driver
+   returned no `verified <sha7>` (a void such as `REVIEW NOT COMPLETE`, a driver that returned
+   without its log, a stale-base abort) has no sha to compare: it is not carried, the chain
+   halts `blocked`, never merge. Any mismatch → the chain halts `blocked`, never merge.
+2. The merge, alone in its own Bash call, with the sha written out as a literal:
+   `gh pr merge <n> --squash --match-head-commit <full sha>`. No `cd`, no `&&`, no `;`, no pipe,
+   no loop, no variable; when the session's cwd is not the repo, add `-R <owner>/<repo>` instead
+   of a `cd`. The call's `description` is `Squash-merge sub-PR #<n> into adw/<slug> (integration
+   branch, not <INTENT_BASE>)`. A permission check reads a chained line as one unit and its
+   denial names no clause: 5 `gh pr merge` calls were denied in twelve days of runs, every one a
+   chained line.
+
+A permission denial of the merge call in that bare form → the chain halts `blocked` with
+`default: run ! gh pr merge <n> --squash --match-head-commit <full sha>, then re-run /adw-build
+<slug>`. Never re-shape the command to get a denied merge through. Transient `gh pr merge`
+failure → retry once, then `blocked` (PR body names the gh error). After the merge,
+`git fetch origin` — the chain continues from `origin/adw/<slug>` (the merge advanced origin
+only; the local ref is never a source of truth). Squash (or `repo-profile §3`'s merge
+convention) keeps the integration branch linear (Phase 4's ≤5-commit rebase rule counts
+cleanly); the `feat` + `fix-attempt-N` commits stay reviewable inside the sub-PR itself.
+
+**A carried block (adw-core §6).** A `blocked` sub-PR is merged, and the owner is not asked,
+unless one of these holds — then the chain halts at it:
+
+- its reason is a `depth escalation` or a `shape escalation` (§3.1): the default replaces the
+  unit, so the next unit would build on code the default throws away;
+- a gate is red on its pushed head. One exception: a port unit that is `port not converged`
+  (§3.1) is carried — its default is a fix-up unit, which builds on this one;
+- the driver returned no `verified <sha7>`: there is no sha the merge can be pinned to.
+
+Before the merge, edit the sub-PR body's `Next:` line to the carried form (adw-core §7) and keep
+the `adw:blocked` label: the label on a merged sub-PR is the record Phase 4 reads. The run does
+not print the block as a question and does not end its turn on it. Review cap with Warnings
+left, an escalated finding, a gate-file diff, open findings `/pr-ready` §5 could not close: all
+carried. A carried gate-file diff is still in the final PR's diff, so §3.4's gate-file tripwire
+fires on the final PR and the owner signs it there.
 
 ## Phase 4 — chain close
 
@@ -1029,6 +1131,24 @@ code — catching a real auto-merge defect on the way, with no escalation raised
 Otherwise the final PR (`adw/<slug>` → `<INTENT_BASE>`) runs the FULL Phase 3 loop on the
 composition — gates, 3.4 verify against `origin/<INTENT_BASE>`, **and 3.6's review** — and
 waits `ready` for the one human consent.
+
+**Carried blocks are answered here, and only here.** After the loop, list them:
+
+```bash
+gh pr list --state merged --base adw/<slug> --label adw:blocked --json number,title
+```
+
+A non-empty list → the final PR is `blocked`, never `ready`, whatever its own loop returned.
+Add `adw:blocked` to it, and put one line per carried sub-PR at the top of its body and on its
+run-report line: `carried #<n> <unit> — <the one-sentence reason>; default: <default>`. This is
+the chain's one stop: the owner answers every carried block and gives the merge consent in the
+same place. When the owner answers a carried block, apply the answer on the integration branch
+as its own commit (a default the owner accepts needs none). An answer commit that changes
+code moves the head the final PR's `ready` was earned at, so the Phase 3 loop (3.4 verify
+against `origin/<INTENT_BASE>` and 3.6's review) runs again on the new head before the next
+step. Then `gh pr edit <n> --remove-label adw:blocked` on that sub-PR; the final PR leaves
+`blocked` when the list is empty and its own loop, at the current head, is `ready`. Of 13 owner stops for a sub-PR merge, 8 were a
+`blocked` sub-PR and the owner answered every one "merge" (adw-core §6).
 
 **The composition review is not waivable, and "every unit was already reviewed" is not a
 reason — it is the reason it is mandatory.** Chain close is the only place code exists that

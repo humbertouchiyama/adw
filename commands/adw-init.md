@@ -190,7 +190,10 @@ draft spec when there is one) and the repo profile, and returns one line per que
 **A question is `ask` when ANY of these holds**, even if it has a default: the answer is a
 product or scope call the code cannot settle, changes money, data or a public contract, is hard to
 reverse, or is the `base:` branch. Only a question matching none of them is `decided` (UX taste,
-naming, which items or copy, a defensible default). Every `ask` is rewritten in plain words: one
+naming, which items or copy, a defensible default). **A question about how to build it is never
+`ask`:** which approach is correct, which file, which library, whether a refactor is in scope. The
+code settles those, and the owner sends them back: 12 of the 64 gates after this pass shipped were
+answered "critically decide". Every `ask` is rewritten in plain words: one
 sentence, no identifiers the owner has to look up, the default and its consequence in a clause.
 Ids come from triage's list and are never renumbered, so `ask` rows can skip a number.
 `decided` items print as ONE line under `needs you`
@@ -200,9 +203,11 @@ touch its unit. `reopen Q<N>` turns a `decided` question back into an `ask` with
 on any other question it does nothing. Only `re-cut` and `new intent` rerun the pass, and only over
 the questions triage marks `new` (none new, no dispatch): every other question keeps its id and its
 status (`ask`, `decided`, answered at the gate, reopened), and new questions take ids after the
-highest so far. `detail`, `reopen`, `regroup`, `depth` and `shape` never rerun it.
+highest so far. `detail`, `reopen`, `regroup`, `depth` and `shape` never rerun it. (The `decide`
+verb and Phase 5 each run it once more, over their own questions: below.)
 When nothing is `ask`, `needs you  none` and `approve` builds straight through the gate; a
-critical-pass question raised later (Phase 3–4) still stops the handoff (Phase 5 step 1). An `ask`
+question raised later (Phase 3–4) stops the handoff only when Phase 5's decide pass leaves it
+`ask` (Phase 5 step 1). An `ask`
 row left blank at the gate takes its default when the owner types `approve` (adw-core §7,
 `blank = defaults`): it was on the surface with that default, and it is recorded in the spec.
 
@@ -219,7 +224,16 @@ The orchestrator composes the pass's prompt from this text:
   same session, same turn** (Phase 5 step 3 — that step, not this sentence, is what
   executes it). Gated on a clean exit: a handoff carrying a non-empty `needs you` stops
   there exactly as `specs only` would — never auto-default a pending critical-pass
-  question straight into build.
+  question straight into build. **`build` or `go`, typed alone, is `approve`** (typed ten times
+  in twelve days).
+- `decide` → the owner hands the open questions back. Any answer that tells the run to choose is
+  this verb for the questions it covers: "you decide", "critically decide", "use your judgment".
+  ONE read-only dispatch, the decide pass's tier, with its brief below changed in one place: the
+  `ask` sentence becomes "The owner delegated these to you. Decide every one:
+  `Q<N> | decided: <answer> — <reason, one clause>`. Keep the default unless the code gives a
+  reason to leave it." A question it omits takes its default. Then do what `approve` does. The
+  settled questions print on the handoff's `decided` line (adw-core §7) and are recorded in the
+  specs under their ids. "You decide" was typed 48 times in 30 sessions.
 - `specs only` → as `approve`, minus the last step: Phase 5 prints the handoff and the run
   ends. This is the verb for reading the specs before any code exists.
 - `detail` → re-render the approval surface with its `detail` and `fyi` blocks appended
@@ -240,7 +254,7 @@ The orchestrator composes the pass's prompt from this text:
 - `new intent` (extend mode only) → drop the extension, cut a fresh slug, run the decide pass over
   its questions (first paragraph of this phase), re-render the approval surface.
 
-Any number of rounds. Only `approve` / `specs only` exits the gate.
+Any number of rounds. Only `approve` / `decide` / `specs only` exits the gate.
 
 **`approve` was the stopping verb until v2.16 and is now the building one.** The rename is
 deliberate: the round-trip existed so the human could read specs, and in practice they
@@ -488,18 +502,25 @@ the cursor (`the report is the whole message`, and the handoff's own
 `Next: /adw-build <slug>`) both say stop, and a rule 180 lines up does not beat them.
 Three ordered steps, no discretion:
 
-1. **Decide the exit first, before printing anything.** Build unless either holds:
+1. **Decide the exit first, before printing anything.** First put every question bound for
+   `needs you` (Phases 3–4) through the decide pass: Phase 2's dispatch, same tier, same
+   criteria, same brief. No question, no dispatch. A `decided` one is sent to the unit's
+   authoring agent (SendMessage; a D0 spec is edited here) to record under its id, and prints on
+   the handoff's `decided` line; only an `ask` stays in `needs you`. Of 12 handoff stops in twelve
+   days, 8 were answered with the default. Then: build unless either holds:
    the gate verb was `specs only`, **or** `needs you` is non-empty. Either → stopping exit.
 2. **Print the handoff exactly** (adw-core §7) in the variant step 1 chose — `Next: nothing
    — building <units>` for the building exit, `Next: /adw-build <slug>` for the stopping
-   one. Rest of the surface is identical: specs line · plans line · `⏱ run` · `needs you`
-   items aggregated from Phase 3 (or `none`). The report is the whole message: **nothing
+   one. **On the building exit the handoff is not a message of its own:** print it as the text
+   of the message whose tool call invokes `/adw-build <slug>` (step 3). A message that holds the
+   handoff and no tool call ends the turn, and the run with it. Rest of the surface is identical: specs line · plans line · `⏱ run` · `needs you`
+   items aggregated from Phase 3 (or `none`). The report is the whole text of the message: **no text
    follows the last line — no summary of what the critical passes found, no explanation of
    a question already printed, no announcement of what you are about to do.** A run that
    narrates after this block has violated adw-core §7 rule 2 no matter how good the
    narration is; the same material belongs in the spec, where the build reads it.
-3. **Building exit only: invoke `/adw-build <slug>` now**, in this turn, with no message
-   between it and the handoff. Not "next I will run" — run it. **Enter build with the spec
+3. **Building exit only: invoke `/adw-build <slug>` now**, in this turn, in the same message as
+   the handoff (step 2). Not "next I will run" — run it. **Enter build with the spec
    bodies OUT of context:** do not re-read, quote or summarise them at the boundary, and
    drop the Phase 3 agents' returned text. Build's Phase 0 resolves every spec from disk
    itself, and the whole cost of collapsing the round-trip is that build no longer starts

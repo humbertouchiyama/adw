@@ -454,7 +454,10 @@ consent. This design carves out exactly one case, authorised by the owner on 202
 intent's integration branch, may be merged by the pipeline once its loop reaches
 `ready`.** Provenance is the authority, never the branch-name pattern — a PR that merely
 *targets* some `adw/*` branch does not qualify. Any PR targeting `develop` or `main`
-requires explicit human consent, always — the carve-out never widens. (Operational note: `gh pr merge --auto`
+requires explicit human consent, always — the carve-out never widens past the integration
+branch. Widened once inside it, owner-authorised 2026-10-01: a `blocked` sub-PR is also merged,
+as a *carried block*, and the final PR answers for it — a chain asks the owner once, at the
+final PR (`adw-core §6`, `adw-build §3.7`). (Operational note: `gh pr merge --auto`
 merges immediately in this repo — checks are not a hard gate — which is the desired
 behaviour here since the loop's own gates are the gate.)
 
@@ -486,7 +489,8 @@ the chain halts `blocked`, reported per the bookkeeping rules below.
 - **Resume:** `/adw-build <intent-slug>` reconstructs topology from the spec headers,
   enumerates merged PRs with base `adw/<intent-slug>`, and maps titles back to unit ids —
   already-merged units are skipped, the next unmerged unit builds. No state file.
-- **Halted chain:** the halting sub-PR's body lists every unit of its chain that remains
+- **Halted chain:** a chain halts on a `failed` sub-PR, or a `blocked` one that cannot be
+  carried (`adw-build §3.7`). The halting sub-PR's body lists every unit of its chain that remains
   unbuilt and why the chain stopped — the durable carrier §4.7 relies on (terminal output
   is unread by construction, §4.6).
 
@@ -540,6 +544,11 @@ practice, not a concession to a clock. Baseline-red is the one exception (§4.2'
 in this repo's own history, none fixable by editing source. An implementer holding only the
 red output and its own diff **will edit source**. Classify these before feeding back, abort
 immediately, and report the environment fault.
+
+**A baseline red is a third class, since 2026-10-01.** A gate that is red at the base too, with no
+failing id the unit added, is neither the unit's red nor an environment fault: the gate is skipped
+for that unit and the PR carries `⚠ baseline red: <gate>` (`adw-build §3.3`, `pr-ready §4.3`).
+Before that the same condition ended `ready`, `blocked` or `failed` depending on the run.
 
 **Infra faults belong in the same classifier, and they are the dangerous half.** The last
 two gates have preconditions the resolution-error list misses: `test:integration` needs
@@ -623,7 +632,9 @@ increased false rejections.** Over-escalation is the dominant failure and verbos
 **The escalation channel must be something the human reads.** `/code-review`'s
 `interactive` mode is never inferred from `apply`, so escalations default to a terminal
 gate — which, unattended, nobody is reading. Route to the PR body/label. For a sub-PR, an
-escalation halts the chain: everything after it depends on its merge.
+escalation no longer halts the chain: the sub-PR is merged as a carried block, the chain builds
+on its recommended default, and the final PR lists it (`adw-core §6`). Halting cost 8 owner
+stops in twelve days of runs, every one answered "merge".
 
 **§4.5 re-runs after the review loop terminates, not only before the PR opens.**
 `/code-review apply` commits and pushes its fixes once its *own* in-worktree verification is
@@ -638,7 +649,7 @@ merge — that nothing checks.
 | State | Meaning | Result |
 |---|---|---|
 | **ready** | gates re-verified green in a clean checkout **after the review loop's last push** | independent/final PR: open, awaits human merge. Sub-PR: merged into the integration branch (§4.1 carve-out), chain continues |
-| **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), or the 16-boundary cap fired (condition 6 — gate-green but unconverged) | PR open, labelled, body per §6.1 S4. A blocked sub-PR halts its chain |
+| **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), or the 16-boundary cap fired (condition 6 — gate-green but unconverged) | PR open, labelled, body per §6.1 S4. A blocked sub-PR is merged as a carried block and the final PR lands `blocked` for it; it halts its chain only when it cannot be carried (`adw-build §3.7`) |
 | **failed** | a §4.8 progress condition fired — **fix**-cycle caps exhausted, repeated error signature, gate regression, diff oscillation, or stall — or an environment fault (including the 4h single-phase clock) | PR open **non-draft**, labelled, body per §6.1 S4 (last red output included). A failed sub-PR halts its chain |
 
 Nothing dies silently in a worktree (30 live today, 2026-07-20). A halted chain reports
