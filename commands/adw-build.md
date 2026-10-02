@@ -1075,7 +1075,7 @@ unless one of these holds — then the chain halts at it:
 
 After the merge, edit the sub-PR body's `Next:` line to the carried form (adw-core §7), so an
 unmerged PR never claims it was merged, and keep the `adw:blocked` label: the label on a merged
-sub-PR is the record Phase 4 reads. If the edit fails or the run ends before it, the label alone is the record and Phase 4 repairs the line. The run does
+sub-PR is the record Phase 4 reads. If the edit fails or the run ends before it, the label alone is the record. The run does
 not print the block as a question and does not end its turn on it. Review cap with Warnings
 left, an escalated finding, a gate-file diff, open findings `/pr-ready` §5 could not close: all
 carried. A carried gate-file diff is still in the final PR's diff, so §3.4's gate-file tripwire
