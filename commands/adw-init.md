@@ -506,7 +506,8 @@ Three ordered steps, no discretion:
    `needs you` (Phases 3–4) through the decide pass: Phase 2's dispatch, same tier, same
    criteria, same brief. No question, no dispatch. A `decided` one is sent to the unit's
    authoring agent (SendMessage; a D0 spec is edited here) to record under its id, and prints on
-   the handoff's `decided` line; only an `ask` stays in `needs you`. Of 12 handoff stops in twelve
+   the handoff's `decided` line only after the spec is read back and shows the answer (when the
+   resume fails, edit the spec here, or keep the question in `needs you`); only an `ask` stays in `needs you`. Of 12 handoff stops in twelve
    days, 8 were answered with the default. Then: build unless either holds:
    the gate verb was `specs only`, **or** `needs you` is non-empty. Either → stopping exit.
 2. **Print the handoff exactly** (adw-core §7) in the variant step 1 chose — `Next: nothing

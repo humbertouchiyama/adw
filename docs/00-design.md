@@ -535,7 +535,7 @@ that UI units have a gate — but a repaired suite the loop never invokes buys n
 runs only for UI-touching units. Narrow the spec selection to the touched surfaces rather
 than dropping the gate, and carry the narrowing as a flag (adw-build §3.2) — a standing
 practice, not a concession to a clock. Baseline-red is the one exception (§4.2's own
-`⚠ no trustworthy gate` flag).
+`⚠ no trustworthy gate` flag, and `⚠ baseline red` for a red proved at `<BASE>`).
 
 ### 4.3 Environment failures abort; they do not consume cycles
 
@@ -603,8 +603,9 @@ Two structural requirements, without which the verifier is theatre:
    reads; re-derive it whenever a gate is added, or the newest gate is the unprotected one.
 
 For a sub-PR, "base" is the integration branch head at the time the unit branched — the
-gate files must match *that*, which itself was verified against `origin/develop` when the
-chain opened. For the final PR: fresh checkout of `origin/develop` head, apply
+gate files must match *that*, which was verified against `origin/develop` when the
+chain opened, unless a carried gate-file diff (the table below) has since merged: then the
+head holds the weakened files, and only the final PR's restore from `origin/develop` is trusted. For the final PR: fresh checkout of `origin/develop` head, apply
 `git diff origin/develop...adw/<intent-slug>`, gate files restored from `origin/develop`
 — the post-sync merge commit makes any other base definition ambiguous.
 
