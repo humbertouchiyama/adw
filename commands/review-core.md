@@ -12,7 +12,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 
 `.claude/commands/*.md` are prompt templates with **no auto-include**, so the mechanism is an explicit Phase-1 `Read`, not silent transclusion. Each skill quotes the one-line rule for a behavior and links here (`→ review-core §N`) for the detail.
 
-**Section anchors are frozen** — the two skills cite `review-core §1`…`§10` by number. Do not renumber. Add new sections at the end.
+**Section anchors are frozen** — the two skills cite `review-core §1`…`§11` by number. Do not renumber. Add new sections at the end.
 
 | § | Section | Owns |
 |---|---|---|
@@ -26,6 +26,7 @@ cited below as `repo-profile §N`. Read that file at Phase 1 too — it is not a
 | §8 | Local ship policy | commit/push/merge consent; apply≠merge; stage-only default vs declared auto-ship |
 | §9 | Refutation pass | attack findings before acting; CONFIRMED/OVERSTATED/REFUTED; gated on the wide path alone — attacks negatives when there is no Blocking |
 | §10 | Waiting for dispatched agents | report files + one blocking wait call, for subagents; a top-level session is exempt; a `NOT RUN` agent stops the run |
+| §11 | The brief floor | the lines every dispatched brief ends with |
 
 ---
 
@@ -438,18 +439,22 @@ So every dispatcher below the top level — a driver, a verifier, a lane — doe
    command**, so the call returns by itself and leaves nothing running (a call the tool moves to the
    background at its timeout keeps polling, and a subagent's report is held until it exits):
    ```bash
-   end=$(( $(date +%s) + 570 )); until [ "$(find "<OUT>" -name '*.md' | wc -l)" -ge <N> ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; ls "<OUT>"
+   end=$(( $(date +%s) + 270 )); until [ "$(find "<OUT>" -name '*.md' | wc -l)" -ge <N> ] || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; ls "<OUT>"
    ```
    Then Read each file. The file is the result; the hand-back carries the same text.
+   **270 s, not 570.** A subagent's prompt cache lives 5 minutes, and a wait that returns after it
+   expired pays to write the whole window again. Measured on 1,868 waits (2026-09-20 to 10-01): a
+   wait over 6 minutes lost the cache 294 times of 297, a wait under 5 minutes 8 times of 1,571.
+   Those re-writes were 13% of the spend of the runs measured.
 4. Hand-backs queue while a call runs and reach you when it returns. If the call returns with fewer
    than `<N>` files, an agent whose hand-back arrived has reported: use it as that agent's result and
-   stop waiting for its file. If some agent has neither a file nor a hand-back, issue the call once
-   more, with `<N>` cut to the files already present plus the agents that still have neither. After
-   the second miss, use what you have and record each agent with neither as
-   `NOT RUN — no report after 20 min`.
+   stop waiting for its file. If some agent has neither a file nor a hand-back, issue the call
+   again, with `<N>` cut to the files already present plus the agents that still have neither.
+   Re-issue it at most 4 times: 5 calls, about 22 minutes. After the fifth miss, use what you have
+   and record each agent with neither as `NOT RUN — no report after 20 min`.
    **The verifier is the exception to the 20 minutes.** Its gates can legitimately run ~90 minutes
    (`adw-build.md` §3 sizes its single-phase ceiling at 4 hours). A verifier wave re-issues the call
-   until its file or hand-back arrives, at most 24 calls; only then is it
+   until its file or hand-back arrives, at most 54 calls; only then is it
    `NOT RUN — no report after 4 h`.
 5. **A `NOT RUN` agent stops the run.** An agent recorded `NOT RUN`, or one whose hand-back is an
    error and not a report, never counts as "no findings". Do not triage, apply, push, post a comment
@@ -458,3 +463,26 @@ So every dispatcher below the top level — a driver, a verifier, a lane — doe
    anywhere in it.
 
 Never wait with `echo`, `true`, a bare `sleep` or `Monitor`.
+
+## §11 — The brief floor (every brief, pasted)
+
+Every brief a session or a subagent writes for another agent ends with the lines below, pasted as
+they are. A dispatched agent has only its brief: each line is a rule that subagents broke in the
+2,686 subagent transcripts of 2026-09-20 to 10-01, and none of them was in a brief.
+
+> - Never `git stash`. It is shared by every worktree of this repo.
+> - Never print, echo or paste a credential: an API key, a token, a password, a value from an env
+>   file. Not in a command, not in a report, not in a PR. Name the variable.
+> - Wait only with `review-core.md` §10's one blocking call. Never `sleep <n>; cat <file>`. Never
+>   write a lock file or a lock script: when a gate must not run beside another, your caller
+>   orders the runs.
+> - Shell: quote every glob (`--include='*.kt'`). Write `"${B}:path"`, never `$B:path`. Never print
+>   a line that starts with `=`. Do not call `timeout`. Give the Read tool the raw path, with no
+>   backslash before a space.
+> - Output that ends in a truncation notice (`+N more`, `see remaining`) is incomplete. Get the
+>   rest the way the notice says before you conclude anything from it.
+
+Counts behind each line: 11 `git stash` commands in 7 sessions; a tracker key and part of a service
+key printed in two transcripts; 30 blocked `sleep N; cat` polls; 581 commands on hand-written gate
+locks, which cost one run four permission denials and another a three-hour stall; about 250 shell
+errors of the four kinds named; 1,211 truncated results.

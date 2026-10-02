@@ -354,6 +354,11 @@ two from a permission denial, one from a session restart. All thirteen were answ
 and the owner gave the standing order ten times ("build all the chain, don't stop at every unit
 merge").
 
+**A merge the owner gave the word for is the same bare call.** When the owner says "merge" for a PR
+into a base, the merge is adw-build §3.7's step 2: one command, alone in its Bash call, the head
+sha written out. A chained line is refused by a permission check even after the word: the owner
+typed six merges by hand for that reason in the same twelve days.
+
 ## 7. Surfaces — the format contract
 
 Four surfaces, named for what they are. The `S<N>` codes are retired — they said nothing
@@ -376,6 +381,10 @@ Three rules (owner feedback, structural after prose failed twice):
    the contract, however good the paragraphs are.
 3. **Decisions read plainly** — one sentence a non-engineer can act on, recommended
    default first. Engineering detail one level down (spec or `<details>` fold).
+   **Never offer a bare id, or a label you made up, as the thing to choose or run.** `C1`, `u14`,
+   `Q13`, "the seat-now line": the same sentence says what it is. This binds every question a run
+   asks, the ones outside these four surfaces included. 17 owner replies in twelve days were a
+   form of "what is this?" (2026-09-20 to 10-01).
 4. **Depth renders as its §3 word** — `express` / `spec` / `plan` / `design` — on every
    surface and in every `note` line. A `shape: port` unit renders as `port` instead of `spec`.
    `D<N>` is the contract's code and the spec header's
@@ -406,8 +415,8 @@ cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · 
 ⚠ <one line each: gate-visibility gap (design §2.2 rollout rule), shared-file hazard,
    uncharted territory>                    ← these print only when they exist
 
-approve → cut + build · specs only → stop after specs · detail · re-cut "<instruction>" ·
-regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port" · reopen Q3   ← `shape` only when repo-profile has a complete §20 (§2); `reopen` only when a `decided` line prints
+approve → cut + build · decide → you settle the open questions, then build · specs only → stop after specs ·
+detail · re-cut "<instruction>" · regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port" · reopen Q3   ← `decide` only when `needs you` is not `none`; `shape` only when repo-profile has a complete §20 (§2); `reopen` only when a `decided` line prints
 
                         ← nothing follows this block: no summary, no narration
 ```
@@ -462,7 +471,9 @@ human gate catches for free.
 **Verb semantics.** `approve` = freeze the cut, run the fan-out, print the handoff, then
 continue straight into `/adw-build <slug>` **in the same session, in the same turn**.
 `specs only` = everything except that last step; it is the old plain `approve`, kept for
-reading the specs before any code exists. Two consequences the surface must own:
+reading the specs before any code exists. `decide` = the owner hands the open `ask` rows back:
+the run settles each one (adw-init Phase 2), then does what `approve` does. Two consequences the
+surface must own:
 
 - **`approve` consents to code, not just to the cut.** Design §6 used to get that consent
   from the human invoking build; with the round-trip collapsed, nothing stands between
@@ -490,8 +501,9 @@ specs      <specs-dir>/YYYY-MM-DD-<intent-slug>/   N units
 plans      u1 u3  ·  none: u2 u4 (below design — plan is in the spec)
 ⏱ run      machine 41m · your gate 3m                ← unconditional (§7.1)
 needs you  none
+decided    Q1 <few words>: <answer> · Q4 <few words>: <answer>   ← only what the `decide` verb or Phase 5's decide pass settled
 
-                        ← nothing follows this block: no summary, no narration
+                        ← no TEXT follows this block, and the same message carries the tool call that starts the build (adw-init Phase 5 step 3)
 ```
 
 Stopping variant — `specs only`, or `approve` with a non-empty `needs you`:
@@ -504,6 +516,7 @@ plans      u1 u3  ·  none: u2 u4 (below design — plan is in the spec)
 needs you  2                     ← ids CONTINUE the approval surface's sequence:
   Q3 (u3) — <one plain-language question>? default: <recommended default>
   Q4 (u3) — <question>? default: <recommended default>
+decided    Q5 <few words>: <answer>   ← only what Phase 5's decide pass settled
 
                         ← nothing follows this block: no summary, no narration
 ```
@@ -511,7 +524,10 @@ needs you  2                     ← ids CONTINUE the approval surface's sequenc
 The first line is the directive slot (rule 1) and it is the run's state in one line: a
 `Next:` naming a command means the human acts next; `Next: nothing` means the session
 does. Never print `Next: /adw-build <slug>` and then build anyway — that line is what the
-human reads to decide whether to walk away.
+human reads to decide whether to walk away. **And never print `Next: nothing — building …` and
+then stop:** a message that ends on that block with no tool call has ended the run. 3 of 9
+building handoffs did exactly that (2026-09-20 to 10-01), and the owner came back to "why did you
+stop when you don't need my input on anything?".
 
 `needs you  none` when empty. **Items are numbered `Q1..QN` in ONE sequence across the
 whole run — the sequence starts at the approval surface and the handoff continues it, never restarting and never
@@ -522,7 +538,8 @@ The same `QN` ids carry into the specs where defaults are recorded.
 Ids are given to every triage question before the decide pass (adw-init Phase 2) and never
 renumbered: only `ask` items are rows under `needs you`, so a gate can show `Q1` and `Q4`, and the
 handoff's new questions continue after the highest id. `decided` ones print on the approval
-surface's `decided` line only, never on the handoff, and the `decided` line is not counted in
+surface's `decided` line; the handoff's `decided` line carries only what was settled after that
+surface printed (the `decide` verb, Phase 5's decide pass). A `decided` line is never counted in
 `needs you N` or in the stopping test above.
 Unanswered items ship with the recommended default, recorded in the spec. A single-unit
 (flat-file) intent prints its spec's flat path on the `specs` line instead of a folder.
@@ -728,6 +745,12 @@ polling — `review-core.md` §10 is the procedure.** The `Agent` tool has no fo
 `run_in_background: false` buys nothing, and a subagent that polls spends most of its cost doing it
 (measured in `review-core.md` §10). The top-level session is the exception: it may end its turn, and
 the notification wakes it.
+
+**Every brief ends with the brief floor: `review-core.md` §11, pasted.** It is about ten lines: no
+`git stash`, no printed credential, no lock script, the wait rule, the shell traps. An orchestrator
+that has not loaded `review-core.md` reads that one section once per run
+(`grep -n '^## §11' <cache>/commands/review-core.md`, then Read from that line) and pastes it into
+every brief it writes. Those rules lived only in files the dispatched agent never reads.
 
 **Every dispatch declares `model:`. An omitted `model:` is a defect, not a default.** An
 unpinned dispatch inherits the session's tier — so the omission is invisible in the prompt and

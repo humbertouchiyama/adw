@@ -110,6 +110,13 @@ stale ref would tier the wrong change.
 State must be `OPEN`. Draft → proceed but say so on the verdict line (a draft can be
 verified; it just cannot be merged). Closed/merged → stop.
 
+**A base the profile does not expect is said out loud.** When `baseRefName` is the production
+branch and `repo-profile §3` names a different default base, print
+`⚠ base is <baseRefName>, the production branch — the default base is <default base>` as the first
+line of Layer 1 and at the end of the machine line (§7). Do not change the base and do not stop: a
+release PR targets that branch on purpose. Two PRs went through this command against the
+production branch by mistake before the owner saw it (2026-09-20).
+
 Three derived values everything below uses:
 
 - `BASE` — default `origin/<baseRefName>`. **Callers may override it** (`/adw-build`
@@ -347,6 +354,7 @@ Then dispatch a **fresh verifier subagent** that re-runs every gate
 - **Pin it to `model: sonnet`.** The verifier re-executes and relays; it never judges. An
   unpinned dispatch inherits the session's most expensive tier for a job that is exit
   codes and output tails.
+- **Its brief ends with `review-core.md` §11's brief floor, pasted**, as does §5's grader brief.
 - **Wait by `review-core.md` §10.** This pass usually runs inside a driver, which must
   not poll. The verifier gets §10's long form: it re-issues the wait for up to 4 hours, not 20
   minutes, because its gates can legitimately run ~90.
@@ -361,6 +369,17 @@ Then dispatch a **fresh verifier subagent** that re-runs every gate
 Any red → the PR is `blocked` with the failing gate's output and
 `default: fix <gate> on <headRefName>, then re-run /pr-ready <N>`. All green → the state is
 earned, pending §5.
+
+**One red does not block: a baseline red.** A gate is baseline red when it is red at `$BASE` too
+and the PR added nothing to it. The verifier's brief carries this step: after every obligated gate
+has run at `$VSHA`, run each red gate once more in the same `$VWT` after
+`git -C "$VWT" checkout --detach "$BASE"`, and report the failing test ids of both runs (for a
+gate with no test ids, its error lines with numbers and quoted strings removed). A caller that
+already holds the base run hands it in as `known baseline red: <gate> — <failing ids>`
+(`/adw-build` §3.3), and the verifier compares against that and skips the base run. Every id of the
+`$VSHA` run also fails at `$BASE` → the row reads `baseline red`, it does not block, and the
+machine line ends `· ⚠ baseline red: <gate>`. Any other id, or a base run that fails to install or
+build → the row stays red and blocks.
 
 Remove `$VWT` (`git worktree remove --force`) as soon as its verdict is recorded.
 
@@ -536,7 +555,9 @@ blocked  #839  <title>  — <one-line reason> · verified <sha7>
 ```
 
 `blocked` carries a recommended default; a blocked verdict with no named next action is
-incomplete. Echo a non-default `BASE` and a draft state on the same line.
+incomplete. Echo a non-default `BASE` and a draft state on the same line. Flags go after
+everything else on that line, each as `· ⚠ <flag>`: §1's production-base warning and §4.3's
+`baseline red: <gate>`.
 
 **Above the machine line, always — for a caller too — print §5's open-findings result:** one
 `closed:` / `open:` line per finding, or `open-findings: none — read <n> comments` /

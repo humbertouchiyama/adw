@@ -545,6 +545,11 @@ in this repo's own history, none fixable by editing source. An implementer holdi
 red output and its own diff **will edit source**. Classify these before feeding back, abort
 immediately, and report the environment fault.
 
+**A baseline red is a third class, since 2026-10-01.** A gate that is red at the base too, with no
+failing id the unit added, is neither the unit's red nor an environment fault: the gate is skipped
+for that unit and the PR carries `⚠ baseline red: <gate>` (`adw-build §3.3`, `pr-ready §4.3`).
+Before that the same condition ended `ready`, `blocked` or `failed` depending on the run.
+
 **Infra faults belong in the same classifier, and they are the dangerous half.** The last
 two gates have preconditions the resolution-error list misses: `test:integration` needs
 `api/.env.test` **and** a running Postgres, and e2e needs a served build. A stopped container
