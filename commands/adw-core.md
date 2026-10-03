@@ -750,6 +750,11 @@ polling — `review-core.md` §10 is the procedure.** The `Agent` tool has no fo
 (measured in `review-core.md` §10). The top-level session is the exception: it may end its turn, and
 the notification wakes it.
 
+**A pane is not a subagent.** Use an `Agent` call when this session needs the result to
+continue. Use `/adw-dispatch` when the work has its own human gate, outlives this task, belongs
+to another repo, or the owner said he does not want it here: `adw-dispatch.md` §1. This table
+governs `Agent` calls only; a dispatched pane's tier is `adw-dispatch.md` §3.
+
 **Every brief ends with the brief floor: `review-core.md` §11, pasted.** It is about ten lines: no
 `git stash`, no printed credential, no lock script, the wait rule, the shell traps. An orchestrator
 that has not loaded `review-core.md` reads that one section once per run

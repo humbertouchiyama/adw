@@ -18,6 +18,8 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 | `commands/review-core.md` | Shared machinery for the two review skills. |
 | `commands/code-review.md` | Review a PR against the consuming repo's conventions. |
 | `commands/cleanup.md` | Clear stale worktrees, branches and disposable state. |
+| `commands/adw-dispatch.md` | Hand an intent to a new herdr pane beside the caller, with a brief, a ledger row and an optional one-line reply. |
+| `scripts/adw-dispatch.py` | The mechanics of `adw-dispatch`: pane placement, the reply, the ledger. Run from the fetch cache. |
 | `docs/00-design.md` | The design, and a frozen archive of every contract change up to the extraction. |
 | `docs/repo-profile-EXAMPLE.md` | A filled-in `repo-profile.md` from a real repository, to copy and edit. |
 | `install/` | The loader stubs and the fetch script a consuming repo drops in. |
