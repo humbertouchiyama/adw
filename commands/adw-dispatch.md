@@ -148,9 +148,9 @@ The Rules lines, verbatim:
   longer runs an agent.
 - If either command fails because the script is missing, skip it and say so in your last line.
 
-**Every brief ends with the brief floor** (adw-core §8): read
-`.claude/adw/cache/commands/review-core.md` §11 and paste its quoted lines under the Rules, as
-they are. The child is a full session, and it still has only its brief.
+**Every brief ends with the brief floor** (adw-core §8): read §11 of
+`"$(git rev-parse --show-toplevel)/.claude/adw/cache/commands/review-core.md"` and paste its
+quoted lines under the Rules, as they are. The child is a full session, and it still has only its brief.
 
 ## 6. Launch
 
