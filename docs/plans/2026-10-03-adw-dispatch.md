@@ -10,6 +10,9 @@
 
 **Spec:** `docs/specs/2026-10-03-adw-dispatch-design.md`
 
+**The code blocks below are the plan as it was built, up to commit `cbc5a8e`.** Later review
+fixes changed the script, the tests and the contract. The files in the repo are the source.
+
 ## Global Constraints
 
 - The child pane is created with `herdr pane split --pane <caller pane id>`. Never `--current`, never `herdr agent start`.

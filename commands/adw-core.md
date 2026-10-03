@@ -837,6 +837,7 @@ adw repo                     consuming repo
   commands/review-core.md      .claude/commands/review-core.md ← stub
   commands/code-review.md      .claude/commands/code-review.md ← stub
   commands/cleanup.md          .claude/commands/cleanup.md    ← stub
+  commands/adw-dispatch.md     .claude/commands/adw-dispatch.md ← stub
   docs/00-design.md            .claude/repo-profile.md        ← the per-repo half, authored here
                                .claude/adw/fetch.sh           ← the fetch, gitignored cache
                                docs/adw/{specs,plans}/        ← this repo's own artifacts

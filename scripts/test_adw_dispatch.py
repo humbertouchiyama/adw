@@ -142,6 +142,19 @@ class Launch(Base):
         self.assertIn("command not found: claude", r.stderr)
         self.assertEqual([x["status"] for x in self.rows()], ["failed"])
 
+    def test_child_that_never_starts_has_its_empty_pane_closed(self):
+        self.launch(FAKE_STATUS="unknown")
+        self.assertIn(["pane", "close", "w1:pNEW"], self.calls())
+
+    def test_child_stopped_at_its_own_prompt_is_failed_and_the_pane_is_kept(self):
+        for status in ("blocked", "idle"):
+            with self.subTest(status=status):
+                r = self.launch(FAKE_STATUS=status)
+                self.assertEqual(r.returncode, 3)
+                self.assertIn(f"`{status}`, not `working`", r.stderr)
+                self.assertEqual(self.rows()[-1]["status"], "failed")
+                self.assertFalse([c for c in self.calls() if c[:2] == ["pane", "close"]])
+
     def test_split_error_is_failed_and_nothing_is_run(self):
         r = self.launch(FAKE_SPLIT_FAIL="1")
         self.assertEqual(r.returncode, 3)
@@ -166,6 +179,7 @@ class Launch(Base):
         self.assertEqual(r.returncode, 3)
         self.assertIn("refused", r.stderr)
         self.assertEqual([x["status"] for x in self.rows()], ["failed"])
+        self.assertIn(["pane", "close", "w1:pNEW"], self.calls())
 
     def test_outside_herdr_stops_before_any_call(self):
         r = self.launch(HERDR_ENV="")
@@ -188,6 +202,11 @@ class Name(Base):
         agents = json.dumps([{"name": "fix-sse"}, {"name": "fix-sse-2"}, {"name": None}])
         r = self.run_cli("name", "fix-sse", FAKE_AGENTS=agents)
         self.assertEqual(r.stdout.strip(), "fix-sse-3")
+
+    def test_a_name_in_the_ledger_is_taken_even_when_its_pane_is_closed(self):
+        self.launch()
+        self.run_cli("finish", "fix-sse", "done")
+        self.assertEqual(self.run_cli("name", "fix-sse").stdout.strip(), "fix-sse-2")
 
 
 class Reply(Base):

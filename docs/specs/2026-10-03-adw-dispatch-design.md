@@ -56,7 +56,9 @@ routes one reply back. Success means:
 | `scripts/adw-dispatch.py` | New. Every step that must be identical each time: split beside the caller, carry `PATH`, submit the reply, write the ledger. The contract calls it from the fetch cache. |
 | `scripts/test_adw_dispatch.py` | New. Tests against a fake `herdr`. |
 | `install/stubs/adw-dispatch.md` | New. The standard loader stub. |
-| `README.md` | One row in "What is here". |
+| `README.md` | Two rows in "What is here": the command and the script. |
+| `commands/adw-core.md` §9, `docs/repo-profile-EXAMPLE.md` | The new file in the file map and in the list of contract files. |
+| `install/fetch.sh` | The drift check also reports a stub the consuming repo does not have. |
 | `commands/adw-core.md` §8 | One paragraph: the pane-or-subagent rule in §5 below, cited from the dispatch tier section. |
 
 **The mechanics are a script, not prose.** `scripts/adw-dispatch.py` runs the commands shown in
@@ -130,8 +132,9 @@ An address is `<name>@<repo>`.
 - `<name>` for the child is the ADW slug when `Task: adw` and the slug is known, else a kebab
   name of four words or fewer taken from the intent.
 - `<name>` for the caller is its herdr agent name or pane label, else its pane id.
-- The child name must be unique among live agents. Check `herdr agent list`. On a collision
-  append `-2`, `-3`.
+- The child name must be unique among live agents and among every ledger row: the brief path
+  and `status` both key on it. `adw-dispatch.py name <wanted>` checks both and appends `-2`,
+  `-3` on a collision.
 
 A target repo given by name resolves from the `repo_path` of earlier ledger rows. An unknown
 name is the one question the dispatcher may ask.
@@ -171,16 +174,21 @@ defect: the child has no "we". No secret or credential goes in a brief.
 
 The contract carries this text verbatim, with the angle-bracket values filled in:
 
-- `Task: adw` — "Run `/adw-init` with the Intent section as the intent. Carry every line of
-  'Decided by the owner' into the run as already decided. Stop at the approval surface and wait
-  for the owner in this pane."
+- `Task: adw` — "Read `.claude/commands/adw-init.md` in this repo and follow it: it is the
+  `/adw-init` command. Run it with the Intent section as the intent. Treat every line under
+  'Decided by the owner' as already decided. Stop at the approval surface and wait for the
+  owner in this pane. At the approval surface your status is blocked and your one line is
+  'approval surface ready'." The child starts from a text prompt, and the harness does not run
+  a slash command written in text, so the line names the file.
 - `Task: free` — "Do the Intent. Write any long result to a file and print its path. Do not
   summarise long output in the pane."
 - Always — "Never merge a PR unless the Intent says so in those words."
-- Always — "When you stop, for any reason, append one row to the ledger (§8) with your final
-  status."
-- `Reply: notify` or `monitor` — the exact two commands of §7.6, with the caller's pane id
-  already written in, and "run both; the second one is what submits the message."
+- Always — "When you stop, for any reason, run `adw-dispatch.py finish <name> <status> <ref>`."
+  The script appends the ledger row (§8).
+- `Reply: notify` or `monitor` — "Then run `adw-dispatch.py reply <caller pane id> <line>`."
+  The script runs the two commands of §7.6.
+- Always, last — the brief floor (`review-core.md` §11), pasted. The child is a full session
+  and it still has only its brief.
 
 ### 7.5 Launch
 
@@ -206,9 +214,14 @@ herdr pane run "$P" '<launcher> --model <tier> "Read <brief path> in full, then 
 - `--model` is always written out. An omitted model is a defect under `adw-core.md` §8, and the
   same reasoning holds for a child session.
 
-Then verify, once: `herdr agent wait <name> --status working --timeout 60000`. On a timeout,
-read the pane's last 15 lines and report the dispatch as **failed** with those lines. Do not
-retry silently.
+Then verify, once: `herdr agent wait <pane id> --status working --timeout 60000`, then
+`herdr agent get <pane id>`. The pane id, not the name: a name can collide. Any status other
+than `working` is **failed**, with the pane's last 15 lines. No agent in the pane (`unknown`):
+the script closes the empty pane. An agent that is `blocked` or `idle` sits at a prompt of its
+own (trust this folder, a permission): the pane stays open for the owner. A failed rename or
+`pane run` also closes the pane. Do not retry silently.
+
+`adw-dispatch.py launch` runs all of §7.5. The commands above show what it does.
 
 Then append the `dispatched` row to the ledger (§8).
 
@@ -223,15 +236,20 @@ Then append the `dispatched` row to the ledger (§8).
   ```
 
   The second command is the fix for failure 1. If the first command fails (the caller pane is
-  gone), the child skips the reply; the ledger row still records the result.
+  gone), the child skips the reply; the ledger row still records the result. The child does
+  not type these: `adw-dispatch.py reply` runs both, puts the marker of §9.1 in front, and
+  skips the reply when the caller's pane runs no agent.
 - **`monitor`**. `notify`, plus the caller blocks on
   `herdr agent wait <name> --status idle --timeout 540000` (the command takes one status, and
   a Bash call cannot block longer than 10 minutes).
   After each return or timeout it reads `herdr agent get <name>`, and repeats until the status
   is `idle` or `blocked`. Then it reads the child pane and relays what it shows to the owner.
+  Two more results end the loop: `agent get` fails (the pane is closed, the child is `lost`),
+  or the status is `unknown` (the child session exited). Without them the loop never ends.
   The caller never types an approval-surface answer into the child pane, not even the owner's
   own words: the owner types those there himself. Any other line the owner gives it for the
-  child, it may send word for word.
+  child, it may send word for word: `herdr agent send <child pane id> <line>`, then
+  `herdr pane send-keys <child pane id> Enter`.
 
 ## 8. The ledger
 
@@ -294,7 +312,8 @@ defaults taken: <list, or "none">
 |---|---|
 | Not inside herdr | Stop. One line. No fallback is run without the owner. |
 | Target repo unknown | Ask once. |
-| `pane split` errors, or the child never reaches `working` | Report `failed` with the pane's last 15 lines. Write a `failed` ledger row. |
+| `pane split` errors, or the child never reaches `working` | Report `failed` with the pane's last 15 lines. Write a `failed` ledger row. Close a pane that has no agent in it. |
+| A script flag or value is wrong (exit 2) | Print the message and stop, as for exit 1. |
 | Caller pane gone at reply time | Child skips the reply. Ledger row still written. |
 | Ledger or briefs folder missing | Create it. |
 

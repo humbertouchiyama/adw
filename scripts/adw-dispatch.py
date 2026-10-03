@@ -5,7 +5,8 @@ The contract decides WHAT to dispatch and writes the brief. This script does the
 must be identical every time: place the pane beside the caller, carry PATH, submit a reply,
 keep the ledger.
 
-Exit codes: 0 ok · 1 usage or not inside herdr · 3 the child did not start.
+Exit codes: 0 ok · 1 not inside herdr, or a bad path or name · 2 bad flag or value (argparse) ·
+3 the child did not start.
 """
 import argparse
 import datetime
@@ -115,9 +116,11 @@ def live_agents():
 
 def cmd_name(a):
     need_herdr()
-    live = live_agents() or {}
+    # A name the ledger already holds is taken too: a second dispatch under it would overwrite
+    # the first brief of the day and hide the first row in `status`.
+    taken = set(live_agents() or {}) | {r["name"] for r in read_rows()}
     name, n = a.wanted, 1
-    while name in live:
+    while name in taken:
         n += 1
         name = f"{a.wanted}-{n}"
     print(name)
@@ -141,7 +144,9 @@ def cmd_launch(a):
         "status": "dispatched", "brief": a.brief, "ref": "",
     }
 
-    def fail(why):
+    def fail(why, close=None):
+        if close:  # a pane with no agent in it is a bare shell: do not leave it beside the caller
+            herdr("pane", "close", close)
         append_row(dict(row, status="failed", ref=why[:200]))
         die(f"FAILED {a.name}: {why}", 3)
 
@@ -157,18 +162,24 @@ def cmd_launch(a):
     # The name is how the ledger and `status` find this pane. No name, no launch.
     ok, _, raw = herdr("agent", "rename", pane, a.name)
     if not ok:
-        fail(f"agent rename {pane}: {raw}")
+        fail(f"agent rename {pane}: {raw}", close=pane)
     prompt = f"Read {a.brief} in full, then execute it."
     line = f"{a.launcher} --model {shlex.quote(a.model)} {shlex.quote(prompt)}"
     ok, _, raw = herdr("pane", "run", pane, line)
     if not ok:
-        fail(f"pane run: {raw}")
+        fail(f"pane run: {raw}", close=pane)
     herdr("agent", "wait", pane, "--status", "working", "--timeout", str(a.timeout_ms))
     ok, data, _ = herdr("agent", "get", pane)
     status = dig(data, "result", "agent", "agent_status") if ok else None
     if status in (None, "unknown"):
         _, _, tail = herdr("pane", "read", pane, "--lines", "15")
-        fail(f"no agent detected in {pane}. Last lines:\n{tail}")
+        fail(f"no agent detected in {pane}. Last lines:\n{tail}", close=pane)
+    if status != "working":
+        # An agent that never reached `working` sits at a prompt of its own (trust this folder,
+        # a permission) and has not read the brief. The pane stays open: the owner answers there.
+        _, _, tail = herdr("pane", "read", pane, "--lines", "15")
+        fail(f"the child in {pane} is `{status}`, not `working`. The pane is left open: "
+             f"answer its prompt there, or close it. Last lines:\n{tail}")
     append_row(row)
     print(pane)
 

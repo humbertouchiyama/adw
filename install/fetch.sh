@@ -32,7 +32,7 @@ loader_drift() {
   for s in "$up"/stubs/*.md; do
     [ -f "$s" ] || continue
     n=$(basename "$s")
-    [ -f "$cmds/$n" ] || continue
+    [ -f "$cmds/$n" ] || { drift="$drift commands/$n(missing)"; continue; }
     cmp -s "$cmds/$n" "$s" 2>/dev/null || drift="$drift commands/$n"
   done
   [ -n "$drift" ] || return 0
