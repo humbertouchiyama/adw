@@ -9,7 +9,8 @@
 Every repo-specific value the shared agent contract needs. One of these lives in each repo that
 runs `/adw-init`, `/adw-build`, `/pr-ready` or `/code-review`; the contract files themselves
 (`adw-core.md`, `adw-init.md`, `adw-build.md`, `pr-ready.md`, `review-core.md`,
-`code-review.md`, `cleanup.md`) live in the `adw` repository and are fetched, never copied.
+`code-review.md`, `cleanup.md`, `adw-dispatch.md`) live in the `adw` repository and are fetched,
+never copied.
 
 The format is prose and tables, not a parsed config. The reader is an agent, so precision matters
 more than syntax.

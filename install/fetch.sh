@@ -26,15 +26,18 @@ stamp() { git -C "$CACHE" log -1 --format='%h' 2>/dev/null; }
 # would have run as verified, and a human code review is what caught it.
 # Report only. Never rewrite a tracked file behind the author's back.
 loader_drift() {
-  up="$CACHE/install"; cmds="$(cd "$DIR/.." 2>/dev/null && pwd)/commands"; drift=""
+  up="$CACHE/install"; cmds="$(cd "$DIR/.." 2>/dev/null && pwd)/commands"; drift=""; missing=""; have=""
   [ -d "$up" ] || return 0
   cmp -s "$DIR/fetch.sh" "$up/fetch.sh" 2>/dev/null || drift="fetch.sh"
   for s in "$up"/stubs/*.md; do
     [ -f "$s" ] || continue
     n=$(basename "$s")
-    [ -f "$cmds/$n" ] || continue
+    [ -f "$cmds/$n" ] || { missing="$missing commands/$n(missing)"; continue; }
+    have=1
     cmp -s "$cmds/$n" "$s" 2>/dev/null || drift="$drift commands/$n"
   done
+  # A repo with no stub at all is mid-install (the README runs this before the cp): say nothing.
+  [ -z "$have" ] || drift="$drift$missing"
   [ -n "$drift" ] || return 0
   echo "adw: the LOADER is behind $REPO —$drift" >&2
   echo "adw: these are copies, not fetched, so nothing else reports this. Diff before overwriting:" >&2
