@@ -119,7 +119,7 @@ The one cognitive move both skills make on every finding. Named once here; every
 
 **Most findings that first look like "your call" resolve to *apply* once assessed** — only true decisions survive as escalations. Lead every report with what you decided; then list the (usually few) genuine escalations. Do not hand the user a raw list to adjudicate — the judgment is made *here*. **Neither skill presents findings as a chooser/menu** — an `AskUserQuestion` "which should I fix?" or a numbered "pick one" list IS a raw list; adjudicate each finding yourself and surface only genuine escalations via §5.
 
-The bucket names each skill uses (code-review `toFix`/`escalate`/`reject`; spec-review `mechanicalFix`/`proseRewrite` + `escalate`; convention verdicts `Insert`/`Reject`) are routing labels under this principle. The phrases **"decide-or-escalate pass"**, **"self-assessed 6.2"**, and **"the lesson bar"** all resolve to this single principle by reference.
+The bucket names each skill uses (code-review `toFix`/`escalate`/`reject`; spec-review `mechanicalFix`/`proseRewrite` + `escalate`; convention verdicts `Insert`/`Enforce`/`Reject`) are routing labels under this principle. The phrases **"decide-or-escalate pass"**, **"self-assessed 6.2"**, and **"the lesson bar"** all resolve to this single principle by reference.
 
 **This principle does NOT flatten spec-review's apply tiers.** In spec-review, **apply** stays two-tier: *mechanical* fixes land under `apply`; *prose* rewrites land only under `apply-all`. The conservative-by-default asymmetry is spec-review's own (it owns the implementation contract; the reviewer catches drift but doesn't flip a validated default). code-review has no such split — its `apply` fixes both.
 
@@ -140,6 +140,8 @@ Then, on what clears both gates, two resolution rules:
 **The tell:** you are about to restate a finding with "should I…?" appended. If anyone who read the diff would answer it the same way, you already know the answer — write the fix, not the question.
 
 **Convention / lesson candidates are a stricter sub-case.** A pattern worth documenting in a standards doc or `.agent/lessons.md` earns **apply** (an `Insert` verdict) only if it clears ALL of: *generic* · *detectable or review-teachable* · *recurrence-likely* · *not already covered* (grep the target doc first) · *worth its weight* · *not pure preference*. Miss one → **reject**, naming the failed criterion. On the fence → **reject** (a missed convention costs one repeated review comment; a bad one silently mis-flags correct code forever). **Learning-doc edits are never auto-applied even in an apply mode** — they steer every future PR/port and need human sign-off; surface `Insert` drafts + a terse `Reject` list for the user to land. (Calibration lines are the one reviewer-side exception — see §6.)
+
+**An `Enforce` verdict is a separate sub-case with its own bar**, not a convention candidate: it adds a check for a rule that is **already written** in a standards or learning doc, so *not already covered* does not apply to it. It earns `Enforce` only if ALL hold: the rule is written · this PR broke it · `repo-profile §17.1` lists no check for it · the check is mechanical (no runtime state, no product intent) and stays green on correct code. Miss one → no verdict. Same sign-off as an `Insert`: never auto-applied.
 
 ---
 
@@ -185,7 +187,7 @@ How genuine **escalate** findings (§3) reach the human. Branches on run context
 
 **Why opt-in, not inferred.** `AskUserQuestion` **blocks on user input**. In an async / CI / scheduled / sub-agent run it would hang the pipeline forever. There is no reliable interactive-vs-async signal intrinsic to a slash command, so this branch fires **only** on the explicit `interactive` flag; absent it, the run always takes the non-blocking default. When in doubt, non-blocking.
 
-Convention/lesson `Insert` verdicts and calibration echoes (§6) are **reported, never surfaced as blocking prompts** — they are drafts for the user to land, not decisions gating the run.
+Convention/lesson `Insert` and `Enforce` verdicts and calibration echoes (§6) are **reported, never surfaced as blocking prompts** — they are drafts for the user to land, not decisions gating the run.
 
 ---
 

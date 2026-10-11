@@ -595,12 +595,18 @@ Look across `findings[]` for a pattern worth documenting. A candidate exists whe
 2. **Grep the target doc first.** Already covered → `[Reject]`, cite the existing entry. Never restate an existing rule.
 3. **Argue both sides against the §3 bar** (generic · detectable/teachable · recurrence-likely · not-covered · worth-its-weight · not-preference). Miss one → `[Reject]`, naming the failed criterion. On the fence → default `[Reject]`.
 4. **Compose only the winners** — for an `Insert`, draft the entry (short rule + ✅/❌ snippet + ref, matching the target file's verbosity).
+5. **Draft the enforcer** — only when `repo-profile §17.1` names an enforcement mechanism (an architecture test, an audit script). For each `Insert`, draft the check that turns the rule red, in that mechanism's shape, or state in one line why it cannot be checked mechanically (needs runtime state, product intent, or matches correct code). Either way, draft the `repo-profile §17.1` row that records it (its check, or its reason), so the map never drifts from the docs. A check that would red on the current base ships with a path allowlist, one reason per path — never a refactor in the same draft.
+
+A second trigger, independent of the bar above: a `toFix` finding that breaks a rule **already written** in a standards or learning doc (`repo-profile §2`), where §17.1 lists no check for that rule. The rule is proven (the doc carries it) and the recurrence is proven (this PR broke it), so the lesson bar does not apply — review-core §3's `Enforce` bar does. Draft the enforcer and its §17.1 row: `[Enforce → <mechanism file>]`.
 
 Output each as a one-line verdict:
 - `[Insert → <target file>]` <one-line rule> — <the ≤1-line rationale that cleared the bar>. *(draft entry below)*
 - `[Reject]` <pattern> — <failed criterion>.
+- `[Enforce → <mechanism file>]` <rule it checks> — <one-line check shape>. *(draft check below)*
 
-**Never auto-apply, even with `apply`** (review-core §3 — learning-doc edits need human sign-off; §7 lists these paths as blast-radius stops). Surface `Insert` drafts + a terse `Reject` list; the user approves an `Insert` to land it.
+**Never auto-apply, even with `apply`** (review-core §3 — learning-doc edits need human sign-off). Surface `Insert` and `Enforce` drafts + a terse `Reject` list; the user approves each draft to land it. An enforcer is code, but it reds every future PR, so it takes the same sign-off as the rule it checks. An enforcer lands in its own PR, never in the PR under review: the mechanism file is often a gate file (`repo-profile §7`), and a PR that edits one cannot earn that gate's green.
+
+`Insert` and `Enforce` entries both go in `conventionEdits[]`.
 
 **Output**: `{toFix[], escalate[], conventionEdits[]}`.
 
@@ -627,7 +633,7 @@ Phase 7 always runs.
      pass; it is a coverage fact, and omitting it lets green local gates read as full coverage.
    - These two lines are **exempt from the one-line-per-item and ~15-line limits below**. That
      pressure is what pushes them into prose under the buckets, where nothing is read.
-4. **⏳ Your decision** — the ONLY bucket that needs the human: escalations that cleared the **§3.1 bar**, each **one plain sentence + a recommended default**, plus convention `Insert` drafts (never auto-landed — need sign-off).
+4. **⏳ Your decision** — the ONLY bucket that needs the human: escalations that cleared the **§3.1 bar**, each **one plain sentence + a recommended default**, plus convention `Insert` and `Enforce` drafts (never auto-landed — need sign-off).
    - **Coverage gaps go in their own labelled sub-block and are NOT counted in `<M>`**: an unrun
      obligated gate, a `§16.4` check assigned to a lane that returned no verdict, and a refuted
      `Blocking`. They are mechanically generated and cleared no §3.1 bar, so counting them there
@@ -680,6 +686,7 @@ Phase 7 always runs.
    **⏳ Your decision** (<M>) — cleared the §3.1 bar; everything engineering-clear is in Done
    - file:line — one plain sentence of what to decide + recommended default
    - `[Insert → <target file>]` <one-line rule> — convention draft, needs your sign-off (not auto-landed)
+   - `[Enforce → <mechanism file>]` <rule it checks> — enforcer draft, needs your sign-off (not auto-landed)
 
    **⏳ Coverage** — mechanically generated, NOT counted in <M>
    - <gate> not run: <why> — obligated by repo-profile §6 for this diff
@@ -726,7 +733,7 @@ gh pr comment <PR_NUMBER> --body "$(cat <<'EOF'
 
 **⏳ Your decision** (<n>) — genuine product/operational calls only
 - file:line — one plain sentence of what to decide + recommended default
-- `[Insert → <target file>]` <one-line rule> (convention, needs sign-off)  ·  `[Reject]` <pattern> — <failed criterion>
+- `[Insert → <target file>]` <one-line rule> (convention, needs sign-off)  ·  `[Enforce → <mechanism file>]` <rule> (enforcer, needs sign-off)  ·  `[Reject]` <pattern> — <failed criterion>
 
 **⏳ Coverage** — mechanically generated, not counted in (<n>)
 - <gate> not run: <why> — obligated by repo-profile §6  ·  <§16.4 check> unanswered  ·  refuted: <file:line> — <guard>
@@ -759,6 +766,7 @@ PR #<N>: <title> (<url>)
 ## ⏳ Your decision (<n>)
 - <file:line — one plain sentence + recommended default>
 - `[Insert → <target>]` <one-line rule> — convention, needs sign-off
+- `[Enforce → <mechanism>]` <rule it checks> — enforcer, needs sign-off
    |   — none
 
 ## ⏳ Your decision — coverage (not counted above)

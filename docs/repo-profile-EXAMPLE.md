@@ -556,6 +556,23 @@ Read by `/code-review` Phase 6.2 — where a convention `Insert` draft is target
 | analytics | `docs/analytics_standards.md` |
 | backend architecture | `docs/backend_standards.md` |
 
+### §17.1 — Enforcement
+
+Read by `/code-review` Phase 6.2 step 5. Optional: omit it and no enforcer is drafted. Lists each
+mechanism that turns a written rule into a red gate, and which written rules each one checks, so the
+review can see a rule with no check.
+
+| Mechanism | Shape of a new check | Rules it checks |
+|---|---|---|
+| `scripts/audit.sh` | one grep check: id, pattern, path glob, severity | `CLAUDE.md` forbidden-pattern table rows 1–6 |
+| `api/test/architecture.test.ts` | one `it()` per rule, path allowlist with a reason per entry | `api/CONVENTIONS.md` §13, §37 |
+
+Rules with no check, and why (a new rule lands here or in the table, never in neither):
+
+| Rule | Why no check |
+|---|---|
+| `CLAUDE.md` "no PII in analytics events" | needs the event payload at runtime |
+
 ## §18 — Disposable state
 
 Read by `/cleanup` Phase 3. Everything a session can leave behind **besides** worktrees and
