@@ -595,16 +595,18 @@ Look across `findings[]` for a pattern worth documenting. A candidate exists whe
 2. **Grep the target doc first.** Already covered → `[Reject]`, cite the existing entry. Never restate an existing rule.
 3. **Argue both sides against the §3 bar** (generic · detectable/teachable · recurrence-likely · not-covered · worth-its-weight · not-preference). Miss one → `[Reject]`, naming the failed criterion. On the fence → default `[Reject]`.
 4. **Compose only the winners** — for an `Insert`, draft the entry (short rule + ✅/❌ snippet + ref, matching the target file's verbosity).
-5. **Draft the enforcer** — only when `repo-profile §17.1` names an enforcement mechanism (an architecture test, an audit script). For each `Insert`, draft the check that turns the rule red, in that mechanism's shape, or state in one line why it cannot be checked mechanically (needs runtime state, product intent, or matches correct code). A check that would red on the current base ships with a path allowlist, one reason per path — never a refactor in the same draft.
+5. **Draft the enforcer** — only when `repo-profile §17.1` names an enforcement mechanism (an architecture test, an audit script). For each `Insert`, draft the check that turns the rule red, in that mechanism's shape, or state in one line why it cannot be checked mechanically (needs runtime state, product intent, or matches correct code). Either way, draft the `repo-profile §17.1` row that records it (its check, or its reason), so the map never drifts from the docs. A check that would red on the current base ships with a path allowlist, one reason per path — never a refactor in the same draft.
 
-A second trigger, independent of the bar above: a `toFix` finding that breaks a rule **already written** in a standards doc, where §17.1 lists no check for that rule. The rule is proven (the doc carries it) and the recurrence is proven (this PR broke it), so skip the bar and draft only the enforcer: `[Enforce → <mechanism file>]`.
+A second trigger, independent of the bar above: a `toFix` finding that breaks a rule **already written** in a standards or learning doc (`repo-profile §2`), where §17.1 lists no check for that rule. The rule is proven (the doc carries it) and the recurrence is proven (this PR broke it), so the lesson bar does not apply — review-core §3's `Enforce` bar does. Draft the enforcer and its §17.1 row: `[Enforce → <mechanism file>]`.
 
 Output each as a one-line verdict:
 - `[Insert → <target file>]` <one-line rule> — <the ≤1-line rationale that cleared the bar>. *(draft entry below)*
 - `[Reject]` <pattern> — <failed criterion>.
 - `[Enforce → <mechanism file>]` <rule it checks> — <one-line check shape>. *(draft check below)*
 
-**Never auto-apply, even with `apply`** (review-core §3 — learning-doc edits need human sign-off; §7 lists these paths as blast-radius stops). Surface `Insert` and `Enforce` drafts + a terse `Reject` list; the user approves each draft to land it. An enforcer is code, but it reds every future PR, so it takes the same sign-off as the rule it checks.
+**Never auto-apply, even with `apply`** (review-core §3 — learning-doc edits need human sign-off). Surface `Insert` and `Enforce` drafts + a terse `Reject` list; the user approves each draft to land it. An enforcer is code, but it reds every future PR, so it takes the same sign-off as the rule it checks. An enforcer lands in its own PR, never in the PR under review: the mechanism file is often a gate file (`repo-profile §7`), and a PR that edits one cannot earn that gate's green.
+
+`Insert` and `Enforce` entries both go in `conventionEdits[]`.
 
 **Output**: `{toFix[], escalate[], conventionEdits[]}`.
 
