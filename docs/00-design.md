@@ -177,7 +177,13 @@ split of one is a legitimate outcome, which is why the command is `init`, not `s
 
 ### 3.2 The cut proposal and the human gate
 
-`/adw-init` first runs **one cheap triage agent** over the intent and prints a proposal:
+**Grill first, only when needed** (adw-init Phase 0.7). A cheap pre-pass lists the questions only
+the owner can answer and that a reasonable owner could answer against the default. None → silent.
+Some → at most two rounds of numbered questions, each with a default, before triage. The answers
+feed triage and every unit author. The same ask rule governs the gate's decide pass. The handoff's
+`asks` line measures it: over 96 gates, 42% came back as "critically decide" or "didn't understand" before this rule.
+
+`/adw-init` then runs **one cheap triage agent** over the intent and prints a proposal:
 the unit cut, a **depth** per unit, and a **packaging** per unit (§3.5). Nothing expensive
 runs before approval — the per-unit front-end (§3.3) can cost more than the implementation,
 and burning it on a mis-cut is the failure this gate exists to prevent.
@@ -757,7 +763,7 @@ its unbuilt units in the halting sub-PR's body (§4.1).
 | **Artifact ratio** — plan lines vs code-diff lines | `git diff --shortstat` excluding both artifact roots at PR open vs `wc -l` of spec+plan (adw-build §3.5); surfaced as `⚠ artifact-heavy` on the PR's S3 line | free |
 | ~~Token burn~~ | — | **dropped.** No source exists; the draft asserted a metric nothing produces |
 | **Progress-condition state** — cycle counts (and what they resumed from), gate exit-code vector, boundary count | orchestrator-held during the run; recovered on resume from the `fix-attempt-N` / `fix(review):` commit prefixes (adw-build Phase 0 step 7) | free |
-| **Per-PR evidence block** — contract sha, cycles, phase split, `owner-wait`, gate vector, mutation coverage ratio, artifact ratio | written into the **PR body** at adw-build §3.4, fetched forever by `gh pr view --json body` (adw-core §7.2) | free |
+| **Per-PR evidence block** — contract sha, cycles, phase split, `owner-wait`, gate vector, mutation coverage ratio, artifact ratio, `asks` (adw-core §7) | written into the **PR body** at adw-build §3.4, fetched forever by `gh pr view --json body` (adw-core §7.2) | free |
 | **The reader over all of the above** | `scripts/adw-metrics.sh` — scans every `[adw …]` PR body, emits the per-run table plus aggregates, and closes with an explicit `NOT MEASURED` block | free |
 
 Nothing else is stored. No run database, and no per-run artifacts — the prohibition is on
@@ -853,7 +859,7 @@ of N.
 
 ### 6.1 Interaction surfaces — the format contract
 
-Every human touchpoint above arrives through one of four surfaces. Their shape is a
+Every human touchpoint above arrives through one of four surfaces (or the interactive grill round, §3.2). Their shape is a
 contract, not a style preference — the owner's recorded feedback
 (`memory/feedback_review_output_structure.md`) is that report-shape rules enforced by
 prose failed twice and held only once made structural. Three rules:

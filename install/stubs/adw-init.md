@@ -1,5 +1,5 @@
 ---
-description: "ADW entry point: intent → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init <intent>"
+description: "ADW entry point: intent → grill (only if needed) → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init <intent>"
 ---
 
 # adw-init — loader
