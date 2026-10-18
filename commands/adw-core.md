@@ -549,7 +549,7 @@ surface printed (the `decide` verb, Phase 5's decide pass). A `decided` line is 
 `ask` rows — by how it settled: `owner` (answered by number), `default` (left blank), `delegated`
 (`decide`, "critically decide", "you decide"). `auto-decided` counts the questions a decide pass settled
 without showing them. When nothing was asked the line reads `shown 0: — · auto-decided <n>`. A question counts once, by how it last settled: a
-`reopen`ed one counts by its new answer, and an `ask` row a `re-cut` removed counts nowhere. Keep one `QN → how` row per question in context. It is the measure of the ask rule (adw-init
+`reopen`ed one counts by its new answer, and an `ask` row a `re-cut` removed counts nowhere. Keep one `QN → how` row per question in context; if compaction dropped them, the line reads `asks n/a — not recoverable`. On a stopping handoff, rows still unanswered count as `pending`. It is the measure of the ask rule (adw-init
 Phase 0.7): **`delegated` above ~15% of `shown` means the rule lets through questions the run can
 settle**, and `default` above ~50% means it asks what no owner disputes. Before this line, the
 measurement took a 96-gate transcript sweep. It goes into the evidence block of every PR built in the same run (adw-build §3.4); a build started later writes `n/a`.

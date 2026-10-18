@@ -159,8 +159,8 @@ candidate question with its id, and reaches the gate through the decide pass lik
 Every settled question is a line `QN — <question>: <answer> (owner | default | delegated)`. The
 list goes into the triage prompt (Phase 1), is frozen with the proposal at `approve`, and goes to
 every unit author with the gate's answers (Phase 3). `delegated` lines print on the approval surface's
-`decided` line, and `reopen Q<N>` turns one back into an `ask` with its default. `re-cut` and `new intent`
-never reopen the list, but an instruction that contradicts a line wins: rewrite that line to the
+`decided` line. `reopen` never touches them (triage cut on them as settled); only `re-cut` or `new intent`
+changes one, and an instruction that contradicts a line wins: rewrite that line to the
 instruction's answer, tagged `owner`, before the freeze.
 
 ## Phase 1 — triage (one cheap agent)
@@ -264,7 +264,7 @@ a leftover grill question keeps its own, and no id is ever renumbered, so `ask` 
 `decided` items print as ONE line under `needs you`
 (`decided  Q2 cap refunds: yes · Q3 export: pick-lists only — reopen by number`), a few words of the
 question then the answer. A `decided` answer goes to every unit author, who follows the ones that
-touch its unit. `reopen Q<N>` turns a `decided` question (or a `delegated` grill one) back into an `ask` with its default;
+touch its unit. `reopen Q<N>` turns a `decided` question back into an `ask` with its default;
 on any other question it does nothing. Only `re-cut` and `new intent` rerun the pass, and only over
 the questions triage marks `new` (none new, no dispatch): every other question keeps its id and its
 status (`ask`, `decided`, answered at the gate, reopened), and new questions take ids after the
@@ -303,11 +303,12 @@ The orchestrator composes the pass's prompt from this text:
   ends. This is the verb for reading the specs before any code exists.
 - `detail` → re-render the approval surface with its `detail` and `fyi` blocks appended
   (adw-core §7). Not an exit — the gate stays open.
-- `reopen Q<N>` → turn a `decided` question (or a `delegated` grill one) back into an `ask` with its default, re-render
+- `reopen Q<N>` → turn a `decided` question back into an `ask` with its default, re-render
   the approval surface.
 - `re-cut "<instruction>"` → send the instruction to the SAME triage agent
   (SendMessage — context intact), adding: "Keep every question your change does not touch
-  verbatim with its id; mark each new question `new`." Run the decide pass over the questions it
+  verbatim with its id; mark each new question `new`. If the instruction contradicts a settled grill
+  line `QN`, the instruction replaces that answer." Run the decide pass over the questions it
   marks `new` (first paragraph of this phase), re-render the approval surface.
 - `regroup` / `depth` → apply mechanically, re-render the approval surface. `regroup` refuses to put
   a port unit in a shared PR or sub-PR, and to put another unit in a port unit's.
