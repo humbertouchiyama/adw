@@ -792,6 +792,7 @@ pipeline knows:
   cycles     fix 1/3 · review 1/2      progress-conditions none fired
   phases     implement 9m · gates 14m · verify 7m · review 21m · reverify 6m
   owner-wait 0m
+  asks       shown 3: owner 1 · default 1 · delegated 1 · auto-decided 4
   gates      <one field per repo-profile §5 gate the diff obligated: name + exit code>
   mutation   aggregate red · per-file 4/4
   artifact   plan 260L / diff 71L = 3.66x
@@ -811,6 +812,8 @@ pipeline knows:
   `owner-wait = Σ(T2ᵢ − T1ᵢ)` over that PR's pairs; subtract it from the per-PR `⏱`. A field
   reported without being measured is the shape §4.8 just retired the clock over.
   `resumed-from` is the recovered cycle count, not `0` by default — see Phase 0 step 7.
+  `asks` is the init handoff's `asks` line (adw-core §7), copied verbatim, the same in every PR of the
+  intent; a build not reached through `approve` writes `asks n/a — fresh /adw-build`.
   `open-findings` is `/pr-ready` §5's result: `none — read <n> comments`, or one
   `closed: <file:line> — <guard>` per graded finding, copied verbatim from the driver's return.
   `tier` records the session's own tier (`ORCH_TIER`, Phase 0 — the one cost term no dispatch

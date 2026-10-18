@@ -177,7 +177,13 @@ split of one is a legitimate outcome, which is why the command is `init`, not `s
 
 ### 3.2 The cut proposal and the human gate
 
-`/adw-init` first runs **one cheap triage agent** over the intent and prints a proposal:
+**Grill first, only when needed** (adw-init Phase 0.7). A cheap pre-pass lists the questions only
+the owner can answer and that a reasonable owner could answer against the default. None → silent.
+Some → at most two rounds of numbered questions, each with a default, before triage. The answers
+feed triage and every unit author. The same ask rule governs the gate's decide pass. The handoff's
+`asks` line measures it: owners delegated ~42% of gate questions before this rule.
+
+`/adw-init` then runs **one cheap triage agent** over the intent and prints a proposal:
 the unit cut, a **depth** per unit, and a **packaging** per unit (§3.5). Nothing expensive
 runs before approval — the per-unit front-end (§3.3) can cost more than the implementation,
 and burning it on a mis-cut is the failure this gate exists to prevent.
