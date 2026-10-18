@@ -813,7 +813,7 @@ pipeline knows:
   reported without being measured is the shape §4.8 just retired the clock over.
   `resumed-from` is the recovered cycle count, not `0` by default — see Phase 0 step 7.
   `asks` is the init handoff's `asks` line (adw-core §7), copied verbatim, the same in every PR of the
-  intent; a build not reached through `approve` writes `asks n/a — fresh /adw-build`.
+  intent; a build not reached through `approve` writes `asks n/a — fresh /adw-build`, and one whose handoff is no longer in context writes `asks n/a — handoff not in context`. Never rebuild the line.
   `open-findings` is `/pr-ready` §5's result: `none — read <n> comments`, or one
   `closed: <file:line> — <guard>` per graded finding, copied verbatim from the driver's return.
   `tier` records the session's own tier (`ORCH_TIER`, Phase 0 — the one cost term no dispatch

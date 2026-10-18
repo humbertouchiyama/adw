@@ -1,5 +1,5 @@
 ---
-description: "ADW entry point: intent → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init <intent>"
+description: "ADW entry point: intent → grill (only if needed) → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init <intent>"
 ---
 
 # /adw-init — from intent to contract, and on into the build
@@ -28,7 +28,7 @@ ref. Empty → ask for the intent and stop.
   the session — do not read this rule as a reason to stop there. (It is stated this way
   because the v2.15 contract said "documents only" at the top and "continue into build"
   at the bottom, and the top won every time.)
-- Nothing expensive runs before the human approves the cut (the grill pre-pass, triage and the decide
+- Nothing expensive runs before the human approves the cut (the grill pre-pass and its `decide` call, triage and the decide
   pass, one call at the first render plus one per `re-cut` or `new intent`, are the only pre-gate
   dispatches) — the
   per-unit fan-out can
@@ -110,8 +110,8 @@ scope, what "done" means — and the repo cannot settle it; (b) a reasonable own
 default. **Also `ask`, whatever (a) and (b) say:** the answer changes money, data or a public
 contract, is hard to reverse, or is the `base:` branch. Everything else is decided, with a reason.
 A question about how to build it is never `ask`: which approach, which file, which library, whether
-a refactor is in scope. Measured: owners sent ~30% of gate questions back because the run could
-decide them better, and ~12% because the default was obvious — (a) catches the first, (b) the second.
+a refactor is in scope. Owner-reported, not measured: about 30% of gate questions went back because the run could
+decide them better, and about 12% because the default was obvious — (a) catches the first, (b) the second.
 
 Dispatch ONE read-only subagent (Explore-type; it must not write) with **`model: sonnet`**:
 
@@ -128,7 +128,8 @@ owner-only gap, and the pre-pass costs one cheap call.
 
 Otherwise **grill in rounds, at most 2.** Give each `G` line a `Q` id in order (`Q1`, `Q2`, …):
 these are the first ids of the run (adw-core §7). A round asks the **frontier** — every question
-whose `needs:` are all answered — and the rest wait for round 2. Stamp T1/T2 around each round
+whose `needs:` are all answered — and the rest wait for round 2. When no question qualifies (a
+cycle, or a `needs:` id nobody listed), treat every `needs:` as `-`. Stamp T1/T2 around each round
 (tag `—`, adw-core §7.1). Print the round and end the turn on it:
 
 ```
@@ -141,19 +142,26 @@ grill  round 1 of 2 — answer by number · blank = defaults · decide → the r
 - An answer by number settles that question: `owner`.
 - A blank row settles at its default when the owner answers any other row or types `go`: `default`.
 - `decide`, "you decide", "critically decide" settles every row it covers through ONE read-only
-  dispatch with the Phase 2 `decide` verb's brief and tier rule (`model: sonnet` here: no depth
-  exists yet): `delegated`.
+  dispatch (`model: sonnet`: no depth exists yet): `delegated`. Its brief: "Read-only: do not
+  write. Read `.claude/repo-profile.md`, then explore the repo read-only. Intent: `<intent
+  verbatim>`. The owner delegated these to you. Decide every one: `Q<N> | decided: <answer> —
+  <reason, one clause>`. Keep the default unless the code gives a reason to leave it. `<Q<N> —
+  question — default>`, one per line." A question it omits takes its default.
 
 **Round 2** only when a question waits on a round-1 answer, or an answer opens a new gap. Send the
 answers to the SAME pre-pass agent (SendMessage — context intact): "The owner answered: `<QN —
 answer>`. Return, in the same format, the questions still open and any new ones those answers
 open, under the same rule — or `none`." New lines take ids after the highest. `none` ends the phase.
+When the agent cannot be resumed, skip round 2: every question still open goes to triage as below.
 **After round 2 there is no round 3:** every question still open goes to triage's prompt as a
 candidate question with its id, and reaches the gate through the decide pass like any other.
 
 Every settled question is a line `QN — <question>: <answer> (owner | default | delegated)`. The
 list goes into the triage prompt (Phase 1), is frozen with the proposal at `approve`, and goes to
-every unit author with the gate's answers (Phase 3). `re-cut` and `new intent` never reopen it.
+every unit author with the gate's answers (Phase 3). `delegated` lines print on the approval surface's
+`decided` line, and `reopen Q<N>` turns one back into an `ask` with its default. `re-cut` and `new intent`
+never reopen the list, but an instruction that contradicts a line wins: rewrite that line to the
+instruction's answer, tagged `owner`, before the freeze.
 
 ## Phase 1 — triage (one cheap agent)
 
@@ -256,7 +264,7 @@ a leftover grill question keeps its own, and no id is ever renumbered, so `ask` 
 `decided` items print as ONE line under `needs you`
 (`decided  Q2 cap refunds: yes · Q3 export: pick-lists only — reopen by number`), a few words of the
 question then the answer. A `decided` answer goes to every unit author, who follows the ones that
-touch its unit. `reopen Q<N>` turns a `decided` question back into an `ask` with triage's default;
+touch its unit. `reopen Q<N>` turns a `decided` question (or a `delegated` grill one) back into an `ask` with its default;
 on any other question it does nothing. Only `re-cut` and `new intent` rerun the pass, and only over
 the questions triage marks `new` (none new, no dispatch): every other question keeps its id and its
 status (`ask`, `decided`, answered at the gate, reopened), and new questions take ids after the
@@ -295,7 +303,7 @@ The orchestrator composes the pass's prompt from this text:
   ends. This is the verb for reading the specs before any code exists.
 - `detail` → re-render the approval surface with its `detail` and `fyi` blocks appended
   (adw-core §7). Not an exit — the gate stays open.
-- `reopen Q<N>` → turn a `decided` question back into an `ask` with triage's default, re-render
+- `reopen Q<N>` → turn a `decided` question (or a `delegated` grill one) back into an `ask` with its default, re-render
   the approval surface.
 - `re-cut "<instruction>"` → send the instruction to the SAME triage agent
   (SendMessage — context intact), adding: "Keep every question your change does not touch
