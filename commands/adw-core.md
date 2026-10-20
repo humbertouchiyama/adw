@@ -7,7 +7,8 @@ description: "Shared ADW contract — spec headers, naming, depth ladder, packag
 **This file lives in the `adw` repository and is fetched, not copied** (§9). It is repo-agnostic:
 every command, path, branch and gate it needs is declared per-repo in the consuming repo's
 `.claude/repo-profile.md`, cited throughout as `repo-profile §N` against frozen anchors §1–§18,
-plus two optional ones a profile may omit: §19 (code-review lanes) and §20 (visual port loop, §3).
+plus three optional ones a profile may omit: §19 (code-review lanes), §20 (visual port loop, §3)
+and §21 (app smoke, adw-build §3.8).
 Both `/adw-init` and `/adw-build` read that file at their Phase 0 alongside this one — it is not
 auto-included.
 
@@ -593,8 +594,10 @@ bound with adw-build §3's progress conditions — and it is durable only becaus
 §3.4 lands it in the PR body; the terminal line does not survive the session. A PR line may carry trailing `· ⚠ <flag>`
 annotations (e.g. `· ⚠ no trustworthy gate sees this unit`, `· ⚠ baseline red: <gate>`); a final PR
 landed `blocked` by a carry adds one line per carried sub-PR, `carried #<n> <unit> — <reason>;
-default: <default>` (adw-build Phase 4); every user-visible PR body carries a `Smoke` list
-(adw-build §3.5); the `note` row carries
+default: <default>` (adw-build Phase 4); every user-visible PR body carries a `## Smoke` section
+of cases (adw-build §3.5); an independent or final PR in a repo whose profile has a §21 adds
+`· smoke clean` after `review clean`, or one `· ⚠ smoke …` flag (adw-build §3.8), and its state
+does not change for it; the `note` row carries
 run-level caveats (non-default `base:`, extend-mode's prior-unit summary, a
 `· ⚠ mutation per-file <covered>/<total>` ratio). The first `note` line is
 unconditional: `note  contract <short-sha>` — the commit the loaded contract came from:
@@ -785,7 +788,7 @@ important the unit is:
 |---|---|
 | **Find** — refute, review, audit, scan, check against a doc, run a fixed checklist | `sonnet` |
 | **Clear a `Blocking`** — grade whether an earlier finding still holds at the head (`pr-ready.md` §5), the refutation step of `review-core.md` §9 | `opus` — takes precedence over the Find row |
-| **Re-execute and relay** — run gates, report exit codes and output tails, verify | `sonnet` |
+| **Re-execute and relay** — run gates, report exit codes and output tails, verify, relay the app smoke (adw-build §3.8) | `sonnet` |
 | **Look up** — read a file or a history and answer a bounded question | `haiku` |
 | **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file | `sonnet` |
 | **Author** — write a spec, a plan, or production code | **keyed on the unit's `depth:`** — `opus` at D3, `sonnet` at D0–D2 |
@@ -878,7 +881,7 @@ and it names an unverified contract rather than a stale one it cannot do anythin
 failure with no cache at all is **exit 1**, and the run stops.
 
 **What is still per-repo.** `repo-profile.md`, authored in the consuming repo and never fetched.
-Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19 and §20 optional). A contract file that
+Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19, §20 and §21 optional). A contract file that
 needs a value which could differ between two repos is wrong: the value belongs in the profile. The
 failing test is always the same — could this exact sentence be true in a repo with a different
 stack? If not, it names a value, and the value moves.

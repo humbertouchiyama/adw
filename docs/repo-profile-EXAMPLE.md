@@ -4,7 +4,8 @@
 > repository ADW was built in: a full-stack TypeScript monorepo (React 19 + Vite, Hono + PostgreSQL
 > 16 + Drizzle, one shared npm workspace). Copy it to `.claude/repo-profile.md` in your repo and
 > replace **every** value. Keep the section numbers: the contract cites them as `repo-profile §N`
-> and the anchors §1–§18 are frozen. §19 and §20 are optional; §20 is sketched at the end.
+> and the anchors §1–§18 are frozen. §19, §20 and §21 are optional; §20 and §21 are sketched at
+> the end.
 
 Every repo-specific value the shared agent contract needs. One of these lives in each repo that
 runs `/adw-init`, `/adw-build`, `/pr-ready` or `/code-review`; the contract files themselves
@@ -16,7 +17,7 @@ The format is prose and tables, not a parsed config. The reader is an agent, so 
 more than syntax.
 
 **Section anchors are frozen** — the contract files cite `repo-profile §1`…`§18` by number, and the
-optional §19 and §20 where a profile carries them. Do not renumber. Add new sections at the end.
+optional §19, §20 and §21 where a profile carries them. Do not renumber. Add new sections at the end.
 
 | § | Section | Read by |
 |---|---|---|
@@ -40,6 +41,7 @@ optional §19 and §20 where a profile carries them. Do not renumber. Add new se
 | §18 | Disposable state | cleanup Phase 3, 5 |
 | §19 | Review-lane map, layer to angle (optional; absent → derived) | code-review lane table |
 | §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2/§3.3/§3.4/§3.6 |
+| §21 | App smoke (optional; absent → no smoke) | adw-build §3.5/§3.8, adw-core §7 |
 
 ---
 
@@ -644,4 +646,25 @@ Plus a fail-closed `verify` template for several screens: delete the previous re
 them all in one build, then `&&`-chain one score per screen, each exiting 1 on an empty score. Every part
 that names a screen (its score, and any per-screen delete or filter) is a per-row part that
 `/adw-init` repeats for each row. Its first token must be on §5's allowlist (adw-init Phase 4); wrap it in `bash -c '…'` otherwise.
+
+## §21 — App smoke (optional)
+
+A profile that keeps this section declares a runner that drives the built app through a case file,
+and `/adw-build` §3.8 then walks the `## Smoke` cases of every PR the human merges (each independent
+PR and each chain's final PR), report only. **Delete the whole section unless the repo has one**:
+absent → no smoke runs and nothing about it prints. Fill every row with a value, not with the
+description:
+
+| | |
+|---|---|
+| **Launch** | how to start one smoke, unattended: a command, or a tracked skill and its arguments, taking the PR number, the head sha, a case file and a device list. It refuses a build that talks to production, edits no code, commits, pushes and posts nothing, and never reports by typing into the caller's terminal or chat: the caller is an agent, and that text would reach it as if the owner wrote it. Say where it prints every value the rows below need (a run directory, a slot, a run name), and at which point of it the Driver probe runs: after the devices boot and the app installs, before the walk |
+| **Cases check** | a command that reads a case file in adw-build §3.5's shape and exits 0 when the runner can walk it, non-zero with the reason when it cannot |
+| **Devices** | the device classes the runner offers, the simulator or emulator runtimes it is valid on (tested, with the date and the driver version), how a case's `Device` line maps onto them, and the set used when no case names one |
+| **Driver probe** | a command, run once per device before the walk, that taps one control, then reads back the screen that tap must open, and exits non-zero when it did not open. A read alone is not a probe: a driver can read a screen and still refuse every tap (adw-build §3.8) |
+| **Data** | what data exists when the runner starts (accounts, a seeded fixture), and how a case gets the data its Preconditions name that the fixture lacks. Never production data, never a person's own account |
+| **Wait test** | a shell test that is true once the run has finished and released what it holds (devices, a lock), so the next smoke can start |
+| **Result** | the file the run writes; its verdict line; which of its table rows are defects and with what severity, which are gaps, and which are neither; how to count the cases that passed; and which line in it shows the driver was lost mid-walk |
+| **Audit** | a command that checks the result's evidence (the screenshots it cites exist, the build is the one asked for), and its exit codes |
+| **Max minutes** | the longest one smoke may run; `/adw-build` abandons it then |
+| **Abandon** | what to run at that deadline: stop the run, release what it holds, and print the last state it reached |
 

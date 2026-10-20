@@ -76,7 +76,7 @@ that survive it — §3.4's evidence block in the PR body, the `fix-attempt-N`/`
 prefixes step 7 recovers counts from, and re-deriving `$VSHA` and the base rather than
 trusting a remembered value.
 
-**After a compaction, re-read this file's Phase 3 (§3 to §3.7) before the next dispatch.** A
+**After a compaction, re-read this file's Phase 3 (§3 to §3.8) before the next dispatch.** A
 summary keeps what the run did and drops what the contract told it to do next. Of the PRs opened
 after a compaction, 15 of 45 had no evidence block (§3.4); before one, 6 of 160. Four of the seven
 runs that compacted mid-run never read this file again (2026-09-20 to 10-01).
@@ -289,7 +289,8 @@ gate file to get green · let a subagent create its own worktree.
   dispatch. A level sibling's implementer brief says `implement, commit, then return before you
   run any gate`; the orchestrator then resumes one sibling at a time (SendMessage: `run the gates
   now`), and it does not dispatch a 3.4 verifier or a 3.6 driver while another unit's implementer,
-  verifier or driver is still running gates. Where §10 says the gates isolate themselves per
+  verifier or driver is still running gates. A §3.8 smoke relay counts as a gate-running agent here:
+  its runner builds the app. Where §10 says the gates isolate themselves per
   worktree, nothing is serialised. **Never a lock file, a lock script, `flock` or a wait-for-lock
   loop**, in this session or in any brief. The rule above named no mechanism, so each run wrote
   its own: 581 lock commands across 9 sessions, four permission denials and 12 hours of owner time
@@ -354,6 +355,9 @@ implement ⟲ gates → verify → open PR → /code-review ⟲ → re-verify �
      ↑________|                            ↑______|
      max 3 cycles                          max 2 cycles
 ```
+
+An independent PR or a final PR then runs §3.8's app smoke on its verified head: report only, after
+the state above is decided, and never on a sub-PR.
 
 **Progress, not elapsed time, terminates a loop** (v2.12; the 45-minute bound it replaces
 is design §4.8). Record `date +%s` at **PR start = this loop's first implementer dispatch
@@ -803,6 +807,11 @@ pipeline knows:
   `mutation` row ends `· fast` or `· gate` (the mode that graded discrimination; `gate` means the per-file sweep was skipped), and its `gates`
   field adds `render gate-mode <exit code>`, so the TRIAL (adw-core §3) leaves a record.
 
+  A PR that §3.8 applies to gets one more row after the smoke returns, written by one more
+  `gh pr edit`: `smoke      <d> defects (<b> blocking) · <g> gaps · cases <passed>/<total> · audit
+  <exit> · <m>m`, or `smoke      not runnable: <reason>`, or `smoke      not run — <reason>`. No
+  other PR carries the row.
+
   `owner-wait` is the decisive one: it is the single bit that distinguishes a 21-hour
   owner gate from a 21-hour stalled pipeline. Git already exposes the *gap* via commit
   timestamps; only the attribution is missing, and three retros failed on exactly that
@@ -890,11 +899,33 @@ semantic-conflict risk.
   ```
   `0` → write the block now, before any other step. 13 of 28 final PRs had no block, and 36 blocks
   still read `review 0/2` on PRs that carry `fix(review):` commits (2026-09-20 to 10-01).
-- **Every adw PR body whose change a user can see or trigger carries a `Smoke` list:** one to five
-  steps a person performs to see the change work, written from the spec's acceptance criteria
-  (`open <screen> → do <action> → expect <result>`). The final PR's list is its units' lists, in
-  order. A unit with nothing to see says `Smoke: none — <why>`. Gates were green on three fixes the
-  owner then found still broken on the device, and the owner asked six runs for this list by hand.
+- **Every adw PR body whose change a user can see or trigger carries a `## Smoke` section:** one to
+  five cases a person, or §3.8's runner, walks to see the change work, written from the spec's
+  acceptance criteria, each in this shape:
+  ```
+  ## Smoke
+  ### AC-1 <screen> — <what the user sees>
+  - **Checks**: <the spec criteria it covers, as `u1 AC 3`>
+  - **Device**: <a device class repo-profile §21 names, or `all`; with no §21, the device a person would use>
+  - **Entry point**: <the screen, and how a user reaches it>
+  - **Preconditions**: <this intent's own data, by name: which records, in which state, seen by which account>
+  - **Steps**:
+    1. <action>
+  - **Expected**:
+    1. <result of step 1>
+  ```
+  In the body, drop this file's two-space indent: the `##` and `###` headings start at column 0,
+  because §3.8 finds the cases by them. Every acceptance criterion that only a look at the running
+  app can check (it names a simulator, a device or a manual check, or says no gate covers it) has a
+  case. **A case whose rule holds on more
+  than one screen ends with a step that repeats the check on each of them, by name**
+  (`On <screen>, <screen>: repeat step 2; expect the same`): a screen that differs from its siblings
+  is the defect no gate sees. Preconditions name data, never "any record": §3.8's runner makes what
+  its fixture lacks (`repo-profile §21`'s Data row). The final PR's cases are its units' cases, in
+  unit order, renumbered `AC-1`, `AC-2`, … in one sequence, each with its `Checks` line. A unit
+  with nothing to see says `Smoke: none — <why>`. Gates were green on three fixes the owner then
+  found still broken on the device, and the owner asked six runs for this list by hand. Then a list
+  that named the three broken screens shipped unwalked on AXCMedApp #580, which is why §3.8 walks it.
 - Every adw PR body carries one depth-conditional line, naming the spec/plan dirs
   (`repo-profile §2`) — D3:
   `<specs-dir>/<plans-dir> in this PR = the unit's contract, authored and critical-passed
@@ -1084,6 +1115,103 @@ left, an escalated finding, a gate-file diff, open findings `/pr-ready` §5 coul
 carried. A carried gate-file diff is still in the final PR's diff, so §3.4's gate-file tripwire
 fires on the final PR and the owner signs it there.
 
+### 3.8 App smoke — the PRs the human merges, report only
+
+**No gate looks at the running app.** On AXCMedApp #580 (units #577, #579) every gate, both
+verifier passes and a full review were green. A simulator walk the owner asked for afterwards found
+three defects: a button floating mid-screen on one tab, a control missing on a sibling tab, and a
+button on the wrong side of another screen. The PR body's own `Smoke` list named all three screens,
+and nobody walked it. This step walks it, with `repo-profile §21`'s runner.
+
+**It runs when all four hold, and only then:**
+
+- `repo-profile §21` exists. Absent → this section does not run, and nothing about it prints.
+- The PR is an independent PR or a final PR. **Never a sub-PR:** a sub-PR merges unseen, nothing acts
+  on its result before the final PR, and the final PR's cases include every unit's (§3.5). A chain of
+  N units pays for one smoke.
+- Its 3.7 state is `ready`, or `blocked` with a `verified <sha7>` from its driver. A `failed` PR, or a
+  `blocked` one with no verified head (Phase 4's unsynced final PR is one), is not smoked: its
+  run-report line carries `· ⚠ smoke not run — no verified head`.
+- Its body's `## Smoke` section has at least one `### AC-<n>` case. `Smoke: none — <why>` → no
+  smoke and no flag.
+
+**It costs tens of minutes per PR, and past an hour on a long case list:** one app build, then every
+case on every device. `repo-profile §21`'s Max minutes is the ceiling. It is machine time: it counts
+in the PR's `⏱`, and the run report prints after the last smoke returns.
+
+**It never changes the PR's state.** A `ready` PR stays `ready`. A defect is never a fix cycle,
+never `blocked`, never `failed`, and never §3.3's environment fault. The PR is terminal before the
+smoke starts, so §3's progress conditions and boundary cap do not count it either. A smoke that could
+not run is a reported gap (`review-core.md` §4), never a pass. Report only, because its verdict is a
+model reading a screen on a simulator, and no run has yet measured how often its `blocking` rows hold
+up. Carry the result as a flag, as §3.3 carries a baseline red, until that number exists.
+
+**A device that reads but cannot act is the silent pass, so the runner proves a tap first.** On
+2026-10-19 one long-running iPadOS 27.0 simulator let the UI driver launch the app and read the
+screen, and refused every tap; fresh simulators of the same runtime and model, and of iOS 18.3 and
+26.5, tapped normally. A walk on that device asserts what it can read and fails nothing it cannot
+reach. So before the walk, §21's Driver probe runs on every device the smoke uses: one tap that must
+change the screen, then a read that proves it did. A read alone (an assert, a hierarchy dump) proves
+nothing about taps. A probe that fails, or a driver the runner reports lost mid-walk, ends the smoke
+as `smoke not runnable: <reason>`: a reported gap, never a pass and never a defect. §21's Devices row
+names the runtimes the runner is valid on.
+
+**Dispatch one `model: sonnet` smoke relay** (adw-core §8's Re-execute and relay row,
+`subagent_type: general-purpose`), and never two smokes at once: a runner owns its devices. Its
+brief carries the PR number `<N>`, `$VSHA` written out in full, `repo-profile §21` pasted whole,
+steps 1 to 5 below pasted, and `review-core.md` §11's brief floor. The relay and its runner edit no
+code, commit nothing, push nothing and post nothing on the PR. The relay:
+
+1. Checks the head: `gh pr view <N> --json headRefOid --jq .headRefOid` must print `$VSHA`. If it
+   does not, return `smoke not run — head moved` and stop.
+2. Extracts the cases, in one Bash call that prints the directory, and copies that path as a literal
+   into every later call:
+   ```bash
+   D="$(mktemp -d)"; gh pr view <N> --json body --jq .body | awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && /^## / {exit} f' > "$D/cases.md"; echo "$D"
+   ```
+   Then it runs §21's Cases check on `<D>/cases.md`. A non-zero exit → return `smoke not run —
+   cases: <the check's message>` and stop.
+3. Prints `date +%s` once and keeps the value as `<start>`. Then starts §21's Launch with `<N>`,
+   `$VSHA`, `<D>/cases.md`, and the devices §21's Devices row derives from the cases' `Device`
+   lines, and keeps every value §21's Wait test, Result, Audit and Abandon rows name, as literals. A
+   launch that stops before the runner runs (its lock is held, its stack will not come up, the
+   build fails) → return `smoke not run — <the runner's own reason>` and stop. §21's Driver probe
+   runs on each device at the point §21's Launch row names, before the walk; a non-zero exit →
+   run §21's Abandon, return `smoke not runnable: <device> — <the probe's failing line>` and stop.
+4. Waits, in one Bash call with `timeout: 600000`, re-issued until it prints `done` or `DEADLINE`.
+   `<test>` is §21's Wait test and `<n>` its Max minutes, both written in:
+   ```bash
+   lim=$(( <start> + <n> * 60 )); end=$(( $(date +%s) + 270 )); [ "$end" -gt "$lim" ] && end=$lim; until { <test>; } || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; if { <test>; }; then echo done; elif [ "$(date +%s)" -ge "$lim" ]; then echo DEADLINE; else echo running; fi
+   ```
+   This is `review-core.md` §10's wait with §21's test in place of the file count, and the same
+   270 s per call. The braces keep a test that holds `&&` or `||` in one piece. On `DEADLINE`, it
+   runs §21's Abandon and returns `smoke not run — exceeded <n> min`, with what Abandon printed.
+5. Runs §21's Audit, then returns this and nothing else: the Result file's path; its verdict line;
+   every row of its table, verbatim; the Audit's exit code and its failing lines; the case count as
+   `<passed>/<total>`, `<passed>` counted as §21's Result row says and `<total>` the number of ids
+   step 2's check printed; and the minutes from `<start>` to `done`. When §21's Result row says the
+   file shows the driver lost mid-walk, the first line of the return is `smoke not runnable: <what
+   the file says>`, and the rest follows it.
+
+**The orchestrator records the return; it reads nothing else.**
+
+- **PR body:** a `## Smoke result` section. On a `ready` PR it goes right after the PR's opening
+  summary. On a `blocked` PR it goes right after the reason line, above the `<details>` fold: the
+  owner decides the merge on it. Its first line is `<verdict line> · at <sha7> · <m>m`, with
+  `· unaudited: <failing check>` appended when the Audit exit is not `0`. Then the returned rows, as
+  they came. Then `evidence: <Result path>, on the machine that ran the build`. A `smoke not run`
+  or `smoke not runnable` return with no Result writes the section with that one line; one with a
+  Result puts that line first. A second smoke of the same PR (Phase 4) replaces the section, never
+  adds one.
+- **Evidence block:** the `smoke` row (§3.4), counted from the rows by §21's Result row.
+- **Run-report PR line:** no defect rows, no gap rows, Audit `0` and no `not runnable` line →
+  `· smoke clean` after `review clean`. Otherwise one trailing flag, the first that applies:
+  `· ⚠ smoke not runnable: <reason>`, `· ⚠ smoke not run — <reason>`, `· ⚠ smoke unaudited —
+  <failing check>`, or `· ⚠ smoke: <d> defects (<b> blocking), <g> gaps`.
+
+After the edit, check it, as §3.5 checks the evidence block:
+`gh pr view <N> --json body --jq .body | grep -c '^## Smoke result' || true` must print `1`.
+
 ## Phase 4 — chain close
 
 All units merged → sync the integration branch with `origin/<INTENT_BASE>` in a dedicated
@@ -1135,7 +1263,8 @@ code — catching a real auto-merge defect on the way, with no escalation raised
 
 Otherwise the final PR (`adw/<slug>` → `<INTENT_BASE>`) runs the FULL Phase 3 loop on the
 composition — gates, 3.4 verify against `origin/<INTENT_BASE>`, **and 3.6's review** — and
-waits `ready` for the one human consent.
+waits `ready` for the one human consent. After the carried blocks below are listed, it runs §3.8's
+app smoke on its verified head: the one smoke of the chain.
 
 **Carried blocks are answered here, and only here.** After the loop, list them:
 
@@ -1152,7 +1281,7 @@ as its own commit (a default the owner accepts needs none). An answer commit tha
 code moves the head the final PR's `ready` was earned at, so the Phase 3 loop (3.4 verify
 against `origin/<INTENT_BASE>` and 3.6's review) runs again on the new head before the next
 step, once per answer commit, with fresh review-cycle and boundary counters. A docs-only answer
-commit needs the 3.4 verify alone, §4 and §5 at the new head with the next `PASS` id, and no review cycle (`/pr-ready` §6: any commit voids `ready`). If a re-pass ends `blocked`, the final PR stays `blocked` with that
+commit needs the 3.4 verify alone, §4 and §5 at the new head with the next `PASS` id, and no review cycle (`/pr-ready` §6: any commit voids `ready`). §3.8 runs again once per owner reply whose answer commits change code, after the last of them is verified; a docs-only reply keeps the smoke result, whose `at <sha7>` names the head it walked. If a re-pass ends `blocked`, the final PR stays `blocked` with that
 reason on its body and the owner decides; the carried lines stay. Then
 `gh pr edit <n> --remove-label adw:blocked` on that sub-PR; the final PR leaves `blocked` when
 the list is empty and its own loop, at the current head, is `ready`. The escalation rate
