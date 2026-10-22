@@ -388,11 +388,15 @@ Five rules (owner feedback, structural after prose failed twice):
    form of "what is this?" (2026-09-20 to 10-01).
 4. **The ask rule binds every question as well** (adw-init Phase 0.7): mid-build, on the run report,
    and in the chat after it. A question that fails the rule is not asked. Decide it, act on it, and
-   say in one line what you decided, so the owner can reverse it. This includes "say `rerun` and I
-   start" and "C1 or C2?" with a recommendation a reasonable owner would not reject. Merges and the
-   `base:` question still need the owner (§6). In 2026-10-02..10-21, where the outcome of such a
-   choice was clear, the owner took the recommendation or delegated it 29 times of 34: "when you
-   recommend to accept, just do it and tell me in the end … if you stop the pipe is worse".
+   say what you decided in one line, so the owner can reverse it: a `note` row on the run report, or
+   one line in the chat after it. This includes "say `rerun` and I start" and "C1 or C2?" with a
+   recommendation a reasonable owner would not reject. Three things still wait for the owner: a merge
+   (§6), the `base:` branch (adw-init Phase 0.7), and the `default:` printed after a stop: `blocked`,
+   `failed`, or an adw-build §3 progress condition or backstop. That default is the owner's to take.
+   A run that re-runs itself after its own backstop has defeated the backstop. In 2026-10-02..10-21,
+   where the outcome of such a choice was clear, the owner took the recommendation or delegated it 29
+   times of 34: "when you recommend to accept, just do it and tell me in the end … if you stop the
+   pipe is worse".
 5. **Depth renders as its §3 word** — `express` / `spec` / `plan` / `design` — on every
    surface and in every `note` line. A `shape: port` unit renders as `port` instead of `spec`.
    `D<N>` is the contract's code and the spec header's
