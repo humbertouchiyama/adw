@@ -381,7 +381,18 @@ already holds the base run hands it in as `known baseline red: <gate> — <faili
 machine line ends `· ⚠ baseline red: <gate>`. Any other id, or a base run that fails to install or
 build → the row stays red and blocks.
 
-Remove `$VWT` (`git worktree remove --force`) as soon as its verdict is recorded.
+Remove `$VWT` as soon as its verdict is recorded: put the gate files back, then remove it **without
+`--force`**.
+
+```bash
+git -C "$VWT" checkout HEAD -- <every repo-profile §7 file>   # undo §4.3's restore from base
+git worktree remove "$VWT"
+```
+
+The owner's settings deny `git worktree remove --force` in every repo. 74 of 81 worktree-removal
+denials in 2026-10-02..10-21 were the `--force` form. Ignored build output does not block a plain
+remove; only tracked changes do, and the gate-file restore is the one tracked change this section
+makes. A plain remove that still fails is `CLEANUP INCOMPLETE` (§8). Never retry it with `--force`.
 
 ### §5 Review evidence — fetched, never asserted
 
