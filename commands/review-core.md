@@ -87,13 +87,14 @@ Two properties hold in every repo, whatever `repo-profile §4` declares:
 
 ```bash
 if [ -z "$(git -C "$WT" status --porcelain)" ]; then
-  git worktree remove "$WT" --force
+  git worktree remove "$WT"
 else
   echo "WARN: $WT has uncommitted changes; not removing. Inspect manually."
 fi
 ```
 
-Removal failure → warn in terminal, don't block. **File mode: nothing to clean up.**
+Removal failure → warn in terminal, don't block. Never add `--force`: a clean tree does not need it,
+and the owner's settings deny it. **File mode: nothing to clean up.**
 
 ---
 
