@@ -180,7 +180,8 @@ split of one is a legitimate outcome, which is why the command is `init`, not `s
 **Grill first, only when needed** (adw-init Phase 0.7). A cheap pre-pass lists the questions only
 the owner can answer and that a reasonable owner could answer against the default. None → silent.
 Some → at most two rounds of numbered questions, each with a default, before triage. The answers
-feed triage and every unit author. The same ask rule governs the gate's decide pass. The handoff's
+feed triage and every unit author. The same ask rule governs the gate's decide pass and, since
+2026-10-22, every later question of the run (§6.1 rule 4). The handoff's
 `asks` line measures it: over 96 gates, 42% came back as "critically decide" or "didn't understand" before this rule.
 
 `/adw-init` then runs **one cheap triage agent** over the intent and prints a proposal:
@@ -872,7 +873,8 @@ of N.
 Every human touchpoint above arrives through one of four surfaces (or the interactive grill round, §3.2). Their shape is a
 contract, not a style preference — the owner's recorded feedback
 (`memory/feedback_review_output_structure.md`) is that report-shape rules enforced by
-prose failed twice and held only once made structural. Three rules:
+prose failed twice and held only once made structural. Five rules (adw-core §7 holds the
+current text):
 
 1. **Every surface has a directive slot** — the single action to take now. Asynchronous
    surfaces (run reports, PR bodies) open with a `Next:` first line; interactive prompts
@@ -882,6 +884,11 @@ prose failed twice and held only once made structural. Three rules:
 3. **Decisions read plainly.** Anything asked of the owner is one sentence a non-engineer
    can act on, recommended default stated first. Engineering detail lives one level down
    (the spec, a `<details>` fold), never in the decision line.
+4. **The ask rule binds every question**, mid-build and after the run report too (§3.2). A
+   question it would decide is decided and reported in one line. Merges, `base:` and the
+   `default:` after a stop still wait for the owner.
+5. **Depth renders as its word** (`express` / `spec` / `plan` / `design`, or `port`), never as
+   `D<N>`.
 
 **S1 — approval surface** (`/adw-init`, interactive): §3.2's format. The closing verb menu
 is the directive slot: `approve · re-cut "…" · regroup "…" · depth "…"`.

@@ -381,7 +381,24 @@ already holds the base run hands it in as `known baseline red: <gate> — <faili
 machine line ends `· ⚠ baseline red: <gate>`. Any other id, or a base run that fails to install or
 build → the row stays red and blocks.
 
-Remove `$VWT` (`git worktree remove --force`) as soon as its verdict is recorded.
+Remove `$VWT` as soon as its verdict is recorded: return it to a clean checkout, then remove it
+**without `--force`**.
+
+```bash
+V="<the VWT literal>"   # §1: a literal, never a variable from an earlier Bash call
+case "$V" in */pr-ready-*) ;; *) echo "not a verify worktree: $V"; exit 1 ;; esac
+git -C "$V" reset -q --hard HEAD && git -C "$V" clean -fdq   # drop the gate-file restore and gate output
+git worktree remove "$V"
+```
+
+The owner's settings deny `git worktree remove --force` in every repo. 74 of 81 worktree-removal
+denials in 2026-10-02..10-21 were the `--force` form. A plain remove refuses any tracked change
+(the gate-file restore, a staged gate file the PR deleted, a lockfile provisioning rewrote) and any
+untracked file that is not ignored (a gate's output, a symlinked `node_modules`). `reset --hard` and
+`clean -fd` clear both; ignored build output does not block the remove, so no `-x`. The `case` guard
+comes first because `git -C ""` runs in the current directory: with an empty `V` the reset would
+hit the main checkout. A remove that still fails is `CLEANUP INCOMPLETE` (§8). Never retry it with
+`--force`.
 
 ### §5 Review evidence — fetched, never asserted
 

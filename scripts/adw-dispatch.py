@@ -131,6 +131,8 @@ def cmd_launch(a):
     beside = a.beside or os.environ.get("HERDR_PANE_ID")
     if not beside:
         die("HERDR_PANE_ID is not set and --beside was not given")
+    # The child starts in the repo, not in this cwd: a relative path would not resolve there.
+    a.brief, a.repo_path = os.path.abspath(a.brief), os.path.abspath(a.repo_path)
     if not os.path.isfile(a.brief):
         die(f"brief not found: {a.brief}")
     if not os.path.isdir(a.repo_path):

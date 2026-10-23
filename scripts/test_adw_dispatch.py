@@ -109,6 +109,24 @@ class Launch(Base):
         self.assertEqual(
             run[3], f"claude --model sonnet 'Read {self.brief} in full, then execute it.'")
 
+    def test_relative_brief_and_repo_reach_the_child_as_absolute_paths(self):
+        # The child starts in the repo, not in the caller's cwd: `Read briefs/<x>.md` left one
+        # child idle 17 h (2026-10-19).
+        r = subprocess.run(
+            [sys.executable, SCRIPT, "launch", "--name", "fix-sse",
+             "--repo-path", os.path.relpath(self.repo, self.tmp),
+             "--brief", os.path.basename(self.brief), "--model", "sonnet", "--from", "caller@adw",
+             "--task", "adw", "--reply", "none", "--timeout-ms", "10"],
+            capture_output=True, text=True, env=self.env, cwd=self.tmp)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        brief, repo = os.path.realpath(self.brief), os.path.realpath(self.repo)
+        calls = self.calls()
+        split = [c for c in calls if c[:2] == ["pane", "split"]][0]
+        self.assertEqual(os.path.realpath(split[split.index("--cwd") + 1]), repo)
+        run = [c for c in calls if c[:2] == ["pane", "run"]][0]
+        self.assertIn(f"Read {brief} in full", run[3])
+        self.assertEqual(self.rows()[0]["brief"], brief)
+
     def test_writes_one_dispatched_row(self):
         self.launch()
         rows = self.rows()

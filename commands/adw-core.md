@@ -373,7 +373,7 @@ and appeared in three files' cross-references:
 | **run report** | `/adw-build` exit | S3 |
 | **PR body** | a `blocked`/`failed` sub-PR | S4 |
 
-Three rules (owner feedback, structural after prose failed twice):
+Five rules (owner feedback, structural after prose failed twice):
 1. Every surface has a **directive slot** — async surfaces open with a `Next:` first line;
    interactive prompts end on the verb menu at the cursor.
 2. **The report is the whole message.** No narration before or after. Each fenced template below
@@ -387,7 +387,18 @@ Three rules (owner feedback, structural after prose failed twice):
    `Q13`, "the seat-now line": the same sentence says what it is. This binds every question a run
    asks, the ones outside these four surfaces included. 17 owner replies in twelve days were a
    form of "what is this?" (2026-09-20 to 10-01).
-4. **Depth renders as its §3 word** — `express` / `spec` / `plan` / `design` — on every
+4. **The ask rule binds every question as well** (adw-init Phase 0.7): mid-build, on the run report,
+   and in the chat after it. A question that fails the rule is not asked. Decide it, act on it, and
+   say what you decided in one line, so the owner can reverse it: a `note` row on the run report, or
+   one line in the chat after it. This includes "say `rerun` and I start" and "C1 or C2?" with a
+   recommendation a reasonable owner would not reject. Three things still wait for the owner: a merge
+   (§6), the `base:` branch (adw-init Phase 0.7), and the `default:` printed after a stop: `blocked`,
+   `failed`, or an adw-build §3 progress condition or backstop. That default is the owner's to take.
+   A run that re-runs itself after its own backstop has defeated the backstop. In 2026-10-02..10-21,
+   where the outcome of such a choice was clear, the owner took the recommendation or delegated it 29
+   times of 34: "when you recommend to accept, just do it and tell me in the end … if you stop the
+   pipe is worse".
+5. **Depth renders as its §3 word** — `express` / `spec` / `plan` / `design` — on every
    surface and in every `note` line. A `shape: port` unit renders as `port` instead of `spec`.
    `D<N>` is the contract's code and the spec header's
    value; it is never printed to a human.
