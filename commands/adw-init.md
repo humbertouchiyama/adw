@@ -211,7 +211,7 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    and §20's port surface instead). A single-unit intent meeting every D1
 >    criterion is proposed `express` (D0) when D0 is active (adw-core §3 status line) —
 >    then include the draft
->    flat spec (header + body per adw-core §2) in the proposal itself; its code
+>    flat spec (header + body per adw-core §2, its acceptance criteria numbered `AC 1`, `AC 2`, …) in the proposal itself; its code
 >    snippets follow the repo comment rule (`repo-profile §2`): one terse line + spec ref,
 >    never a multi-line rationale comment (D0 skips the fan-out, so this is the
 >    draft's only exposure to that rule);

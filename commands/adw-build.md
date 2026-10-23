@@ -927,7 +927,8 @@ semantic-conflict risk.
   In the body, drop this file's two-space indent: the `##` and `###` headings and the closing
   `<!-- /smoke -->` line start at column 0, because §3.8 finds the cases by them and stops at that
   line, so a section that is the last one in the body does not take the tables and the evidence block
-  after it. Every acceptance criterion that only a look at the running
+  after it. The marker closes the whole section once, after the last case, never after each case;
+  on a final PR it follows the last renumbered case, and a unit's own marker is dropped. Every acceptance criterion that only a look at the running
   app can check (it names a simulator, a device or a manual check, or says no gate covers it) has a
   case. **A case whose rule holds on more
   than one screen ends with a step that repeats the check on each of them, by name**
@@ -1188,11 +1189,15 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
    ```bash
    D="$(mktemp -d)"; gh pr view <N> --json body --jq .body | awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && (/^## / || /^<!-- \/smoke -->/) {exit} f' > "$D/cases.md"; echo "$D"
    ```
-   Then it runs §21's Cases check on `<D>/cases.md`. A non-zero exit → return `smoke not run —
-   cases: <the check's message>` and stop. Before it launches anything it also checks §21's
-   Launch, Wait test, Result, Evidence, Audit and Abandon rows: a row that is missing or empty, or a
-   Max minutes that is not a whole number → return `smoke not run — §21 <row> is empty` and stop.
-   Nothing has launched, so there is nothing to abandon.
+   Before it runs anything from §21, it checks §21's Cases check, Devices, Launch, Driver probe, Wait
+   test, Result, Evidence, Audit, Max minutes and Abandon rows: a row that is missing or empty →
+   return `smoke not run — §21 <row> is empty` and stop; a Max minutes that is not a whole number →
+   return `smoke not run — §21 Max minutes is not a whole number` and stop. Nothing has launched, so
+   there is nothing to abandon. Then it compares the case counts:
+   `grep -c '^### AC-' "<D>/cases.md"` must equal the same `grep -c` on the whole body
+   (`gh pr view <N> --json body --jq .body`); unequal → return `smoke not run — cases: the section
+   is cut short` and stop. Then it runs §21's Cases check on `<D>/cases.md`. A non-zero exit →
+   return `smoke not run — cases: <the check's message>` and stop.
 3. Prints `date +%s` once and keeps the value as `<start>`. Then starts §21's Launch with `<N>`,
    `$VSHA`, `<D>/cases.md`, and the devices §21's Devices row derives from the cases' `Device`
    lines, and keeps every value §21's Wait test, Result, Evidence, Audit and Abandon rows name, as literals. A
@@ -1209,10 +1214,11 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
    printed>`.
    `<test>` is §21's Wait test and `<n>` its Max minutes, both written in:
    ```bash
-   lim=$(( <start> + <n> * 60 )); end=$(( $(date +%s) + 270 )); [ "$end" -gt "$lim" ] && end=$lim; until { <test>; } || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; if { <test>; }; then echo done; elif [ "$(date +%s)" -ge "$lim" ]; then echo DEADLINE; else echo running; fi
+   lim=$(( <start> + <n> * 60 )); end=$(( $(date +%s) + 270 )); [ "$end" -gt "$lim" ] && end=$lim; until { <test>; } >/dev/null 2>&1 || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; if { <test>; } >/dev/null 2>&1; then echo done; elif [ "$(date +%s)" -ge "$lim" ]; then echo DEADLINE; else echo running; fi
    ```
    This is `review-core.md` §10's wait with §21's test in place of the file count, and the same
-   270 s per call. The braces keep a test that holds `&&` or `||` in one piece. Paste §21's test
+   270 s per call. The braces keep a test that holds `&&` or `||` in one piece, and only its exit status counts: a test
+   that prints would otherwise turn `running` into another word and Abandon a healthy walk. Paste §21's test
    unchanged, a lock clause included: it reads a lock the runner itself takes and releases, which
    Phase 1's ban on lock files and wait-for-lock loops (locks a run writes to order its own agents)
    does not reach. Without that clause the wait ends before the runner lets go of its devices. On `DEADLINE`, it
@@ -1286,7 +1292,8 @@ section and the evidence row before anything moves the head (smoke fix cycle ste
   PR replaces the section, never adds one, and keeps every `fixed:` line.
 - **Evidence block:** the `smoke` row (§3.4), counted from the rows by §21's Result row.
 - **Run-report PR line:** the last walk has no defect rows, no gap rows, Audit `0`, no `not
-  runnable` line, and `<passed>` equal to `<total>` → `· smoke clean` after `review clean`.
+  runnable` line, and `<passed>` equal to `<total>` → `· smoke clean` after `review clean` (a `blocked` line has none:
+  after its default).
   Otherwise one trailing flag, the first that applies: `· ⚠ smoke not runnable: <reason>`,
   `· ⚠ smoke not run — <reason>`, `· ⚠ smoke unaudited — <failing check>`, or `· ⚠ smoke: <d>
   defects (<b> blocking, <v> valid), <g> gaps, cases <passed>/<total>`. Either form ends
@@ -1337,7 +1344,9 @@ not red). One cycle:
    cycle's pushed head takes Phase 4's rule for an answer commit that changes code, once per cycle,
    on an independent PR too: 3.4 verify at the new head with the next `PASS` id, then 3.6's review,
    with fresh review-cycle and boundary counters. §3.7 then decides the state again, from that
-   re-pass, and `$VSHA` is the head that re-pass verified (§3.6's assertion). The re-pass's body edits keep the `## Smoke result` section. A PR that was
+   re-pass, and `$VSHA` is the head that re-pass verified (§3.6's assertion). The re-pass's body edits keep the `## Smoke result` section. When the re-pass ends `failed` or with
+   no verified head, no walk follows and the bound may not fire: write the cycle's `fixed: …,
+   unconfirmed` lines and replace its `running` line then. A PR that was
    `blocked` before the cycle stays `blocked`, with its earlier reason and label, whatever the
    re-pass returns; a reason the re-pass adds goes below it. The cycle fixed a screen, not the
    question that blocked the PR. Then the next walk, when this
