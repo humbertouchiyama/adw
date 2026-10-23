@@ -548,10 +548,15 @@ practice, not a concession to a clock. Baseline-red is the one exception (§4.2'
 gates cannot render native chrome at all. Where `repo-profile §21` declares a runner, every PR the
 human merges (each independent PR, each chain's final PR, never a sub-PR) gets one walk of the
 `## Smoke` cases its body carries, on the verified head, after its state is decided (adw-build
-§3.8). Report only: it adds a flag and a body section and never changes `ready`, because its verdict
-is a model reading a screen and its false-positive rate is still unmeasured. A device the driver can
-read but not tap would pass every case it cannot reach, so a tap probe runs first, and a failed probe
-ends the smoke as `smoke not runnable`, never as a pass.
+§3.8). Its verdict is a model reading a screen, and its false-positive rate is unmeasured, so no
+defect row is fixed on the walk's word: a `model: opus` refuter rebuilds each `blocking` and
+`worth-fixing` row from the evidence, the spec criterion and the code (`review-core.md` §9's pass),
+and only a row that holds up is fixed. A fix is at most two smoke fix cycles, each one gates, a 3.4
+verify, a 3.6 review and another walk; a confirmed defect still there after the second makes the PR
+`blocked`. `polish` and gap rows only report. The `refuted` count on each PR's `smoke` evidence row
+is the false-positive measure the step lacked. A device the driver can read but not tap would pass
+every case it cannot reach, so a tap probe runs first, and a failed probe ends the smoke as `smoke
+not runnable`, never as a pass.
 
 ### 4.3 Environment failures abort; they do not consume cycles
 
@@ -822,7 +827,7 @@ aggregate cannot tell them apart, the script reports `no data`, never `0`.
 | **Fabricated `verify`** — `tsc`/`grep` forms | **Human.** The mutation check is diff-scoped and re-runs *the test files the unit touched*; a rename or deletion touches none, so there is nothing to re-run. These are exactly the forms §3.4 added to represent #731/#756 — the coverage extension and its verification mechanism are disjoint at the cases that motivated the extension |
 | Composition bugs across units in one sub-PR | System — gates run on the composition |
 | Composition bugs across sub-PRs in a chain | System — the final PR runs the full loop on the whole chain (§4.1) |
-| Wrong placement, a missing control, a screen unlike its siblings — the running app, which no gate renders | System, **report only**: the app smoke (§4.2, adw-build §3.8) where `repo-profile §21` declares a runner; else **Human** |
+| Wrong placement, a missing control, a screen unlike its siblings — the running app, which no gate renders | System: the app smoke (§4.2, adw-build §3.8) where `repo-profile §21` declares a runner — it fixes a defect its refuter confirms and blocks on one two fix cycles did not clear; else **Human** |
 | Hard unit silently omitted | **Human**, at the §3.2 gate, and only because the surface prints uncovered spec criteria |
 | Mis-cut units, wrong depth | **Human**, at the §3.2 gate — the reason the gate precedes the fan-out |
 | **Correlated blind spot** | **Nobody. Irreducible.** |

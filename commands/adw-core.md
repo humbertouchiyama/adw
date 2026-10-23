@@ -607,8 +607,9 @@ annotations (e.g. `· ⚠ no trustworthy gate sees this unit`, `· ⚠ baseline 
 landed `blocked` by a carry adds one line per carried sub-PR, `carried #<n> <unit> — <reason>;
 default: <default>` (adw-build Phase 4); every user-visible PR body carries a `## Smoke` section
 of cases (adw-build §3.5); an independent or final PR in a repo whose profile has a §21 adds
-`· smoke clean` after `review clean`, or one `· ⚠ smoke …` flag (adw-build §3.8), and its state
-does not change for it; the `note` row carries
+`· smoke clean` after `review clean`, or one `· ⚠ smoke …` flag, either one ending `· fixed <f>`
+when smoke fix cycles fixed rows (adw-build §3.8): a smoke defect that its refuter confirms is
+fixed, and one still there after two smoke fix cycles puts the PR on the `blocked` row; the `note` row carries
 run-level caveats (non-default `base:`, extend-mode's prior-unit summary, a
 `· ⚠ mutation per-file <covered>/<total>` ratio). The first `note` line is
 unconditional: `note  contract <short-sha>` — the commit the loaded contract came from:
@@ -798,10 +799,10 @@ important the unit is:
 | The agent's job | Tier |
 |---|---|
 | **Find** — refute, review, audit, scan, check against a doc, run a fixed checklist | `sonnet` |
-| **Clear a `Blocking`** — grade whether an earlier finding still holds at the head (`pr-ready.md` §5), the refutation step of `review-core.md` §9 | `opus` — takes precedence over the Find row |
+| **Clear a `Blocking`** — grade whether an earlier finding still holds at the head (`pr-ready.md` §5), the refutation step of `review-core.md` §9, the check of the app smoke's defect rows (adw-build §3.8) | `opus` — takes precedence over the Find row |
 | **Re-execute and relay** — run gates, report exit codes and output tails, verify, relay the app smoke (adw-build §3.8) | `sonnet` |
 | **Look up** — read a file or a history and answer a bounded question | `haiku` |
-| **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file | `sonnet` |
+| **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file; the app smoke's fix agent (adw-build §3.8) is one | `sonnet` |
 | **Author** — write a spec, a plan, or production code | **keyed on the unit's `depth:`** — `opus` at D3, `sonnet` at D0–D2 |
 | **Decide** — settle each gate question or hand it to the owner (`adw-init.md` Phase 2) | `opus`; `sonnet` when every unit is D0–D1. A wrong `decided` builds unseen |
 | **Drive** — run `/pr-ready <N> apply` end to end for one PR (tier, review cycles, the post-review re-pass, evidence, verdict, cleanup) and return its machine line | `sonnet` |
