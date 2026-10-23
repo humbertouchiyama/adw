@@ -922,9 +922,12 @@ semantic-conflict risk.
     1. <action>
   - **Expected**:
     1. <result of step 1>
+  <!-- /smoke -->
   ```
-  In the body, drop this file's two-space indent: the `##` and `###` headings start at column 0,
-  because §3.8 finds the cases by them. Every acceptance criterion that only a look at the running
+  In the body, drop this file's two-space indent: the `##` and `###` headings and the closing
+  `<!-- /smoke -->` line start at column 0, because §3.8 finds the cases by them and stops at that
+  line, so a section that is the last one in the body does not take the tables and the evidence block
+  after it. Every acceptance criterion that only a look at the running
   app can check (it names a simulator, a device or a manual check, or says no gate covers it) has a
   case. **A case whose rule holds on more
   than one screen ends with a step that repeats the check on each of them, by name**
@@ -1183,13 +1186,16 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
 2. Extracts the cases, in one Bash call that prints the directory, and copies that path as a literal
    into every later call:
    ```bash
-   D="$(mktemp -d)"; gh pr view <N> --json body --jq .body | awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && /^## / {exit} f' > "$D/cases.md"; echo "$D"
+   D="$(mktemp -d)"; gh pr view <N> --json body --jq .body | awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && (/^## / || /^<!-- \/smoke -->/) {exit} f' > "$D/cases.md"; echo "$D"
    ```
    Then it runs §21's Cases check on `<D>/cases.md`. A non-zero exit → return `smoke not run —
-   cases: <the check's message>` and stop.
+   cases: <the check's message>` and stop. Before it launches anything it also checks §21's
+   Launch, Wait test, Result, Evidence, Audit and Abandon rows: a row that is missing or empty, or a
+   Max minutes that is not a whole number → return `smoke not run — §21 <row> is empty` and stop.
+   Nothing has launched, so there is nothing to abandon.
 3. Prints `date +%s` once and keeps the value as `<start>`. Then starts §21's Launch with `<N>`,
    `$VSHA`, `<D>/cases.md`, and the devices §21's Devices row derives from the cases' `Device`
-   lines, and keeps every value §21's Wait test, Result, Audit and Abandon rows name, as literals. A
+   lines, and keeps every value §21's Wait test, Result, Evidence, Audit and Abandon rows name, as literals. A
    launch that stops before the runner runs (its lock is held, its stack will not come up, the
    build fails, a Bash call of it is cut off at the 600000 ms limit) → run §21's Abandon, then
    return `smoke not run — <the runner's own reason>`, with what Abandon printed, and stop. A
@@ -1197,7 +1203,10 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
    would find them. §21's Driver probe
    runs on each device at the point §21's Launch row names, before the walk; a non-zero exit →
    run §21's Abandon, return `smoke not runnable: <device> — <the probe's failing line>` and stop.
-4. Waits, in one Bash call with `timeout: 600000`, re-issued until it prints `done` or `DEADLINE`.
+4. Waits, in one Bash call with `timeout: 600000`, re-issued only while it prints `running`. A call
+   that prints anything else but `done` or `DEADLINE` (nothing, an error, a cut at the 600000 ms
+   limit) is not re-issued: run §21's Abandon and return `smoke not run — the wait failed: <what it
+   printed>`.
    `<test>` is §21's Wait test and `<n>` its Max minutes, both written in:
    ```bash
    lim=$(( <start> + <n> * 60 )); end=$(( $(date +%s) + 270 )); [ "$end" -gt "$lim" ] && end=$lim; until { <test>; } || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; if { <test>; }; then echo done; elif [ "$(date +%s)" -ge "$lim" ]; then echo DEADLINE; else echo running; fi
@@ -1208,7 +1217,8 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
    Phase 1's ban on lock files and wait-for-lock loops (locks a run writes to order its own agents)
    does not reach. Without that clause the wait ends before the runner lets go of its devices. On `DEADLINE`, it
    runs §21's Abandon and returns `smoke not run — exceeded <n> min`, with what Abandon printed.
-5. Runs §21's Audit, then returns this and nothing else: the Result file's path; its verdict line;
+5. Runs §21's Audit, then returns this and nothing else: the Result file's path; the directory §21's Evidence row's
+   image paths are relative to; its verdict line;
    every row of its table, verbatim; the Audit's exit code and its failing lines; the case count as
    `<passed>/<total>`, `<passed>` counted as §21's Result row says and `<total>` the number of ids
    step 2's check printed; and the minutes from `<start>` to `done`. When §21's Result row says the
@@ -1239,7 +1249,7 @@ than 4. Its brief is §9's quoted prompt block, not §9's dispatch rules, with f
   `gh pr view <N> --json body --jq .body`."
 - The claims are the rows to check, one per line, each as the relay returned it:
   `POSITIVE | <row id> | <the row>`. Add `$VSHA` in full, `<N>`, the Result path, `repo-profile
-  §21`'s Evidence row pasted, and the spec path of every unit in the PR. Nothing else from the
+  §21`'s Evidence row pasted, the evidence directory the relay returned, and the spec path of every unit in the PR. Nothing else from the
   relay's return.
 - The chain to rebuild for a row has three links. (1) The evidence §21's Evidence row locates for
   it shows the state the row states: open each image with the Read tool and judge from it. A row
@@ -1313,19 +1323,21 @@ not red). One cycle:
 4. A red goes to §3.3's classifier. A genuine red goes back to the same agent once, by SendMessage;
    its fix is one more `smoke-fix-<c>:` commit, then the gates again. A second red, or an
    environment fault: nothing is pushed, and the PR is `blocked` by the bound below, with `smoke fix
-   red: <gate>; its commits are on smoke-red/<head branch>-<c>`. Move them off the head branch
+   red: <gate>; its commits are on smoke-red/<head branch>-<sha7>-<c>`. Move them off the head branch
    first, in one Bash call, so that no later push from this worktree (Phase 4's answer commit is
    one) carries them:
    ```bash
-   git -C "<worktree>" branch "smoke-red/<head branch>-<c>" && git -C "<worktree>" reset --keep <VSHA> && [ "$(git -C "<worktree>" rev-parse HEAD)" = "<VSHA>" ]
+   git -C "<worktree>" branch "smoke-red/<head branch>-<sha7>-<c>" && git -C "<worktree>" reset --keep <VSHA> && [ "$(git -C "<worktree>" rev-parse HEAD)" = "<VSHA>" ]
    ```
+   `<sha7>` is `$VSHA`'s first seven characters: a final PR restarts `<c>` at 1 on each code-changing
+   owner reply, and each reply's head is a new `$VSHA`, so the name is new each time.
    `--keep`, not `--hard`: it refuses, rather than discards, an uncommitted edit. A non-zero exit
    adds `; <worktree> is not back at <sha7>` to the reason.
 5. After the push, `ready` no longer holds: a code commit voids it (`/pr-ready` §6). So the
    cycle's pushed head takes Phase 4's rule for an answer commit that changes code, once per cycle,
    on an independent PR too: 3.4 verify at the new head with the next `PASS` id, then 3.6's review,
    with fresh review-cycle and boundary counters. §3.7 then decides the state again, from that
-   re-pass, and `$VSHA` is the head that re-pass verified (§3.6's assertion). A PR that was
+   re-pass, and `$VSHA` is the head that re-pass verified (§3.6's assertion). The re-pass's body edits keep the `## Smoke result` section. A PR that was
    `blocked` before the cycle stays `blocked`, with its earlier reason and label, whatever the
    re-pass returns; a reason the re-pass adds goes below it. The cycle fixed a screen, not the
    question that blocked the PR. Then the next walk, when this
@@ -1338,7 +1350,9 @@ is gate-green and reviewed, and a person must look at the screen. The reason is 
 defects — <the first row's id and claim>` (plus the step 2 or step 4 text when that applies), with
 `default: fix them on <head branch>, then re-run /pr-ready <N>`. A PR already `blocked` keeps its
 own reason and adds this one as a second line. The body write that records the bound replaces the
-`smoke fix cycle <c> running` line, since the head did not move. A PR the bound turns from `ready`
+`smoke fix cycle <c> running` line, since the head did not move, and writes the `fixed: …,
+unconfirmed` line of every row a pushed cycle fixed: when the re-pass ended `failed` or with no
+verified head, no walk follows to write it. A PR the bound turns from `ready`
 to `blocked` gets §3.7's label, checked as §3.7 checks it, and its body re-laid in the `blocked`
 layout (§3.4, §3.5): the reason line and its default first, `## Smoke result` right after it, and
 the per-gate table and evidence block inside the `<details>` fold.
