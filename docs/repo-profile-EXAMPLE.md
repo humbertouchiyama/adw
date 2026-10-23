@@ -38,7 +38,7 @@ optional §19, §20 and §21 where a profile carries them. Do not renumber. Add 
 | §15 | Review emphasis + Blocking severity classes | code-review Phase 4, review-core §9 |
 | §16 | Project rule tables | code-review Phase 5.2, 5.3 |
 | §17 | Convention doc routing | code-review Phase 6.2 |
-| §18 | Disposable state | cleanup Phase 3, 5 |
+| §18 | Disposable state | cleanup Phase 3, 5; adw-build Phase 5 (`Provisioned files`) |
 | §19 | Review-lane map, layer to angle (optional; absent → derived) | code-review lane table |
 | §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2/§3.3/§3.4/§3.6 |
 | §21 | App smoke (optional; absent → no smoke) | adw-build §3.5/§3.8, adw-core §7 |
@@ -578,7 +578,7 @@ Rules with no check, and why (a new rule lands here or in the table, never in ne
 ## §18 — Disposable state
 
 Read by `/cleanup` Phase 3. Everything a session can leave behind **besides** worktrees and
-branches, which `/cleanup` handles on its own.
+branches, which `/cleanup` handles on its own. adw-build Phase 5 reads the one line below.
 
 **Provisioned files:** none. Read by adw-build Phase 5, which passes each path to its cleanup
 script as `--provisioned`. A tracked file that §4's provisioning rewrites in every worktree (a

@@ -670,8 +670,9 @@ next run's analysis needs:
 
 One more `note` line is unconditional: **`note run-clean: …`**, the last line of adw-build
 Phase 5's cleanup script, verbatim, and after it one `note kept …` line per item the script kept.
-A kept item is disk this run did not free, with the reason it would not: the owner frees it by
-hand or with `/cleanup`.
+A kept item is disk this run did not free, with the reason it would not. The owner frees it by
+hand: `/cleanup` skips a dirty or unpushed worktree too. A non-zero exit prints
+`note run-clean failed — <the script's last line>` instead.
 
 Nothing else is printed.
 

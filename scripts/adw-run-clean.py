@@ -5,7 +5,7 @@ The run names everything it creates after its slug, so the slug is the whole sco
 
   adw-<slug>-uNN[+uMM]           unit worktree           adw-build Phase 2
   adw-close-<slug>               chain close worktree    adw-build Phase 4
-  pr-ready-<slug>[-…]-v<k>       verify worktree         pr-ready §4.3
+  pr-ready-<slug>-uNN|close-v<k> verify worktree         pr-ready §4.3, REF from adw-build §3.4
   pr-<N>                         review worktree         review-core §1.1, one per --pr
   Xcode DerivedData whose WorkspacePath is inside one of those worktrees, once it is gone
 
@@ -42,7 +42,7 @@ def scope(slug, prs):
     out = [
         ("unit", re.compile(rf"^adw-{s}-{units}$"), lambda n: "adw/" + n[len("adw-"):]),
         ("close", re.compile(rf"^adw-close-{s}$"), lambda n: f"adw/{slug}"),
-        ("verify", re.compile(rf"^pr-ready-{s}(?:-{units}|-close)?-v\d+$"), None),
+        ("verify", re.compile(rf"^pr-ready-{s}-(?:{units}|close)-v\d+$"), None),
     ]
     for n in prs:
         out.append(("review", re.compile(rf"^pr-{n}$"), None))
@@ -229,9 +229,9 @@ def clean_derived_data(main, kinds, dd, dry, procs, gone):
 
     `gone` names the worktrees a dry run would have removed, so the dry run lists their DerivedData too."""
     root = os.path.join(main, ".claude", "worktrees") + "/"
-    done, done_kb = [], 0
+    done, kept, done_kb = [], [], 0
     if not os.path.isdir(dd):
-        return done, done_kb
+        return done, kept, done_kb
     for d in sorted(os.listdir(dd)):
         full = os.path.join(dd, d)
         if not DD_NAME.match(d) or os.path.islink(full) or not os.path.isdir(full):
@@ -247,18 +247,20 @@ def clean_derived_data(main, kinds, dd, dry, procs, gone):
         if not kind_of(name, kinds)[0] or (os.path.exists(root + name) and name not in gone):
             continue
         if busy(full, procs) or busy(wp, procs):
+            kept.append(d)
             print(f"kept     {d}  a process uses it ({name})")
             continue
         kb = size_kb(full)
         if not dry:
             shutil.rmtree(full, ignore_errors=True)
             if os.path.exists(full):
+                kept.append(d)
                 print(f"kept     {d}  delete failed ({name})")
                 continue
         done.append(d)
         done_kb += kb
         print(f"{'would delete' if dry else 'deleted '}  {d}  {gb(kb)}  (DerivedData of {name})")
-    return done, done_kb
+    return done, kept, done_kb
 
 
 def main():
@@ -286,10 +288,10 @@ def main():
     procs = processes()
     wt, kept, wt_kb = clean_worktrees(main_dir, kinds, set(a.provisioned), a.dry_run, procs, here)
     gone = set(wt) if a.dry_run else set()
-    dd, dd_kb = clean_derived_data(main_dir, kinds, a.derived_data, a.dry_run, procs, gone)
+    dd, dd_kept, dd_kb = clean_derived_data(main_dir, kinds, a.derived_data, a.dry_run, procs, gone)
     verb = "would free" if a.dry_run else "freed"
     print(f"run-clean{' (dry run)' if a.dry_run else ''}: {len(wt)} worktrees, {len(dd)} DerivedData dirs, "
-          f"{verb} {gb(wt_kb + dd_kb)}; kept {len(kept)}")
+          f"{verb} {gb(wt_kb + dd_kb)}; kept {len(kept) + len(dd_kept)}")
 
 
 if __name__ == "__main__":

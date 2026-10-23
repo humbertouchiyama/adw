@@ -134,10 +134,22 @@ class Scope(Base):
 
     def test_verify_worktree_is_reset_then_removed(self):
         wt = self.worktree("pr-ready-foo-u1-v2", detach=True)
+        self.worktree("pr-ready-foo-close-v1", detach=True)
         self.write(wt, "iosApp/Podfile.lock", "COCOAPODS: 1.16.2\n")   # a gate-file restore, a lockfile rewrite
         self.write(wt, "gate-output.log", "x")                        # untracked gate output
         rc, out = self.run_clean("--slug", "foo")
         self.assertNotIn("pr-ready-foo-u1-v2", self.registered(), out)
+        self.assertNotIn("pr-ready-foo-close-v1", self.registered(), out)
+
+    def test_verify_names_of_other_intents_are_not_matched(self):
+        # slug foo must not reach intent foo-u2's or foo-close's verify worktrees, nor an improvised name
+        names = ["pr-ready-foo-u2-close-v1", "pr-ready-foo-close-u1-v1", "pr-ready-foo-v1",
+                 "pr-ready-foo-final-v1", "pr-ready-42-v1"]
+        for n in names:
+            self.worktree(n, detach=True)
+        rc, out = self.run_clean("--slug", "foo", "--pr", "42")
+        for n in names:
+            self.assertIn(n, self.registered(), out)
 
     def test_branch_that_does_not_match_the_name_is_kept(self):
         self.worktree("adw-foo-u1", "something-else")
@@ -272,6 +284,17 @@ class DerivedData(Base):
         self.assertIn("would remove  adw-foo-u1", out)
         self.assertIn("would delete", out)
         self.assertIn("(dry run): 1 worktrees, 1 DerivedData dirs", out)
+
+    def test_a_kept_derived_data_dir_is_counted(self):
+        wt = self.worktree("adw-foo-u1", "adw/foo-u1")
+        d = self.derived(os.path.join(wt, "iosApp/iosApp.xcworkspace"))
+        sleeper = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", d + "/Build"])
+        self.addCleanup(sleeper.wait)
+        self.addCleanup(sleeper.kill)
+        time.sleep(0.3)
+        rc, out = self.run_clean("--slug", "foo")
+        self.assertTrue(os.path.exists(d), out)
+        self.assertIn("kept 1", out)
 
     def test_symlinked_or_unreadable_derived_data_is_left(self):
         wt = self.worktree("adw-foo-u1", "adw/foo-u1")

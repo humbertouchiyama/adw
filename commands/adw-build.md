@@ -769,9 +769,11 @@ pipeline knows:
   why `/pr-ready` takes `BASE` as an override rather than always deriving it from
   `baseRefName`.
 - **`PASS`** — `v1`, `v2` for the post-review re-pass, `v3+` for a void re-pass (3.6).
-- **`REF`** — `<slug>-uNN` (grouped: `<slug>-uNN+uMM`). This pass runs BEFORE 3.5 opens the
+- **`REF`** — `<slug>-uNN` (grouped: `<slug>-uNN+uMM`); for a chain's final PR (Phase 4),
+  `<slug>-close`. This pass runs BEFORE 3.5 opens the
   PR, so `/pr-ready` §1's default `<N>` does not exist yet; §4.3 names the worktree and §8
-  sweeps it, both off `$REF`. Pass the same value to every `PASS` of the same unit.
+  sweeps it, both off `$REF`. Pass the same value to every `PASS` of the same unit. Phase 5's
+  cleanup finds a verify worktree, and its DerivedData, only by these two shapes.
 - **The mutation check.** The verifier's report must ALSO carry §3.2's red-then-restored
   pair, plus the per-file iteration where §3.2 makes it mandatory, and for a port unit the mode
   the check ran in (`fast` or `gate`; `gate` means the per-file sweep was skipped). It stays here rather
@@ -1524,8 +1526,8 @@ run actually shows that shape**, else `note  CI red — verify before merge`. #8
 ## Phase 5 — run report
 
 **First, remove what this run left on disk, and nothing else.** A unit worktree holds 1 to 3 GB
-of build output, and every worktree that built an Xcode project leaves a DerivedData directory
-outside it. No step of the run removed either, so they stayed until the owner ran `/cleanup`.
+of build output, and an IDE build can leave a cache directory outside the worktree (Xcode does,
+one per worktree). No step of the run removed either, so they stayed until the owner ran `/cleanup`.
 One Bash call, with the slug, one `--pr` per PR this run opened (the final PR included), and one
 `--provisioned` per path on the `Provisioned files` line of `repo-profile §18` (no line, or
 `none`: no flag):
@@ -1536,14 +1538,16 @@ python3 "$R/.claude/adw/cache/scripts/adw-run-clean.py" --repo "$R" --slug <slug
 ```
 
 The script's scope is the names this run gives what it creates: `adw-<slug>-uNN` (Phase 2),
-`adw-close-<slug>` (Phase 4), `pr-ready-<slug>-…-v<k>` (`/pr-ready` §4.3) and `pr-<N>` for each
-`--pr` (review-core §1.1), plus the Xcode DerivedData of each of them that is gone. It keeps a
+`adw-close-<slug>` (Phase 4), `pr-ready-<slug>-uNN-v<k>` and `pr-ready-<slug>-close-v<k>`
+(§3.4's `REF`, `/pr-ready` §4.3) and `pr-<N>` for each `--pr` (review-core §1.1), plus the build
+cache each of them that is gone left outside itself (the script knows Xcode's DerivedData). It keeps a
 worktree, and prints `kept <name> <why>`, when a process works in it, when its HEAD is on no
 remote ref and is no PR's head, when it is a unit or close worktree whose branch has no PR, or
 when it holds any change but a provisioned file. A verify worktree is reset first, as
 `/pr-ready` §4.3 does. It never uses `--force` and never deletes a branch. Put its last line
-and each `kept` line on the run report as `note` lines, verbatim. Exit 1 → the note is
-`run-clean failed — <its message>`.
+and each `kept` line on the run report as `note` lines, verbatim. Any non-zero exit (1: not a
+git checkout; 2: a bad flag, or `python3` found no script) → the one note is
+`run-clean failed — <the last line it printed>`.
 
 A step after the report that needs a worktree the script removed (Phase 4's answer commit on a
 final PR, the §3.8 smoke fix cycle that follows it) re-creates it first, then provisions it
