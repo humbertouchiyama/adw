@@ -20,6 +20,7 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 | `commands/cleanup.md` | Clear stale worktrees, branches and disposable state. |
 | `commands/adw-dispatch.md` | Hand an intent to a new herdr pane beside the caller, with a brief, a ledger row and an optional one-line reply. |
 | `scripts/adw-dispatch.py` | The mechanics of `adw-dispatch`: pane placement, the reply, the ledger. Run from the fetch cache. |
+| `scripts/adw-run-clean.py` | Removes what one `/adw-build` run left on disk (its worktrees, their Xcode DerivedData) and nothing else. Run from the fetch cache at `adw-build` Phase 5. |
 | `docs/00-design.md` | The design, and a frozen archive of every contract change up to the extraction. |
 | `docs/repo-profile-EXAMPLE.md` | A filled-in `repo-profile.md` from a real repository, to copy and edit. |
 | `install/` | The loader stubs and the fetch script a consuming repo drops in. |

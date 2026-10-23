@@ -580,6 +580,12 @@ Rules with no check, and why (a new rule lands here or in the table, never in ne
 Read by `/cleanup` Phase 3. Everything a session can leave behind **besides** worktrees and
 branches, which `/cleanup` handles on its own.
 
+**Provisioned files:** none. Read by adw-build Phase 5, which passes each path to its cleanup
+script as `--provisioned`. A tracked file that §4's provisioning rewrites in every worktree (a
+lockfile an install step re-stamps) goes here; the script restores it before it removes the
+worktree. Any other change keeps the worktree. Here §4's provisioning leaves `git status` clean
+(it writes only ignored paths), so the line is `none`.
+
 ### 18.1 — Inside the worktree — reclaimed for free
 
 A worktree's Vite/Vitest/tsc caches live in its own `.cache/` (`scripts/cache-dir.ts`, Trello #228),

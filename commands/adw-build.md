@@ -1310,7 +1310,8 @@ not red). One cycle:
 1. The record above is written, with its `smoke fix cycle <c> running` line. A session that dies
    inside the cycle leaves a body that says the head moved past what was verified.
 2. Bring the PR's worktree to `$VSHA`: Phase 2's worktree for an independent PR, Phase 4's close
-   worktree for a final PR. One Bash call, the path and the full sha written out:
+   worktree for a final PR (after Phase 5 removed it, re-create it first, as Phase 5 says). One
+   Bash call, the path and the full sha written out:
    ```bash
    git -C "<worktree>" fetch origin && git -C "<worktree>" merge --ff-only <VSHA> && [ "$(git -C "<worktree>" rev-parse HEAD)" = "<VSHA>" ]
    ```
@@ -1433,7 +1434,8 @@ Add `adw:blocked` to it, and put one line per carried sub-PR at the top of its b
 run-report line: `carried #<n> <unit> — <the one-sentence reason>; default: <default>`. This is
 the chain's one stop: the owner answers every carried block and gives the merge consent in the
 same place. When the owner answers a carried block, apply the answer on the integration branch
-as its own commit (a default the owner accepts needs none). An answer commit that changes
+as its own commit (a default the owner accepts needs none), from the close worktree: Phase 5
+removed it when it was clean, so re-create it first, as Phase 5 says. An answer commit that changes
 code moves the head the final PR's `ready` was earned at, so the Phase 3 loop (3.4 verify
 against `origin/<INTENT_BASE>` and 3.6's review) runs again on the new head before the next
 step, once per answer commit, with fresh review-cycle and boundary counters. A docs-only answer
@@ -1520,6 +1522,34 @@ run actually shows that shape**, else `note  CI red — verify before merge`. #8
 "red because broken" are indistinguishable at a glance — which is the problem.
 
 ## Phase 5 — run report
+
+**First, remove what this run left on disk, and nothing else.** A unit worktree holds 1 to 3 GB
+of build output, and every worktree that built an Xcode project leaves a DerivedData directory
+outside it. No step of the run removed either, so they stayed until the owner ran `/cleanup`.
+One Bash call, with the slug, one `--pr` per PR this run opened (the final PR included), and one
+`--provisioned` per path on the `Provisioned files` line of `repo-profile §18` (no line, or
+`none`: no flag):
+
+```bash
+R="$(git rev-parse --show-toplevel)"
+python3 "$R/.claude/adw/cache/scripts/adw-run-clean.py" --repo "$R" --slug <slug> --pr <N> --pr <M> --provisioned <path>
+```
+
+The script's scope is the names this run gives what it creates: `adw-<slug>-uNN` (Phase 2),
+`adw-close-<slug>` (Phase 4), `pr-ready-<slug>-…-v<k>` (`/pr-ready` §4.3) and `pr-<N>` for each
+`--pr` (review-core §1.1), plus the Xcode DerivedData of each of them that is gone. It keeps a
+worktree, and prints `kept <name> <why>`, when a process works in it, when its HEAD is on no
+remote ref and is no PR's head, when it is a unit or close worktree whose branch has no PR, or
+when it holds any change but a provisioned file. A verify worktree is reset first, as
+`/pr-ready` §4.3 does. It never uses `--force` and never deletes a branch. Put its last line
+and each `kept` line on the run report as `note` lines, verbatim. Exit 1 → the note is
+`run-clean failed — <its message>`.
+
+A step after the report that needs a worktree the script removed (Phase 4's answer commit on a
+final PR, the §3.8 smoke fix cycle that follows it) re-creates it first, then provisions it
+(`repo-profile §4`): `git fetch origin && git branch -f <branch> origin/<branch> && git worktree
+add "<path>" <branch>`, with Phase 4's `$CW` and `adw/<slug>` for the close worktree, and
+Phase 2's `$WT` and unit branch for a unit.
 
 Print the **run report exactly** (adw-core §7): one line per PR, ready → blocked → failed → unbuilt;
 `Next:` names the merge order. The report is the whole message — nothing else is printed.

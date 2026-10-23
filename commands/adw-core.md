@@ -583,6 +583,8 @@ note     window <N>k — compact before resuming             ← only when ≥40
 note     tier <uNN> <word> author=<tier> impl=<tier>       ← only for units built below opus (§8)
 note     orchestrator <tier> — restart the next run with claude --model sonnet   ← only when the session ran above sonnet (§8)
 note     level <uNN>+<uNN> built concurrently              ← only when a DAG level ran >1 unit
+note     run-clean: 3 worktrees, 2 DerivedData dirs, freed 7.9 GB; kept 1   ← unconditional (adw-build Phase 5)
+note     kept     adw-<slug>-u2  uncommitted: <paths>      ← one per item run-clean kept
 note     <further run-level caveats — one line each, only when present>
 
                         ← nothing follows this block: no summary, no narration
@@ -665,6 +667,11 @@ next run's analysis needs:
   is the largest single cost term in a run and the only one no dispatch line records — it is
   visible in the bill and nowhere else. The evidence block carries it per PR; this line is the
   run-level copy the owner reads before starting the next run.
+
+One more `note` line is unconditional: **`note run-clean: …`**, the last line of adw-build
+Phase 5's cleanup script, verbatim, and after it one `note kept …` line per item the script kept.
+A kept item is disk this run did not free, with the reason it would not: the owner frees it by
+hand or with `/cleanup`.
 
 Nothing else is printed.
 
