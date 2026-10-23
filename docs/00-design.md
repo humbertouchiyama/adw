@@ -551,9 +551,10 @@ human merges (each independent PR, each chain's final PR, never a sub-PR) gets o
 §3.8). Its verdict is a model reading a screen, and its false-positive rate is unmeasured, so no
 defect row is fixed on the walk's word: a `model: opus` refuter rebuilds each `blocking` and
 `worth-fixing` row from the evidence, the spec criterion and the code (`review-core.md` §9's pass),
-and only a row that holds up is fixed. A fix is at most two smoke fix cycles, each one gates, a 3.4
-verify, a 3.6 review and another walk; a confirmed defect still there after the second makes the PR
-`blocked`. `polish` and gap rows only report. The `refuted` count on each PR's `smoke` evidence row
+and only a row that holds up is fixed. A fix is at most two smoke fix cycles (on a final PR, per
+code-changing owner reply), each one gates, a 3.4 verify, a 3.6 review and another walk; a confirmed
+defect no cycle fixed (still there after the second, or its cycle could not start, went red, or was
+not allowed on a PR with a red gate) makes the PR `blocked`. `polish` and gap rows only report. The `refuted` count on each PR's `smoke` evidence row
 is the false-positive measure the step lacked. A device the driver can read but not tap would pass
 every case it cannot reach, so a tap probe runs first, and a failed probe ends the smoke as `smoke
 not runnable`, never as a pass.
@@ -671,7 +672,7 @@ merge — that nothing checks.
 | State | Meaning | Result |
 |---|---|---|
 | **ready** | gates re-verified green in a clean checkout **after the review loop's last push** | independent/final PR: open, awaits human merge. Sub-PR: merged into the integration branch (§4.1 carve-out), chain continues |
-| **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), or the 16-boundary cap fired (condition 6 — gate-green but unconverged) | PR open, labelled, body per §6.1 S4. A blocked sub-PR is merged as a carried block and the final PR lands `blocked` for it; it halts its chain only when it cannot be carried (`adw-build §3.7`) |
+| **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), the 16-boundary cap fired (condition 6 — gate-green but unconverged), or the app smoke left a defect its refuter confirmed and no smoke fix cycle fixed (adw-build §3.8) | PR open, labelled, body per §6.1 S4. A blocked sub-PR is merged as a carried block and the final PR lands `blocked` for it; it halts its chain only when it cannot be carried (`adw-build §3.7`) |
 | **failed** | a §4.8 progress condition fired — **fix**-cycle caps exhausted, repeated error signature, gate regression, diff oscillation, or stall — or an environment fault (including the 4h single-phase clock) | PR open **non-draft**, labelled, body per §6.1 S4 (last red output included). A failed sub-PR halts its chain |
 
 Nothing dies silently in a worktree (30 live today, 2026-07-20). A halted chain reports
@@ -688,11 +689,11 @@ its unbuilt units in the halting sub-PR's body (§4.1).
   `/code-review` already handles that case at its end.
 - **Per-PR stop rule: progress, not elapsed time** (v2.12 — the recalibration this bullet
   promised, performed at run 10). Six conditions, evaluated at every phase boundary and all
-  enforced in adw-build §3: cycle caps (no cycle past fix 3 / review 2) · repeated error
+  enforced in adw-build §3: cycle caps (no cycle past fix 3 / review 2 / smoke fix 2) · repeated error
   signature (normalised) · gate regression (green→red, twice, after §4.3 classification) ·
   diff oscillation · stall (HEAD + gate exit-vector + PR state unchanged across two
   boundaries, **evaluated only after a repeat cycle**) · boundary cap (16 crossings →
-  `blocked`). The first pass of a mandatory stage — 3.4 verify, the single 3.6 review,
+  `blocked`; a smoke fix cycle restarts the count, as Phase 4's answer commit does). The first pass of a mandatory stage — 3.4 verify, the single 3.6 review,
   Phase 4's composition review — is exempt from all six: it is a completion, not a loop.
   The stall condition's scoping is not a detail: unscoped, it fires on the *clean* run,
   where a green unit's HEAD and gate vector are supposed to sit still. The boundary cap is

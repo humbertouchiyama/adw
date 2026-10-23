@@ -358,7 +358,8 @@ implement ⟲ gates → verify → open PR → /code-review ⟲ → re-verify �
 
 An independent PR or a final PR then runs §3.8's app smoke on its verified head, after the state
 above is decided, and never on a sub-PR. A defect the smoke's check confirms starts a smoke fix
-cycle, at most two per PR, and each cycle comes back through gates → verify → review.
+cycle, at most two per PR (on a final PR, per code-changing owner reply: Phase 4), and each cycle
+comes back through gates → verify → review.
 
 **Progress, not elapsed time, terminates a loop** (v2.12; the 45-minute bound it replaces
 is design §4.8). Record `date +%s` at **PR start = this loop's first implementer dispatch
@@ -814,9 +815,10 @@ pipeline knows:
 
   A PR that §3.8 applies to gets one more row after each walk, written by one more `gh pr edit`
   and replaced by the next walk's: `smoke      walk <k> · <d> defects (<b> blocking) · <g> gaps ·
-  valid <v> · refuted <r> · fixed <f> · cases <passed>/<total> · audit <exit> · <m>m`, or
+  valid <v> · refuted <r> · fixed <f> (<u> unconfirmed) · cases <passed>/<total> · audit <exit> · <m>m`, or
   `smoke      not runnable: <reason> · fixed <f>`, or `smoke      not run — <reason> · fixed <f>`. The counts
-  are the last walk's, except `fixed`, which counts every row a smoke fix cycle fixed, and `<m>`,
+  are the last walk's, except `fixed`, which counts every row a smoke fix cycle fixed (`<u>` of them
+  with a `fixed:` line still ending `, unconfirmed`, §3.8), and `<m>`,
   the minutes of every walk. No other PR carries the row.
 
   `owner-wait` is the decisive one: it is the single bit that distinguishes a 21-hour
@@ -1130,7 +1132,9 @@ three defects: a button floating mid-screen on one tab, a control missing on a s
 button on the wrong side of another screen. The PR body's own `Smoke` list named all three screens,
 and nobody walked it. This step walks it with `repo-profile §21`'s runner, checks each defect the
 walk reports, and fixes the ones that hold up. Rework that began at the owner's own device check
-cost about 52 agent hours in 2026-10-02..22, and each fix there was ordered by hand.
+cost about 52 agent hours in 2026-10-02..22, and each fix there was ordered by hand. **A TRIAL**
+(design §4.2): each PR's `smoke` evidence row records how many rows the check found `valid` and how
+many it `refuted`, the measure this step has not had.
 
 **It runs when all four hold, and only then:**
 
@@ -1146,7 +1150,8 @@ cost about 52 agent hours in 2026-10-02..22, and each fix there was ordered by h
 
 **A walk costs tens of minutes, and past an hour on a long case list:** one app build, then every
 case on every device. `repo-profile §21`'s Max minutes is the ceiling of one walk. A PR walks at
-most three times: once, then once after each of at most two smoke fix cycles, and each cycle also pays
+most three times (on a final PR, three per code-changing owner reply: Phase 4): once, then once
+after each of at most two smoke fix cycles, and each cycle also pays
 for a 3.4 verify and a 3.6 review. It is machine time: it counts in the PR's `⏱`, and the run report
 prints after the last walk returns.
 
@@ -1186,7 +1191,10 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
    `$VSHA`, `<D>/cases.md`, and the devices §21's Devices row derives from the cases' `Device`
    lines, and keeps every value §21's Wait test, Result, Audit and Abandon rows name, as literals. A
    launch that stops before the runner runs (its lock is held, its stack will not come up, the
-   build fails) → return `smoke not run — <the runner's own reason>` and stop. §21's Driver probe
+   build fails, a Bash call of it is cut off at the 600000 ms limit) → run §21's Abandon, then
+   return `smoke not run — <the runner's own reason>`, with what Abandon printed, and stop. A
+   launch that stops leaves what it took (a lock, booted devices, a stack) held, and the next walk
+   would find them. §21's Driver probe
    runs on each device at the point §21's Launch row names, before the walk; a non-zero exit →
    run §21's Abandon, return `smoke not runnable: <device> — <the probe's failing line>` and stop.
 4. Waits, in one Bash call with `timeout: 600000`, re-issued until it prints `done` or `DEADLINE`.
@@ -1195,7 +1203,10 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
    lim=$(( <start> + <n> * 60 )); end=$(( $(date +%s) + 270 )); [ "$end" -gt "$lim" ] && end=$lim; until { <test>; } || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; if { <test>; }; then echo done; elif [ "$(date +%s)" -ge "$lim" ]; then echo DEADLINE; else echo running; fi
    ```
    This is `review-core.md` §10's wait with §21's test in place of the file count, and the same
-   270 s per call. The braces keep a test that holds `&&` or `||` in one piece. On `DEADLINE`, it
+   270 s per call. The braces keep a test that holds `&&` or `||` in one piece. Paste §21's test
+   unchanged, a lock clause included: it reads a lock the runner itself takes and releases, which
+   Phase 1's ban on lock files and wait-for-lock loops (locks a run writes to order its own agents)
+   does not reach. Without that clause the wait ends before the runner lets go of its devices. On `DEADLINE`, it
    runs §21's Abandon and returns `smoke not run — exceeded <n> min`, with what Abandon printed.
 5. Runs §21's Audit, then returns this and nothing else: the Result file's path; its verdict line;
    every row of its table, verbatim; the Audit's exit code and its failing lines; the case count as
@@ -1256,17 +1267,21 @@ section and the evidence row before anything moves the head (smoke fix cycle ste
   with `· unaudited: <failing check>` appended when the Audit exit is not `0`. Then the returned
   rows, as they came. Then one line per checked row: `valid: <id> — <the three links>`,
   `refuted: <id> — <the link that breaks>` or `unchecked: <id>`. Then one `fixed: <id> (walk <k>)
-  in <sha7>` line per row a smoke fix cycle fixed, `<sha7>` being the head that cycle pushed, and `smoke fix cycle <c> running — the head moves past
-  <sha7>` while a cycle runs. Then `evidence: <Result path>, on the machine that ran the build`. A
+  in <sha7>, unconfirmed` line per row a smoke fix cycle fixed, `<sha7>` being the head that cycle
+  pushed; a later walk that passes its audit and leaves no `valid` row drops `, unconfirmed` from
+  every such line. Then `smoke fix cycle <c> running — the head moves past <sha7>` while a cycle
+  runs. Then `evidence: <Result path>, on the machine that ran the build`. A
   `smoke not run` or `smoke not runnable` return with no Result writes the section with that one
   line, plus any `fixed:` lines; one with a Result puts that line first. A later walk of the same
   PR replaces the section, never adds one, and keeps every `fixed:` line.
 - **Evidence block:** the `smoke` row (§3.4), counted from the rows by §21's Result row.
-- **Run-report PR line:** the last walk has no defect rows, no gap rows, Audit `0` and no `not
-  runnable` line → `· smoke clean` after `review clean`. Otherwise one trailing flag, the first that
-  applies: `· ⚠ smoke not runnable: <reason>`, `· ⚠ smoke not run — <reason>`, `· ⚠ smoke
-  unaudited — <failing check>`, or `· ⚠ smoke: <d> defects (<b> blocking, <v> valid), <g> gaps`.
-  Either form ends `· fixed <f>` when smoke fix cycles fixed `<f>` rows.
+- **Run-report PR line:** the last walk has no defect rows, no gap rows, Audit `0`, no `not
+  runnable` line, and `<passed>` equal to `<total>` → `· smoke clean` after `review clean`.
+  Otherwise one trailing flag, the first that applies: `· ⚠ smoke not runnable: <reason>`,
+  `· ⚠ smoke not run — <reason>`, `· ⚠ smoke unaudited — <failing check>`, or `· ⚠ smoke: <d>
+  defects (<b> blocking, <v> valid), <g> gaps, cases <passed>/<total>`. Either form ends
+  `· fixed <f>` when smoke fix cycles fixed `<f>` rows, and `· fixed <f>, <u> unconfirmed` when `<u>`
+  of those `fixed:` lines still end `, unconfirmed`.
 
 After each edit, check it, as §3.5 checks the evidence block:
 `gh pr view <N> --json body --jq .body | grep -c '^## Smoke result' || true` must print `1`.
@@ -1297,13 +1312,23 @@ not red). One cycle:
    and return the pushed sha.
 4. A red goes to §3.3's classifier. A genuine red goes back to the same agent once, by SendMessage;
    its fix is one more `smoke-fix-<c>:` commit, then the gates again. A second red, or an
-   environment fault: nothing is pushed, the commits stay unpushed on the worktree's branch, and
-   the PR is `blocked` by the bound below, with `smoke fix red: <gate>`.
+   environment fault: nothing is pushed, and the PR is `blocked` by the bound below, with `smoke fix
+   red: <gate>; its commits are on smoke-red/<head branch>-<c>`. Move them off the head branch
+   first, in one Bash call, so that no later push from this worktree (Phase 4's answer commit is
+   one) carries them:
+   ```bash
+   git -C "<worktree>" branch "smoke-red/<head branch>-<c>" && git -C "<worktree>" reset --keep <VSHA> && [ "$(git -C "<worktree>" rev-parse HEAD)" = "<VSHA>" ]
+   ```
+   `--keep`, not `--hard`: it refuses, rather than discards, an uncommitted edit. A non-zero exit
+   adds `; <worktree> is not back at <sha7>` to the reason.
 5. After the push, `ready` no longer holds: a code commit voids it (`/pr-ready` §6). So the
    cycle's pushed head takes Phase 4's rule for an answer commit that changes code, once per cycle,
    on an independent PR too: 3.4 verify at the new head with the next `PASS` id, then 3.6's review,
    with fresh review-cycle and boundary counters. §3.7 then decides the state again, from that
-   re-pass, and `$VSHA` is the head that re-pass verified (§3.6's assertion). Then the next walk, when this
+   re-pass, and `$VSHA` is the head that re-pass verified (§3.6's assertion). A PR that was
+   `blocked` before the cycle stays `blocked`, with its earlier reason and label, whatever the
+   re-pass returns; a reason the re-pass adds goes below it. The cycle fixed a screen, not the
+   question that blocked the PR. Then the next walk, when this
    section's four conditions still hold.
 
 **The bound.** Smoke fix cycle 3 never starts. A `valid` row that no smoke fix cycle fixed makes the PR
@@ -1312,7 +1337,11 @@ went red (step 4), and one on a PR whose state allows no cycle. `blocked`, never
 is gate-green and reviewed, and a person must look at the screen. The reason is `smoke: <v> valid
 defects — <the first row's id and claim>` (plus the step 2 or step 4 text when that applies), with
 `default: fix them on <head branch>, then re-run /pr-ready <N>`. A PR already `blocked` keeps its
-own reason and adds this one as a second line.
+own reason and adds this one as a second line. The body write that records the bound replaces the
+`smoke fix cycle <c> running` line, since the head did not move. A PR the bound turns from `ready`
+to `blocked` gets §3.7's label, checked as §3.7 checks it, and its body re-laid in the `blocked`
+layout (§3.4, §3.5): the reason line and its default first, `## Smoke result` right after it, and
+the per-gate table and evidence block inside the `<details>` fold.
 
 ## Phase 4 — chain close
 

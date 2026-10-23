@@ -667,6 +667,6 @@ description:
 | **Result** | the file the run writes; its verdict line; which of its table rows are defects and with what severity, which are gaps, and which are neither; how to count the cases that passed; and which line in it shows the driver was lost mid-walk |
 | **Evidence** | for a defect row, where the files that show it are: the image a row cites, or the entry it cites and the image that entry names, with the directory each path is relative to, and which line of an entry holds the path. The §3.8 refuter opens those images and judges from them, not from the walk's own words |
 | **Audit** | a command that checks the result's evidence (the screenshots it cites exist, the build is the one asked for), and its exit codes |
-| **Max minutes** | the longest one smoke may run; `/adw-build` abandons it then |
+| **Max minutes** | the longest one walk may run, counted from before Launch; `/adw-build`'s relay runs Abandon at its first wait check past it, and on any Launch that stops before the walk |
 | **Abandon** | what to run at that deadline: stop the run, release what it holds, and print the last state it reached |
 

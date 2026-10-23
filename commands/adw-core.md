@@ -608,8 +608,9 @@ landed `blocked` by a carry adds one line per carried sub-PR, `carried #<n> <uni
 default: <default>` (adw-build Phase 4); every user-visible PR body carries a `## Smoke` section
 of cases (adw-build §3.5); an independent or final PR in a repo whose profile has a §21 adds
 `· smoke clean` after `review clean`, or one `· ⚠ smoke …` flag, either one ending `· fixed <f>`
-when smoke fix cycles fixed rows (adw-build §3.8): a smoke defect that its refuter confirms is
-fixed, and one still there after two smoke fix cycles puts the PR on the `blocked` row; the `note` row carries
+(and `, <u> unconfirmed`) when smoke fix cycles fixed rows (adw-build §3.8): a smoke defect that its
+refuter confirms is fixed, and one no smoke fix cycle fixed puts the PR on the `blocked` row; a PR
+whose body says `Smoke: none — <why>` adds neither; the `note` row carries
 run-level caveats (non-default `base:`, extend-mode's prior-unit summary, a
 `· ⚠ mutation per-file <covered>/<total>` ratio). The first `note` line is
 unconditional: `note  contract <short-sha>` — the commit the loaded contract came from:
