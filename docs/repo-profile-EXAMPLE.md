@@ -663,10 +663,10 @@ description:
 | **Devices** | the device classes the runner offers, the simulator or emulator runtimes it is valid on (tested, with the date and the driver version), how a case's `Device` line maps onto them, and the set used when no case names one |
 | **Driver probe** | a command, run once per device before the walk, that taps one control, then reads back the screen that tap must open, and exits non-zero when it did not open. A read alone is not a probe: a driver can read a screen and still refuse every tap (adw-build §3.8) |
 | **Data** | what data exists when the runner starts (accounts, a seeded fixture), and how a case gets the data its Preconditions name that the fixture lacks. Never production data, never a person's own account |
-| **Wait test** | a shell test that is true once the run has finished and released what it holds (devices, a lock), so the next smoke can start |
+| **Wait test** | a shell test, judged by its exit status alone (its output is discarded), that is true once the run has finished and released what it holds (devices, a lock), so the next smoke can start |
 | **Result** | the file the run writes; its verdict line; which of its table rows are defects and with what severity, which are gaps, and which are neither; how to count the cases that passed; and which line in it shows the driver was lost mid-walk |
 | **Evidence** | for a defect row, where the files that show it are: the image a row cites, or the entry it cites and the image that entry names, with the directory each path is relative to, and which line of an entry holds the path. The §3.8 refuter opens those images and judges from them, not from the walk's own words |
 | **Audit** | a command that checks the result's evidence (the screenshots it cites exist, the build is the one asked for), and its exit codes |
-| **Max minutes** | the longest one walk may run, counted from before Launch; `/adw-build`'s relay runs Abandon at its first wait check past it, and on any Launch that stops before the walk |
+| **Max minutes** | a whole number: the longest one walk may run, counted from before Launch; `/adw-build`'s relay runs Abandon at its first wait check past it, and on any Launch that stops before the walk |
 | **Abandon** | what to run at that deadline: stop the run, release what it holds, and print the last state it reached |
 

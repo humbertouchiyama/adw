@@ -607,7 +607,7 @@ annotations (e.g. `· ⚠ no trustworthy gate sees this unit`, `· ⚠ baseline 
 landed `blocked` by a carry adds one line per carried sub-PR, `carried #<n> <unit> — <reason>;
 default: <default>` (adw-build Phase 4); every user-visible PR body carries a `## Smoke` section
 of cases (adw-build §3.5); an independent or final PR in a repo whose profile has a §21 adds
-`· smoke clean` after `review clean`, or one `· ⚠ smoke …` flag, either one ending `· fixed <f>`
+`· smoke clean` after `review clean` (a `blocked` line has none: after its default), or one `· ⚠ smoke …` flag, either one ending `· fixed <f>`
 (and `, <u> unconfirmed`) when smoke fix cycles fixed rows (adw-build §3.8): a smoke defect that its
 refuter confirms is fixed, and one no smoke fix cycle fixed puts the PR on the `blocked` row; a PR
 whose body says `Smoke: none — <why>` adds neither; the `note` row carries

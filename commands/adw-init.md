@@ -211,7 +211,7 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    and §20's port surface instead). A single-unit intent meeting every D1
 >    criterion is proposed `express` (D0) when D0 is active (adw-core §3 status line) —
 >    then include the draft
->    flat spec (header + body per adw-core §2) in the proposal itself; its code
+>    flat spec (header + body per adw-core §2, its acceptance criteria numbered `AC 1`, `AC 2`, …) in the proposal itself; its code
 >    snippets follow the repo comment rule (`repo-profile §2`): one terse line + spec ref,
 >    never a multi-line rationale comment (D0 skips the fan-out, so this is the
 >    draft's only exposure to that rule);
@@ -361,7 +361,8 @@ with the most to discover), so blocking on it is a pure loss every time.
 > when the unit was approved as `port`. Approved answers for this intent, one per line as
 > `QN — <question>: <answer>`: `<list>`. Follow each one that touches this unit and
 > record it in the spec under its `QN` id. The spec body
-> states: the problem, the change, acceptance criteria, and (bugs) root cause with
+> states: the problem, the change, acceptance criteria numbered `AC 1`, `AC 2`, … (adw-build §3.5's
+> `Checks` line cites them), and (bugs) root cause with
 > evidence. Reference only plugin skills (`superpowers:*`) or tracked commands.
 > Code snippets in the spec/plan MUST follow the repo comment rule (`repo-profile §2`): one
 > terse line + spec ref, never a multi-line rationale comment — the implementer copies
