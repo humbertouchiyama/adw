@@ -1557,8 +1557,9 @@ that follows it, and a fix the owner asks for after testing a PR. One Bash call:
 `git fetch origin && git branch -f <branch> origin/<branch> && git worktree add "<path>" <branch>`,
 with Phase 4's `$CW` and `adw/<slug>` for the close worktree, and Phase 2's `$WT` and unit branch
 for a unit. The cost is the provisioning and one cold build. When that work has pushed and
-reported the PR's new state, run the cleanup call above again with the same flags: it removes the
-re-created worktree and the verify and review worktrees the fix made.
+reported the PR's new state, run the cleanup call above again with the same flags, and print its
+last line and each `kept` line: it removes the re-created worktree and the verify and review
+worktrees the fix made.
 
 Print the **run report exactly** (adw-core §7): one line per PR, ready → blocked → failed → unbuilt;
 `Next:` names the merge order. The report is the whole message — nothing else is printed.
