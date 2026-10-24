@@ -131,6 +131,34 @@ def prs_for(branch, main):
         return None
 
 
+def pr_by_number(n, main):
+    """[the PR] numbered n, or None when gh did not answer."""
+    p = subprocess.run(["gh", "pr", "view", str(n), "--json", "number,state,headRefOid"],
+                       cwd=main, capture_output=True, text=True)
+    if p.returncode != 0:
+        return None
+    try:
+        return [json.loads(p.stdout)]
+    except ValueError:
+        return None
+
+
+def covered(wt, prs):
+    """True when HEAD is a PR's head, or an ancestor of one whose commits are here.
+
+    A fix pushed from another worktree leaves this HEAD behind its PR's head, and a merged PR's
+    remote branch may be pruned, so HEAD is on no remote ref. The PR head still proves GitHub has it."""
+    head = git("rev-parse", "HEAD", cwd=wt)[1].strip()
+    for p in prs:
+        oid = p.get("headRefOid") or ""
+        if oid == head:
+            return True
+        if oid and git("cat-file", "-e", oid + "^{commit}", cwd=wt)[0] == 0 \
+                and git("merge-base", "--is-ancestor", head, oid, cwd=wt)[0] == 0:
+            return True
+    return False
+
+
 def changes(wt):
     """Return [(status, path)] for every tracked change and untracked file. Ignored files are not listed."""
     rc, out, _ = git("status", "--porcelain=v1", "-z", "--untracked-files=normal", cwd=wt)
@@ -183,13 +211,15 @@ def clean_worktrees(main, kinds, provisioned, dry, procs, here):
             if not prs:
                 keep(f"no PR has head {row['branch']}")
                 continue
-            head = git("rev-parse", "HEAD", cwd=path)[1].strip()
-            if not on_remote(path) and not any(p.get("headRefOid") == head for p in prs):
+            if not on_remote(path) and not covered(path, prs):
                 keep("HEAD is on no remote ref and is no PR's head")
                 continue
         elif not on_remote(path):
-            keep("HEAD is on no remote ref")
-            continue
+            # A review worktree pushes its apply fixes, so its PR's head can cover a pruned branch.
+            prs = pr_by_number(name[len("pr-"):], main) if kind == "review" else None
+            if not prs or not covered(path, prs):
+                keep("HEAD is on no remote ref")
+                continue
         items = changes(path)
         if items is None:
             keep("git status failed")

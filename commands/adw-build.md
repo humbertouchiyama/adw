@@ -1528,12 +1528,13 @@ run actually shows that shape**, else `note  CI red — verify before merge`. #8
 **First, remove what this run left on disk, and nothing else.** A unit worktree holds 1 to 3 GB
 of build output, and an IDE build can leave a cache directory outside the worktree (Xcode does,
 one per worktree). No step of the run removed either, so they stayed until the owner ran `/cleanup`.
-One Bash call, with the slug, one `--pr` per PR this run opened (the final PR included), and one
+One Bash call with `timeout` 600000 (it deletes several GB), with the slug, one `--pr` per PR this run opened (the final PR included), and one
 `--provisioned` per path on the `Provisioned files` line of `repo-profile §18` (no line, or
 `none`: no flag):
 
 ```bash
-R="$(git rev-parse --show-toplevel)"
+R="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"   # the main checkout, wherever the shell is
+test -f "$R/.claude/adw/cache/scripts/adw-run-clean.py" || R="$(git rev-parse --show-toplevel)"
 python3 "$R/.claude/adw/cache/scripts/adw-run-clean.py" --repo "$R" --slug <slug> --pr <N> --pr <M> --provisioned <path>
 ```
 
@@ -1554,12 +1555,14 @@ is the longest idle time of a run, often a night, and other runs fill the disk d
 the report that needs a worktree the script removed re-creates it first, then provisions it
 (`repo-profile §4`). That work is Phase 4's answer commit on a final PR, the §3.8 smoke fix cycle
 that follows it, and a fix the owner asks for after testing a PR. One Bash call:
-`git fetch origin && git branch -f <branch> origin/<branch> && git worktree add "<path>" <branch>`,
-with Phase 4's `$CW` and `adw/<slug>` for the close worktree, and Phase 2's `$WT` and unit branch
+`git fetch origin && git branch -f <branch> origin/<branch> && git worktree add "<path>" <branch>`.
+If `git branch -f` refuses because another checkout holds the branch (the owner's, to test it), run
+`git worktree add --detach "<path>" origin/<branch>` instead and push with `git push origin HEAD:<branch>`.
+Take Phase 4's `$CW` and `adw/<slug>` for the close worktree, and Phase 2's `$WT` and unit branch
 for a unit. The cost is the provisioning and one cold build. When that work has pushed and
 reported the PR's new state, run the cleanup call above again with the same flags, and print its
-last line and each `kept` line: it removes the re-created worktree and the verify and review
+last line and each `kept` line as `note` lines at the end of that report, not as a second run report: it removes the re-created worktree and the verify and review
 worktrees the fix made.
 
 Print the **run report exactly** (adw-core §7): one line per PR, ready → blocked → failed → unbuilt;
-`Next:` names the merge order. The report is the whole message — nothing else is printed.
+`Next:` names the merge order. The report is the whole message — nothing else is printed, except that second cleanup's `note` lines.

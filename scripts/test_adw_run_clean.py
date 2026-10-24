@@ -16,9 +16,15 @@ FAKE_GH = r'''#!/usr/bin/env python3
 import json, os, sys
 if os.environ.get("FAKE_GH_FAIL"):
     sys.exit(1)
-branch = sys.argv[sys.argv.index("--head") + 1]
 with open(os.environ["FAKE_GH_PRS"]) as f:
-    print(json.dumps(json.load(f).get(branch, [])))
+    prs = json.load(f)
+if sys.argv[2] == "view":
+    found = [p for v in prs.values() for p in v if str(p["number"]) == sys.argv[3]]
+    if not found:
+        sys.exit(1)
+    print(json.dumps(found[0]))
+else:
+    print(json.dumps(prs.get(sys.argv[sys.argv.index("--head") + 1], [])))
 '''
 
 DD_HASH = "abcdefghijklmnopqrstuvwxyzab"  # 28 lowercase letters, the shape Xcode names a DerivedData dir with
@@ -206,6 +212,43 @@ class Guards(Base):
         self.pr("adw/foo-u1", head, state="MERGED")
         rc, out = self.run_clean("--slug", "foo")
         self.assertNotIn("adw-foo-u1", self.registered(), out)
+
+    def test_a_unit_behind_its_pr_head_is_removed_once_the_remote_branch_is_pruned(self):
+        wt = self.worktree("adw-foo-u1", "adw/foo-u1", pr=False)
+        self.write(wt, "fix.txt", "pushed from the review worktree")
+        self.git("add", "-A", cwd=wt)
+        self.git("commit", "-qm", "fix", cwd=wt)
+        self.git("push", "-q", "origin", "adw/foo-u1", cwd=wt)
+        self.pr("adw/foo-u1", self.git("rev-parse", "HEAD", cwd=wt), state="MERGED")
+        self.git("reset", "-q", "--hard", "HEAD~1", cwd=wt)
+        self.git("push", "-q", "origin", "--delete", "adw/foo-u1", cwd=wt)
+        self.git("fetch", "-q", "--prune", "origin")
+        rc, out = self.run_clean("--slug", "foo")
+        self.assertNotIn("adw-foo-u1", self.registered(), out)
+
+    def test_a_review_worktree_at_its_pr_head_is_removed_once_the_remote_branch_is_pruned(self):
+        wt = self.worktree("adw-foo-u1", "adw/foo-u1")
+        head = self.git("rev-parse", "HEAD", cwd=wt)
+        rev = os.path.join(self.wts, "pr-2")
+        self.git("worktree", "add", "-q", "--detach", rev, head)
+        self.git("push", "-q", "origin", "--delete", "adw/foo-u1", cwd=wt)
+        self.git("fetch", "-q", "--prune", "origin")
+        self.pr("adw/foo-u1", head, state="MERGED")
+        rc, out = self.run_clean("--slug", "foo", "--pr", "2")
+        self.assertNotIn("pr-2", self.registered(), out)
+
+    def test_a_review_worktree_with_no_pr_head_match_is_kept(self):
+        wt = self.worktree("adw-foo-u1", "adw/foo-u1", pr=False)
+        head = self.git("rev-parse", "HEAD", cwd=wt)
+        rev = os.path.join(self.wts, "pr-2")
+        self.git("worktree", "add", "-q", "--detach", rev, head)
+        self.write(rev, "local.txt", "x")
+        self.git("add", "-A", cwd=rev)
+        self.git("commit", "-qm", "unpushed", cwd=rev)
+        self.pr("adw/foo-u1", head, state="MERGED")
+        rc, out = self.run_clean("--slug", "foo", "--pr", "2")
+        self.assertIn("pr-2", self.registered())
+        self.assertIn("HEAD is on no remote ref", out)
 
     def test_provisioned_file_is_restored_and_anything_else_keeps_it(self):
         wt = self.worktree("adw-foo-u1", "adw/foo-u1")

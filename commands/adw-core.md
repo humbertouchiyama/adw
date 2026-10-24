@@ -674,7 +674,8 @@ A kept item is disk this run did not free, with the reason it would not. The own
 hand: `/cleanup` skips a dirty or unpushed worktree too. A non-zero exit prints
 `note run-clean failed — <the script's last line>` instead.
 
-Nothing else is printed.
+Nothing else is printed, except the `note` lines of the cleanup that adw-build Phase 5 runs again after
+post-report work.
 
 ### PR body — a `blocked`/`failed` sub-PR (async)
 
