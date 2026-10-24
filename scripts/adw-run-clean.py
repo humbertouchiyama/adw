@@ -151,7 +151,7 @@ def covered(wt, prs):
     head = git("rev-parse", "HEAD", cwd=wt)[1].strip()
     for p in prs:
         oid = p.get("headRefOid") or ""
-        if oid == head:
+        if head and oid == head:
             return True
         if oid and git("cat-file", "-e", oid + "^{commit}", cwd=wt)[0] == 0 \
                 and git("merge-base", "--is-ancestor", head, oid, cwd=wt)[0] == 0:
