@@ -9,6 +9,10 @@ Reclaim a session's leftovers: merged/closed worktrees + their local branches, a
 databases, caches, daemons). **Destructive** — so it classifies first, prints a plan, and waits for
 your go-ahead.
 
+`/adw-build` removes what its own run created, at its Phase 5 (adw-build Phase 5). This command
+clears the rest: a run that stopped before Phase 5, and every other session's leftovers. An item
+Phase 5 kept as dirty or unpushed stays in this command's Skip buckets too.
+
 **This file lives in the `adw` repository and is fetched, not copied** (adw-core §9). It is repo-agnostic: every value that could differ between repos is in the consuming repo's `repo-profile.md`. Read
 the consuming repo's `.claude/repo-profile.md` §18 before Phase 3 — it is not auto-included, and
 without it Phase 3 has nothing to classify.

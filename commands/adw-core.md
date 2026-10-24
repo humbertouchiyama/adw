@@ -583,6 +583,8 @@ note     window <N>k — compact before resuming             ← only when ≥40
 note     tier <uNN> <word> author=<tier> impl=<tier>       ← only for units built below opus (§8)
 note     orchestrator <tier> — restart the next run with claude --model sonnet   ← only when the session ran above sonnet (§8)
 note     level <uNN>+<uNN> built concurrently              ← only when a DAG level ran >1 unit
+note     run-clean: 3 worktrees, 2 DerivedData dirs, freed 7.9 GB; kept 1   ← unconditional (adw-build Phase 5)
+note     kept     adw-<slug>-u2  uncommitted: <paths>      ← one per item run-clean kept
 note     <further run-level caveats — one line each, only when present>
 
                         ← nothing follows this block: no summary, no narration
@@ -666,7 +668,14 @@ next run's analysis needs:
   visible in the bill and nowhere else. The evidence block carries it per PR; this line is the
   run-level copy the owner reads before starting the next run.
 
-Nothing else is printed.
+One more `note` line is unconditional: **`note run-clean: …`**, the last line of adw-build
+Phase 5's cleanup script, verbatim, and after it one `note kept …` line per item the script kept.
+A kept item is disk this run did not free, with the reason it would not. The owner frees it by
+hand: `/cleanup` skips a dirty or unpushed worktree too. A non-zero exit prints
+`note run-clean failed — <the script's last line>` instead.
+
+Nothing else is printed, except the `note` lines of the cleanup that adw-build Phase 5 runs again after
+post-report work.
 
 ### PR body — a `blocked`/`failed` sub-PR (async)
 
