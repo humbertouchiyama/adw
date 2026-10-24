@@ -1549,11 +1549,16 @@ and each `kept` line on the run report as `note` lines, verbatim. Any non-zero e
 git checkout; 2: a bad flag, or `python3` found no script) → the one note is
 `run-clean failed — <the last line it printed>`.
 
-A step after the report that needs a worktree the script removed (Phase 4's answer commit on a
-final PR, the §3.8 smoke fix cycle that follows it) re-creates it first, then provisions it
-(`repo-profile §4`): `git fetch origin && git branch -f <branch> origin/<branch> && git worktree
-add "<path>" <branch>`, with Phase 4's `$CW` and `adw/<slug>` for the close worktree, and
-Phase 2's `$WT` and unit branch for a unit.
+The cleanup runs here, before the owner tests, on purpose: the wait for the owner's test and merge
+is the longest idle time of a run, often a night, and other runs fill the disk during it. Work after
+the report that needs a worktree the script removed re-creates it first, then provisions it
+(`repo-profile §4`). That work is Phase 4's answer commit on a final PR, the §3.8 smoke fix cycle
+that follows it, and a fix the owner asks for after testing a PR. One Bash call:
+`git fetch origin && git branch -f <branch> origin/<branch> && git worktree add "<path>" <branch>`,
+with Phase 4's `$CW` and `adw/<slug>` for the close worktree, and Phase 2's `$WT` and unit branch
+for a unit. The cost is the provisioning and one cold build. When that work has pushed and
+reported the PR's new state, run the cleanup call above again with the same flags: it removes the
+re-created worktree and the verify and review worktrees the fix made.
 
 Print the **run report exactly** (adw-core §7): one line per PR, ready → blocked → failed → unbuilt;
 `Next:` names the merge order. The report is the whole message — nothing else is printed.
