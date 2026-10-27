@@ -177,11 +177,10 @@ split of one is a legitimate outcome, which is why the command is `init`, not `s
 
 ### 3.2 The cut proposal and the human gate
 
-**Grill first, only when needed** (adw-init Phase 0.7). A cheap pre-pass lists the questions only
-the owner can answer and that a reasonable owner could answer against the default. None → silent.
-Some → at most two rounds of numbered questions, each with a default, before triage. The answers
-feed triage and every unit author. The same ask rule governs the gate's decide pass and, since
-2026-10-22, every later question of the run (§6.1 rule 4). The handoff's
+**One prompt, at the gate** (adw-init Phase 0.7). Triage lists only the questions the owner alone
+can answer and that a reasonable owner could reject against the default, each with its default
+and consequence. There is no question round before triage. The same ask rule governs the gate's
+decide pass and, since 2026-10-22, every later question of the run (§6.1 rule 4). The handoff's
 `asks` line measures it: over 96 gates, 42% came back as "critically decide" or "didn't understand" before this rule.
 
 `/adw-init` then runs **one cheap triage agent** over the intent and prints a proposal:
@@ -876,7 +875,7 @@ of N.
 
 ### 6.1 Interaction surfaces — the format contract
 
-Every human touchpoint above arrives through one of four surfaces (or the interactive grill round, §3.2). Their shape is a
+Every human touchpoint above arrives through one of four surfaces. Their shape is a
 contract, not a style preference — the owner's recorded feedback
 (`memory/feedback_review_output_structure.md`) is that report-shape rules enforced by
 prose failed twice and held only once made structural. Five rules (adw-core §7 holds the
