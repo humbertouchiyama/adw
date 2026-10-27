@@ -146,7 +146,7 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    A **question** is anything the owner must ANSWER (each becomes a numbered `QN` at the
 >    approval surface, adw-core §7) and ships with a recommended default and its consequence in one
 >    clause; check the repo before you list one — a question the code answers is not one, and
->    a question about how to build it is never one (Phase 0.7's ask rule); a
+>    a question about how to build it is never one. The ask rule: <Phase 0.7's ask rule, pasted>; a
 >    "confirm X before …" item is a question, never a hazard and never fyi. A **hazard**
 >    is anything the owner might act on without being asked: files shared between units,
 >    scope=future / fan-out hazards, gate-visibility gaps, uncharted territory — these

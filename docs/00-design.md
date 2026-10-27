@@ -178,8 +178,8 @@ split of one is a legitimate outcome, which is why the command is `init`, not `s
 ### 3.2 The cut proposal and the human gate
 
 **One prompt, at the gate** (adw-init Phase 0.7). Triage lists only the questions the owner alone
-can answer and that a reasonable owner could reject against the default, each with its default
-and consequence. There is no question round before triage. The same ask rule governs the gate's
+can answer and that a reasonable owner could reject against the default, plus anything that changes
+money, data or a public contract or is hard to reverse, each with its default and consequence. There is no question round before triage. The same ask rule governs the gate's
 decide pass and, since 2026-10-22, every later question of the run (§6.1 rule 4). The handoff's
 `asks` line measures it: over 96 gates, 42% came back as "critically decide" or "didn't understand" before this rule.
 
