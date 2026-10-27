@@ -12,7 +12,7 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 | Path | What |
 |---|---|
 | `commands/adw-core.md` | The shared contract. Spec headers, naming, the depth ladder, packaging, the approval and handoff surfaces. Read at Phase 0 by both commands below. |
-| `commands/adw-init.md` | Intent → grill (only when needed) → triage → human-approved unit cut → per-unit specs. |
+| `commands/adw-init.md` | Intent → triage → human-approved unit cut → per-unit specs. |
 | `commands/adw-build.md` | Specs → worktrees → gates → independent verification → PRs → review loop. |
 | `commands/pr-ready.md` | Independently verify an open PR is actually mergeable. |
 | `commands/review-core.md` | Shared machinery for the two review skills. |

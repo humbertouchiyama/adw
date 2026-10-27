@@ -363,7 +363,7 @@ typed six merges by hand for that reason in the same twelve days.
 
 ## 7. Surfaces — the format contract
 
-Four surfaces, named for what they are (the grill round of adw-init Phase 0.7 is a fifth prompt, interactive, with no code: it ends on its own answer line, like the approval surface). The `S<N>` codes are retired — they said nothing
+Four surfaces, named for what they are. The `S<N>` codes are retired — they said nothing
 and appeared in three files' cross-references:
 
 | Surface | When | Old code |
@@ -413,7 +413,7 @@ extends <slug> · u1–u6: merged u1 u2 u3 u5 · open u4 (#820) · unbuilt u6   
 needs you  2                               ← or: none — answer by number; blank = defaults
   Q1 (u4) — <one plain-language question>? default: <recommended default>
   Q2 — <question>? default: <recommended default>
-decided  Q3 <few words>: <answer> · Q4 <few words>: <answer> — reopen by number   ← only when the decide pass or a grill `decide` settled any (adw-init Phase 0.7, Phase 2)
+decided  Q3 <few words>: <answer> · Q4 <few words>: <answer> — reopen by number   ← only when the decide pass settled any (adw-init Phase 2)
 
 cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · u6
   u1  plan     <unit title>
@@ -462,7 +462,7 @@ pipeline, and the pre-v2.8 shape buried both the cut and the asks under rational
 - **Anything that needs an answer is a numbered `QN`, never an fyi bullet.** A line
   containing "confirm", "your call", or a question mark inside `fyi` is a contract
   violation — run-6 buried its base-branch override there as concern #1 of ten. Q ids
-  are run-wide and start at the grill's list (adw-init Phase 0.7), then triage's (some are settled by the decide pass, so `ask` rows can skip a
+  are run-wide and start at triage's list (some are settled by the decide pass, so `ask` rows can skip a
   number): the handoff continues after the highest id, and a question answered at the gate keeps its id
   and does not reprint.
 - `why-<word>` and `verify` live only in `detail`, ONE line each — still the anchor the
@@ -545,19 +545,18 @@ building handoffs did exactly that (2026-09-20 to 10-01), and the owner came bac
 stop when you don't need my input on anything?".
 
 `needs you  none` when empty. **Items are numbered `Q1..QN` in ONE sequence across the
-whole run — the sequence starts at the first grill round, or at the approval surface when there is none, and the handoff continues it, never restarting and never
+whole run — the sequence starts at the approval surface, and the handoff continues it, never restarting and never
 labelling by bare unit id** — the owner answers by number (`1- …`, `Q3: no`), and
 repeated unit labels give them nothing to reference (runs 3 and 6 both shipped
 `u1 · / u1 · / u2 ·` shapes; both times the answers came back by guessed position).
 The same `QN` ids carry into the specs where defaults are recorded.
-Grill questions (adw-init Phase 0.7) take the first ids; triage's continue after them.
 Ids are given to every triage question before the decide pass (adw-init Phase 2) and never
 renumbered: only `ask` items are rows under `needs you`, so a gate can show `Q1` and `Q4`, and the
 handoff's new questions continue after the highest id. `decided` ones print on the approval
 surface's `decided` line; the handoff's `decided` line carries only what was settled after that
 surface printed (the `decide` verb, Phase 5's decide pass). A `decided` line is never counted in
 `needs you N` or in the stopping test above.
-**The `asks` line counts every question this run put to the owner** — grill rows and approval-surface
+**The `asks` line counts every question this run put to the owner** — approval-surface
 `ask` rows — by how it settled: `owner` (answered by number), `default` (left blank), `delegated`
 (`decide`, "critically decide", "you decide"). `auto-decided` counts the questions a decide pass settled
 without showing them. When nothing was asked the line reads `shown 0: — · auto-decided <n>`. A question counts once, by how it last settled: a
