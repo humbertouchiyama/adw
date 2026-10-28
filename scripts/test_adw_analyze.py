@@ -14,7 +14,7 @@ KEY = "-----BEGIN PRIVATE KEY-----MIIEvQIBADANBgkqhkiG9w0BAQEFAASC"
 MARKER = "the owner said the staging password lives in the shared drive under ops"
 
 
-class E2E(TmpCase):
+class Fixture(TmpCase):
     def setUp(self):
         super().setUp()
         self.projects = self.mkdir("projects")
@@ -56,6 +56,8 @@ class E2E(TmpCase):
         with open(os.path.join(self.reports, UNTIL, name)) as f:
             return f.read()
 
+
+class E2E(Fixture):
     def test_end_to_end(self):
         r = self.run_reader()
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -104,6 +106,49 @@ class E2E(TmpCase):
         self.assertEqual((m["window"], m["status_window"]), (None, "no data"))
         row = next(line for line in self.out("report.md").splitlines() if "evidence.review0_with_fixreview_rate.v1" in line)
         self.assertIn("no data", row)
+
+
+class Leak(Fixture):
+    def outputs(self):
+        d = os.path.join(self.reports, UNTIL)
+        return {n: open(os.path.join(d, n)).read() for n in os.listdir(d)}
+
+    def scan(self):
+        return self.run_cli("--reports", self.reports, "--projects", self.projects, "--scan", "--date", UNTIL)
+
+    def plant(self, text):
+        with open(os.path.join(self.reports, UNTIL, "report.md"), "a") as f:
+            f.write("\n" + text + "\n")
+
+    def test_reader_never_emits_text(self):
+        self.assertEqual(self.run_reader().returncode, 0)
+        for name, text in self.outputs().items():
+            self.assertNotIn("BEGIN PRIVATE KEY", text, name)
+            self.assertNotIn("staging password", text, name)
+
+    def test_scan_catches_planted_key(self):
+        self.run_reader()
+        self.plant("Found this: " + KEY)
+        r = self.scan()
+        self.assertEqual(r.returncode, 4)
+        self.assertRegex(r.stdout, r"report\.md:\d+ secret")
+        self.assertNotIn("PRIVATE KEY", r.stdout + r.stderr)
+
+    def test_scan_catches_planted_quote(self):
+        self.run_reader()
+        self.plant("As the transcript put it, " + MARKER[5:65] + ", which matters.")
+        r = self.scan()
+        self.assertEqual(r.returncode, 4)
+        self.assertRegex(r.stdout, r"report\.md:\d+ transcript")
+        self.assertNotIn("staging", r.stdout + r.stderr)
+
+    def test_clean_report_passes(self):
+        self.run_reader()
+        r = self.scan()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_scan_needs_an_existing_date(self):
+        self.assertEqual(self.scan().returncode, 2)
 
 
 if __name__ == "__main__":
