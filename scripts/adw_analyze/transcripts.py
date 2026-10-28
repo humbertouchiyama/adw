@@ -258,8 +258,7 @@ def read_user(s, o, ts, last_assistant, pending, tool_names) -> None:
     m = o.get("message") or {}
     c = m.get("content")
     pdc = o.get("permissionDecision") or {}
-    if pdc.get("decision") == "reject":
-        s.denials["permissionDecision:" + str(pdc.get("source"))] += 1
+    marked = 0
     has_result = False
     if isinstance(c, list):
         for b in c:
@@ -275,6 +274,10 @@ def read_user(s, o, ts, last_assistant, pending, tool_names) -> None:
                 src = denial_source(result_text(b))
                 if src:
                     s.denials[src] += 1
+                    marked += 1
+    if pdc.get("decision") == "reject" and not marked:
+        # a rejected call usually also carries a marker in its error text; count the denial once
+        s.denials["permissionDecision:" + str(pdc.get("source"))] += 1
     text = text_of(c) if not has_result else ""
     if INTERRUPT in text_of(c):
         s.interrupts.append(ts)

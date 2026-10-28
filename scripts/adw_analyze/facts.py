@@ -61,7 +61,12 @@ class Intent:
 
     @property
     def run_h(self) -> float:
-        return sum((ts_seconds(s.last_ts) - ts_seconds(s.first_ts)) / 3600 for s in self.mains if s.first_ts and s.last_ts)
+        """Main-thread wall time with every gap capped like the wait, so the share compares like with like."""
+        total = 0.0
+        for s in self.mains:
+            ts = [ts_seconds(t) for t in s.turn_ts]
+            total += sum(min(b - a, WAIT_CAP_H * 3600) for a, b in zip(ts, ts[1:])) / 3600
+        return total
 
     @property
     def lead_h(self) -> float | None:
@@ -221,5 +226,6 @@ class Slice:
         return out
 
     def intents(self, anchor: str = "last_merge") -> list[Intent]:
-        return [i for i in self.facts.intents if self.in_repo(i.repo) and self.inside(getattr(i, anchor))
+        """Intents with at least one attributed session: every intent metric reads transcripts."""
+        return [i for i in self.facts.intents if i.sessions and self.in_repo(i.repo) and self.inside(getattr(i, anchor))
                 and self.side_ok(i.contract_sha, getattr(i, anchor))]

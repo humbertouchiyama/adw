@@ -93,6 +93,13 @@ class Parse(TmpCase):
         self.assertEqual(s.tool_errors["Bash"], 5)
         self.assertEqual(sum(s.tool_calls.values()), 5)
 
+    def test_permission_decision_and_marker_count_once(self):
+        s = self.session([
+            assistant("2026-10-01T10:00:00Z", "m1", tools=[tool_use("t1", "Bash", command="x")]),
+            tool_result("2026-10-01T10:00:01Z", "t1", "Permission for this action has been denied by the Claude Code auto mode classifier.",
+                        is_error=True, permissionDecision={"decision": "reject", "source": "classifier"})])
+        self.assertEqual(dict(s.denials), {"auto_mode_classifier": 1})
+
     def test_gate_calls(self):
         s = self.session([
             assistant("2026-10-01T10:00:00Z", "m1", tools=[tool_use("t1", "Bash", command="./gradlew testDebugUnitTest")]),

@@ -46,7 +46,7 @@ def session(sid, agent=None, model="claude-opus-5-5", out=0, first="2026-10-05T0
 
 def fixture():
     prs = [
-        pr(1, "[adw alpha u01] a", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", labels_ever=["blocked"],
+        pr(1, "[adw alpha u01] a", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", labels_ever=["adw:blocked"],
            block="contract   aaaaaaa\ncycles     fix 1/3 · review 0/2 progress-conditions none fired\nowner-wait 0m",
            commits=["feat: x", "fix-attempt-1: y", "fix(review): z"]),
         pr(2, "[adw alpha] Alpha", "2026-10-06T10:00:00Z", "2026-10-06T12:00:00Z",
@@ -56,7 +56,7 @@ def fixture():
         pr(4, "fix: crash after #1", "2026-10-08T10:00:00Z", "2026-10-08T11:00:00Z", body="Follow-up to #1."),
         pr(10, "adw-build: x", "2026-10-09T10:00:00Z", "2026-10-09T11:00:00Z", repo="adw", files=["commands/adw-build.md"]),
     ]
-    open_prs = [pr(3, "[adw beta u01] b", "2026-10-07T10:00:00Z", state="OPEN", labels_now=["failed"])]
+    open_prs = [pr(3, "[adw beta u01] b", "2026-10-07T10:00:00Z", state="OPEN", labels_now=["adw:failed"])]
     sessions = [
         session("m1", out=1_000_000, first="2026-10-05T08:00:00Z", last="2026-10-06T12:00:00Z",
                 prompts=[("2026-10-05T09:00:00Z", "2026-10-05T08:30:00Z"), ("2026-10-05T20:00:00Z", "2026-10-05T00:00:00Z")],
@@ -142,6 +142,19 @@ class Values(unittest.TestCase):
         self.assertEqual(self.v("friction.compactions_limit.v1").value, 1)
         self.assertEqual(self.v("friction.compactions_idle.v1").value, 1)
         self.assertAlmostEqual(self.v("time.gate_fg_hours.v1").value, 1.0)
+
+    def test_run_hours_cap_gaps_like_the_wait(self):
+        alpha = next(i for i in self.facts.intents if i.slug == "alpha")
+        m1 = alpha.mains[0]
+        m1.turn_ts = ["2026-10-05T08:00:00Z", "2026-10-05T09:00:00Z", "2026-10-06T05:00:00Z"]
+        self.assertAlmostEqual(alpha.run_h, 13.0)
+
+    def test_intents_without_sessions_are_not_zero_cost(self):
+        F.Intent  # beta has sessions; add a third intent with a merged PR and no session
+        self.facts.prs.append(pr(5, "[adw gamma u01] g", "2026-10-09T10:00:00Z", "2026-10-09T12:00:00Z"))
+        facts = F.assemble([APP, ADW], {"app": [s for s in self.facts.sessions]}, self.facts.prs, self.facts.open_prs, until=END)
+        r = compute("cost.usd_per_intent_median.v1", F.Slice(facts, START, END))
+        self.assertEqual(r.n, 1)
 
     def test_lead_time(self):
         self.assertAlmostEqual(self.v("time.intent_lead_hours_median.v1").value, 27.0)

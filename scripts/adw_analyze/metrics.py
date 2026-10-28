@@ -193,14 +193,14 @@ def label_rate(sl, label):
     return ratio(sum(1 for p in opened if label in p.labels_ever), len(opened)), len(opened), {}
 
 
-@metric("outcome.ever_blocked_rate", "rate", 20, "ratio", "opened ADW PRs that ever had the blocked label")
+@metric("outcome.ever_blocked_rate", "rate", 20, "ratio", "opened ADW PRs that ever had the adw:blocked label")
 def _(sl):
-    return label_rate(sl, "blocked")
+    return label_rate(sl, "adw:blocked")
 
 
-@metric("outcome.failed_rate", "rate", 20, "ratio", "opened ADW PRs that ever had the failed label")
+@metric("outcome.failed_rate", "rate", 20, "ratio", "opened ADW PRs that ever had the adw:failed label")
 def _(sl):
-    return label_rate(sl, "failed")
+    return label_rate(sl, "adw:failed")
 
 
 @metric("outcome.fix_cycles_per_pr", "rate", 20, "count", "mean max N of fix-attempt-N over merged ADW PRs (inherited commits excluded)")
@@ -386,10 +386,10 @@ metric("design.review_cap_reached", "count", 1, "count", "cycles rows with revie
 
 
 def open_bf(sl):
-    return [p for p in sl.facts.open_prs if p.adw and p.labels_now & {"blocked", "failed"}]
+    return [p for p in sl.facts.open_prs if p.adw and p.labels_now & {"adw:blocked", "adw:failed"}]
 
 
-@metric("design.open_blocked_failed", "count", 1, "count", "open ADW PRs labelled blocked or failed, as of the window end (design §8: over 5 kills)")
+@metric("design.open_blocked_failed", "count", 1, "count", "open ADW PRs labelled adw:blocked or adw:failed, as of the window end (design §8: over 5 kills)")
 def _(sl):
     if not sl.is_current:
         return None, 0, {}
