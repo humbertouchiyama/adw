@@ -28,6 +28,9 @@ if argv[:2] == ["repo", "view"]:
         sys.exit(1)
     print(vis)
     sys.exit(0)
+if argv[:2] == ["issue", "create"]:
+    print("https://github.com/o/r/issues/1")
+    sys.exit(0)
 if argv[:2] == ["api", "graphql"]:
     fields = {}
     for i, a in enumerate(argv):
