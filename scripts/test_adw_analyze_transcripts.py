@@ -105,6 +105,12 @@ class Parse(TmpCase):
                            "permissionDecision": {"decision": "reject", "source": "sk-ant-api03 secret value here"}}])
         self.assertEqual(dict(s.denials), {"permissionDecision:other": 1})
 
+    def test_tool_error_keys_are_short(self):
+        s = self.session([
+            assistant("2026-10-01T10:00:00Z", "m1", tools=[tool_use("t1", "mcp__xcode-mcp__DeviceInteractionSynthesize")]),
+            tool_result("2026-10-01T10:00:01Z", "t1", "boom", is_error=True)])
+        self.assertEqual(dict(s.tool_errors), {"mcp__xcode-mcp": 1})
+
     def test_gate_calls(self):
         s = self.session([
             assistant("2026-10-01T10:00:00Z", "m1", tools=[tool_use("t1", "Bash", command="./gradlew testDebugUnitTest")]),

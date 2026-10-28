@@ -49,6 +49,15 @@ DENIALS = [
 IDLE_NOTICE = "Compacted while idle"
 SOURCE = re.compile(r"^[a-z_]{1,32}$")
 TYPE = re.compile(r"^[a-z][a-z-]{0,39}$")
+TOOL = re.compile(r"^[A-Za-z_]{1,32}$")
+SERVER = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
+
+
+def tool_key(name) -> str:
+    """An MCP tool name is long and sits verbatim in transcripts, so it trips the leak scan: keep the server."""
+    if isinstance(name, str) and name.startswith("mcp__"):
+        return "mcp__" + safe(name.split("__")[1] if name.count("__") >= 2 else "", SERVER)
+    return safe(name, TOOL)
 
 
 def safe(value, rx: re.Pattern) -> str:
@@ -277,7 +286,7 @@ def read_user(s, o, ts, last_assistant, pending, tool_names) -> None:
                 gate, start = pending.pop(tid)
                 s.gate_calls.append((gate, start, ts_seconds(ts) - ts_seconds(start)))
             if b.get("is_error"):
-                s.tool_errors[tool_names.get(tid, "?")] += 1
+                s.tool_errors[tool_key(tool_names.get(tid))] += 1
                 src = denial_source(result_text(b))
                 if src:
                     s.denials[src] += 1
