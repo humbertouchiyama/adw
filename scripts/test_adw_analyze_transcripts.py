@@ -100,6 +100,11 @@ class Parse(TmpCase):
                         is_error=True, permissionDecision={"decision": "reject", "source": "classifier"})])
         self.assertEqual(dict(s.denials), {"auto_mode_classifier": 1})
 
+    def test_keys_from_transcripts_are_sanitized(self):
+        s = self.session([{"type": "user", "timestamp": "2026-10-01T10:01:00Z", "message": {"content": "x"},
+                           "permissionDecision": {"decision": "reject", "source": "sk-ant-api03 secret value here"}}])
+        self.assertEqual(dict(s.denials), {"permissionDecision:other": 1})
+
     def test_gate_calls(self):
         s = self.session([
             assistant("2026-10-01T10:00:00Z", "m1", tools=[tool_use("t1", "Bash", command="./gradlew testDebugUnitTest")]),

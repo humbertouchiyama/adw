@@ -47,6 +47,13 @@ DENIALS = [
     ("built-in Claude Code safety", "builtin_safety"),
 ]
 IDLE_NOTICE = "Compacted while idle"
+SOURCE = re.compile(r"^[a-z_]{1,32}$")
+TYPE = re.compile(r"^[a-z][a-z-]{0,39}$")
+
+
+def safe(value, rx: re.Pattern) -> str:
+    """Values that become output keys come from transcripts: keep only enum-shaped ones."""
+    return value if isinstance(value, str) and rx.match(value) else "other"
 INTERRUPT = "[Request interrupted by user"
 
 
@@ -170,7 +177,7 @@ def read_session(path: str, gates: dict[str, str]) -> SessionFacts:
             t = o.get("type")
             ts = o.get("timestamp")
             if t not in KNOWN_TYPES:
-                s.unknown_types[str(t)] += 1
+                s.unknown_types[safe(t, TYPE)] += 1
                 continue
             if o.get("gitBranch"):
                 s.branches[o["gitBranch"]] += 1
@@ -277,7 +284,7 @@ def read_user(s, o, ts, last_assistant, pending, tool_names) -> None:
                     marked += 1
     if pdc.get("decision") == "reject" and not marked:
         # a rejected call usually also carries a marker in its error text; count the denial once
-        s.denials["permissionDecision:" + str(pdc.get("source"))] += 1
+        s.denials["permissionDecision:" + safe(pdc.get("source"), SOURCE)] += 1
     text = text_of(c) if not has_result else ""
     if INTERRUPT in text_of(c):
         s.interrupts.append(ts)

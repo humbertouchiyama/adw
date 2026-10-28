@@ -175,6 +175,12 @@ class Values(unittest.TestCase):
         prior = F.Slice(self.facts, "2026-09-03T00:00:00Z", START)
         self.assertEqual(compute("design.open_blocked_failed.v1", prior).status, "no data")
 
+    def test_contract_prs_split_by_the_clock(self):
+        after = F.Slice(self.facts, START, END, side=("after", "M"), is_after=lambda m, c: True, split_at="2026-10-09T12:00:00Z")
+        before = F.Slice(self.facts, START, END, side=("before", "M"), is_after=lambda m, c: True, split_at="2026-10-09T12:00:00Z")
+        self.assertEqual([p.number for p in after.contract_prs()], [])
+        self.assertEqual([p.number for p in before.contract_prs()], [10])
+
     def test_loop_counts(self):
         self.facts.predict_lines = {10: [SimpleNamespace(kind="none")]}
         self.assertEqual(self.v("loop.contract_prs_merged.v1").value, 1)

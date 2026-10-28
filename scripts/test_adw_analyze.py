@@ -3,6 +3,8 @@ import json
 import os
 import unittest
 
+from adw_analyze.cli import lookback_since
+
 from adw_analyze.metrics import REGISTRY
 from adw_analyze.testkit import (TmpCase, assistant, pr_node, tool_result, tool_use, user_prompt, write_session,
                                  write_subagent)
@@ -77,6 +79,21 @@ class E2E(Fixture):
         halts = next(line for line in report.splitlines() if "owner.halts_per_merged_pr.v1" in line)
         self.assertNotIn("%", halts)
 
+    def test_a_record_whose_line_changed_still_prints(self):
+        self.write_json(os.path.join(self.reports, "2026-10-20", "metrics.json"), {"verdicts": {"7:deadbeef": {
+            "verdict": "failed", "of_record": True, "pr": 7, "metric": "outcome.fix_cycles_per_pr.v1",
+            "for_path": "commands/adw-init.md", "section": "4", "line": "predicts  …"}}})
+        self.git("add", ".", cwd=self.reports)
+        self.git("commit", "-q", "-m", "old report", cwd=self.reports)
+        self.assertEqual(self.run_reader().returncode, 0)
+        report = self.out("report.md")
+        verdicts = report.split("## Verdicts")[1].split("## Delete candidates")[0]
+        deletes = report.split("## Delete candidates")[1].split("## Metrics")[0]
+        self.assertIn("#7", verdicts)
+        self.assertIn("record stands", verdicts)
+        self.assertIn("#7 `commands/adw-init.md` §4", deletes)
+        self.assertIn("critical pass: pending", self.out("issue.md"))
+
     def test_same_date_twice_exits_2(self):
         self.assertEqual(self.run_reader().returncode, 0)
         before = self.out("report.md")
@@ -142,6 +159,20 @@ class Leak(Fixture):
         self.assertRegex(r.stdout, r"report\.md:\d+ transcript")
         self.assertNotIn("staging", r.stdout + r.stderr)
 
+    def test_scan_catches_a_quote_beside_the_word_predicts(self):
+        self.run_reader()
+        self.plant("#9 predicts a drop, but the session says " + MARKER[5:65])
+        self.assertEqual(self.scan().returncode, 4)
+
+    def test_scan_reads_every_string_of_a_record(self):
+        hidden = "this sentence lives only in a tool use result and nowhere in the message itself ok"
+        write_session(self.projects, "-app", "m5", [{"type": "user", "timestamp": "2026-10-21T08:00:00Z",
+                      "message": {"content": [{"type": "tool_result", "tool_use_id": "z", "content": "short"}]},
+                      "toolUseResult": {"originalFile": hidden}}])
+        self.run_reader()
+        self.plant("quote: " + hidden)
+        self.assertEqual(self.scan().returncode, 4)
+
     def test_clean_report_passes(self):
         self.run_reader()
         r = self.scan()
@@ -149,6 +180,17 @@ class Leak(Fixture):
 
     def test_scan_needs_an_existing_date(self):
         self.assertEqual(self.scan().returncode, 2)
+
+
+class Lookback(unittest.TestCase):
+    def test_reaches_back_to_the_oldest_baseline_but_not_past_retention(self):
+        from types import SimpleNamespace as P
+        until = "2026-12-01T00:00:00Z"
+        self.assertEqual(lookback_since(until, 28, []), "2026-10-06T00:00:00Z")
+        old = P(merged="2026-10-01T00:00:00Z", by="2026-11-19")      # baseline from 09-03
+        self.assertEqual(lookback_since(until, 28, [old]), "2026-09-03T00:00:00Z")
+        older = P(merged="2026-08-01T00:00:00Z", by="2026-09-01")
+        self.assertEqual(lookback_since(until, 28, [older]), "2026-09-02T00:00:00Z")   # until − 90 d
 
 
 if __name__ == "__main__":

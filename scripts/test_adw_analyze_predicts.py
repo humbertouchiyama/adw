@@ -61,6 +61,19 @@ class Parse(unittest.TestCase):
                     "predicts  cost.usd_per_merged_pr.v1 down 10% by 2026-11-20 for commands/adw-build.md §3.6\n")
         self.assertNotEqual(a.key, b.key)
 
+    def test_backticks_and_bullets(self):
+        a, b = read("`predicts  cost.usd_per_merged_pr.v1 down 10% by 2026-11-20 for commands/adw-build.md §3.4`\n"
+                    "- predicts  cost.usd_per_merged_pr.v1 down 10% by 2026-11-20 for commands/adw-build.md\n")
+        self.assertEqual((a.for_path, a.section), ("commands/adw-build.md", "3.4"))
+        self.assertIsInstance(b, Prediction)
+
+    def test_up_to_zero_and_unknown_repo_rejected(self):
+        [r] = read("predicts  outcome.ever_blocked_rate.v1 up to-zero by 2026-11-20 for commands/adw-build.md")
+        self.assertEqual(r.reason, "bad grammar")
+        [r] = read_predictions(contract_pr("predicts  outcome.ever_blocked_rate.v1 down 10% by 2026-11-20 for commands/adw-build.md repo nope"),
+                               lambda sha, path: path in EXISTS, repos={"app"})
+        self.assertEqual(r.reason, "unknown repo")
+
     def test_prose_and_unmerged_are_ignored(self):
         self.assertEqual(read("This predicts nothing.\nThe word predicts appears here."), [])
         self.assertEqual(read("predicts  none — x", merged=None), [])

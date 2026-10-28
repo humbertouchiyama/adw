@@ -87,6 +87,7 @@ class Facts:
     repo_of: dict
     excluded_sessions: int = 0
     predict_lines: dict = field(default_factory=dict)
+    since: str | None = None
 
     def role_of(self, repo_name: str) -> str:
         return next((r.role for r in self.repos if r.name == repo_name), "app")
@@ -101,7 +102,8 @@ class Facts:
 
 
 def assemble(repos: list[Repo], sessions_by_repo: dict[str, list[SessionFacts]], prs: list[PR], open_prs: list[PR],
-             until: str, excluded_sessions: int = 0) -> Facts:
+             until: str, excluded_sessions: int = 0, since: str | None = None) -> Facts:
+    """since: the earliest time the data covers; a baseline that starts before it is no data."""
     slug_of, repo_of, intents = {}, {}, {}
     for p in prs:
         if p.adw and p.slug:
@@ -121,7 +123,7 @@ def assemble(repos: list[Repo], sessions_by_repo: dict[str, list[SessionFacts]],
                 intents[(r.name, slug)].sessions.append(s)
     sessions = [s for r in repos for s in sessions_by_repo.get(r.name, [])]
     return Facts(until=until, repos=repos, sessions=sessions, prs=prs, open_prs=open_prs, intents=list(intents.values()),
-                 slug_of=slug_of, repo_of=repo_of, excluded_sessions=excluded_sessions)
+                 slug_of=slug_of, repo_of=repo_of, excluded_sessions=excluded_sessions, since=since)
 
 
 def transcript_paths(projects_dir: str, repo: Repo) -> list[str]:
@@ -159,7 +161,7 @@ def build_facts(repos: list[Repo], projects_dir: str, until: str, since: str,
         prs += fetch_prs(r, since if r.role == "app" else None)
         if r.role == "app":
             open_prs += fetch_open_prs(r)
-    return assemble(repos, by_repo, prs, open_prs, until, excluded)
+    return assemble(repos, by_repo, prs, open_prs, until, excluded, since)
 
 
 class Slice:
@@ -213,7 +215,7 @@ class Slice:
 
     def contract_prs(self, field: str = "merged") -> list[PR]:
         return [p for p in self.facts.prs if self.facts.role_of(p.repo) == "contract" and self.inside(getattr(p, field))
-                and any(f.startswith(("commands/", "scripts/")) for f in p.files)]
+                and any(f.startswith(("commands/", "scripts/")) for f in p.files) and self.side_ok(None, getattr(p, field))]
 
     def sessions(self) -> list[SessionFacts]:
         out = []

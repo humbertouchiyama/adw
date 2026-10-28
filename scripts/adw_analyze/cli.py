@@ -16,9 +16,11 @@ from .github import SourceError
 from .metrics import REGISTRY, compute
 from .predicts import read_predictions
 from .report import Run, write_outputs
-from .verdicts import git_is_after, git_path_exists, git_watch_changed, judge, read_records
+from .github import fetch_prs
+from .verdicts import baseline_start, git_is_after, git_path_exists, git_watch_changed, judge, read_records
+from .transcripts import ts_seconds
 
-LOOKBACK_DAYS = 77
+RETENTION_DAYS = 90  # cleanupPeriodDays (spec §5.6): nothing older exists to read
 
 
 def parse(argv: list[str]) -> argparse.Namespace:
@@ -79,12 +81,15 @@ def analyze(reports: str, repos: list, args) -> int:
         return fail(2, "name the adw checkout with --adw or a contract repo checkout in sources.json")
     window = (stamp(end - timedelta(days=args.days)), until)
     prior = (stamp(end - timedelta(days=2 * args.days)), window[0])
+    exists, is_after = git_path_exists(adw_dir), git_is_after(adw_dir)
+    app_names = {r.name for r in repos if r.role == "app"}
     try:
-        facts = build_facts(repos, args.projects, until, stamp(end - timedelta(days=LOOKBACK_DAYS)))
+        early = [x for r in repos if r.role == "contract" for p in fetch_prs(r, None)
+                 for x in read_predictions(p, exists, app_names) if x.kind == "prediction"]
+        facts = build_facts(repos, args.projects, until, lookback_since(until, args.days, early))
     except SourceError as e:
         return fail(1, str(e))
-    exists, is_after = git_path_exists(adw_dir), git_is_after(adw_dir)
-    lines = {p.number: read_predictions(p, exists) for p in facts.prs if facts.role_of(p.repo) == "contract"}
+    lines = {p.number: read_predictions(p, exists, app_names) for p in facts.prs if facts.role_of(p.repo) == "contract"}
     facts.predict_lines = lines
     predictions = [x for xs in lines.values() for x in xs if x.kind == "prediction"]
     rejected = [x for xs in lines.values() for x in xs if x.kind == "rejected"]
@@ -104,6 +109,14 @@ def analyze(reports: str, repos: list, args) -> int:
         shutil.rmtree(tmp, ignore_errors=True)
     print(out)
     return 0
+
+
+def lookback_since(until: str, days: int, predictions: list) -> str:
+    """Read back to the prior window and to every prediction's baseline start, never past retention."""
+    end = ts_seconds(until)
+    want = min([end - 2 * days * 86400] + [ts_seconds(baseline_start(p)) for p in predictions])
+    floor = end - RETENTION_DAYS * 86400
+    return stamp(datetime.fromtimestamp(max(want, floor), timezone.utc))
 
 
 def load_legacy(reports: str) -> list:

@@ -12,7 +12,7 @@ APP = Repo(name="app", slug="o/app", base="develop")
 ADW = Repo(name="adw", slug="o/adw", role="contract", base="main")
 MERGE = "2026-10-10T00:00:00Z"
 BY = "2026-10-31"
-NEVER = lambda repo, start, end: False  # noqa: E731
+NEVER = lambda repo, start, end: None  # noqa: E731
 
 
 def day(d, h=12):
@@ -51,8 +51,8 @@ class Base(TmpCase):
     def sample(self, before_fix=10, after_fix=6):
         return self.prs(20, self.sha["A"], before_fix, "10-01") + self.prs(20, self.sha["C"], after_fix, "10-20")
 
-    def facts(self, prs, until="2026-11-01T00:00:00Z"):
-        return F.assemble([APP, ADW], {"app": []}, prs, [], until=until)
+    def facts(self, prs, until="2026-11-01T00:00:00Z", since=None):
+        return F.assemble([APP, ADW], {"app": []}, prs, [], until=until, since=since)
 
     def judge(self, p, prs, others=(), watch=NEVER, until="2026-11-01T00:00:00Z"):
         return V.judge(p, self.facts(prs, until), [p, *others], self.is_after, watch)
@@ -117,8 +117,23 @@ class Judge(Base):
         self.assertEqual(self.judge(self.prediction(), self.sample(), others=[other_metric]).verdict, "worked")
 
     def test_confounded_by_watch_path(self):
-        v = self.judge(self.prediction(), self.sample(), watch=lambda repo, start, end: True)
-        self.assertEqual((v.verdict, v.cause), ("confounded", "watch path changed"))
+        v = self.judge(self.prediction(), self.sample(), watch=lambda repo, start, end: "watch path changed in app")
+        self.assertEqual((v.verdict, v.cause), ("confounded", "watch path changed in app"))
+
+    def test_met_exactly_is_worked(self):
+        prs = self.prs(5, self.sha["A"], 1, "10-01") + self.prs(15, self.sha["A"], 0, "10-01")
+        prs += self.prs(4, self.sha["C"], 1, "10-20") + self.prs(16, self.sha["C"], 0, "10-20")
+        self.assertEqual(self.judge(self.prediction(amount=20.0), prs).verdict, "worked")      # 0.25 -> 0.20 is -20%
+        self.assertEqual(self.judge(self.prediction(amount=0.05, unit="abs"), prs).verdict, "worked")
+
+    def test_baseline_before_the_data_is_no_data(self):
+        p = self.prediction()
+        facts = self.facts(self.sample(), since="2026-09-25T00:00:00Z")   # baseline starts 09-19
+        v = V.judge(p, facts, [p], self.is_after, NEVER)
+        self.assertEqual((v.verdict, v.cause), ("no data", "baseline starts before the data read"))
+
+    def test_baseline_start(self):
+        self.assertEqual(V.baseline_start(self.prediction()), "2026-09-19T00:00:00Z")
 
 
 class Records(Base):
@@ -137,6 +152,23 @@ class Records(Base):
         early = V.record_entry(self.judge(self.prediction(key="15:eeee"), self.sample(), until="2026-10-25T00:00:00Z"), recs)
         self.assertFalse(early["of_record"])
 
+    def test_records_only_from_committed_files(self):
+        reports = self.git_repo("reports")
+        self.write_json(os.path.join(reports, "2026-11-02", "metrics.json"), {"verdicts": {"12:aaaa": {"verdict": "failed", "of_record": True}}})
+        self.assertEqual(V.read_records(reports), {})
+        self.git("add", ".", cwd=reports)
+        self.git("commit", "-q", "-m", "r", cwd=reports)
+        self.assertEqual(V.read_records(reports)["12:aaaa"]["verdict"], "failed")
+
+    def test_record_keeps_what_the_line_said(self):
+        reports = self.mkdir("reports")
+        entry = {"verdict": "failed", "of_record": True, "pr": 12, "metric": "m.v1", "for_path": "commands/x.md",
+                 "section": "3.4", "line": "predicts  m.v1 down 10% by 2026-11-01 for commands/x.md §3.4"}
+        self.write_json(os.path.join(reports, "2026-11-02", "metrics.json"), {"verdicts": {"12:aaaa": entry}})
+        rec = V.read_records(reports)["12:aaaa"]
+        self.assertEqual((rec["pr"], rec["metric"], rec["for_path"], rec["section"], rec["date"]),
+                         (12, "m.v1", "commands/x.md", "3.4", "2026-11-02"))
+
 
 class Watch(Base):
     def test_git_watch_changed(self):
@@ -154,6 +186,9 @@ class Watch(Base):
         self.git("fetch", "-q", "origin", cwd=app)
         repo = Repo(name="app", slug="o/app", checkout=app, base="develop", watch=["repo-profile.md"])
         changed = V.git_watch_changed([repo, ADW])
-        self.assertTrue(changed(None, "2026-10-10T00:00:00Z", "2026-10-20T00:00:00Z"))
-        self.assertFalse(changed("app", "2026-10-16T00:00:00Z", "2026-10-20T00:00:00Z"))
-        self.assertFalse(changed("other", "2026-10-10T00:00:00Z", "2026-10-20T00:00:00Z"))
+        self.assertEqual(changed(None, "2026-10-10T00:00:00Z", "2026-10-20T00:00:00Z"), "watch path changed in app")
+        self.assertIsNone(changed("app", "2026-10-16T00:00:00Z", "2026-10-20T00:00:00Z"))
+        self.assertIsNone(changed("other", "2026-10-10T00:00:00Z", "2026-10-20T00:00:00Z"))
+        broken = Repo(name="app", slug="o/app", checkout=app, base="no-such-branch", watch=["repo-profile.md"])
+        self.assertEqual(V.git_watch_changed([broken])(None, "2026-10-10T00:00:00Z", "2026-10-20T00:00:00Z"),
+                         "watch check failed in app")

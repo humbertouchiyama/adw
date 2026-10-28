@@ -87,13 +87,22 @@ def totals(facts: Facts) -> dict:
 
 
 def entries(run: Run) -> dict:
+    by_key = {p.key: p for p in run.predictions}
     out = {}
     for v in run.verdicts:
+        p = by_key[v.key]
         e = record_entry(v, run.records)
         e.update(baseline=v.baseline.value, after=v.after.value, n_baseline=v.baseline.n, n_after=v.after.n,
-                 unknown_shas=len(v.unknown_shas))
+                 unknown_shas=len(v.unknown_shas), pr=p.pr, metric=p.metric, for_path=p.for_path, section=p.section,
+                 line=p.line)
         out[v.key] = e
     return out
+
+
+def orphans(run: Run) -> list:
+    """Records whose predicts line changed or was removed: the record stands (spec §5.3)."""
+    live = {p.key for p in run.predictions}
+    return [dict(r, key=k) for k, r in sorted(run.records.items()) if k not in live]
 
 
 def metrics_json(run: Run, verdicts: dict, t: dict) -> dict:
@@ -116,7 +125,10 @@ def metrics_json(run: Run, verdicts: dict, t: dict) -> dict:
 
 
 def delete_candidates(run: Run, verdicts: dict) -> list:
-    return [p for p in run.predictions if verdicts.get(p.key, {}).get("verdict") == "failed"]
+    """(pr, for_path, section, metric) of every failed verdict of record, live or orphaned."""
+    out = [(p.pr, p.for_path, p.section, p.metric) for p in run.predictions if verdicts.get(p.key, {}).get("verdict") == "failed"]
+    out += [(r.get("pr"), r.get("for_path"), r.get("section"), r.get("metric")) for r in orphans(run) if r.get("verdict") == "failed"]
+    return out
 
 
 def report_md(run: Run, verdicts: dict, t: dict) -> str:
@@ -140,10 +152,14 @@ def report_md(run: Run, verdicts: dict, t: dict) -> str:
                        f"(n {e['n_baseline']}) | {fmt(p.metric, e['after'])} (n {e['n_after']}) | {e['verdict']} | {note} |")
     else:
         out.append("No predicts lines yet.")
+    lost = orphans(run)
+    if lost:
+        out += ["", "Records whose predicts line changed or was removed (the record stands):", ""]
+        out += [f"- #{r.get('pr')} `{r.get('metric')}` — {r.get('verdict')} ({r.get('date')}); record stands" for r in lost]
     out += ["", "## Delete candidates", ""]
     cands = delete_candidates(run, verdicts)
-    out += [f"- #{p.pr} `{p.for_path}`{' §' + p.section if p.section else ''} — `{p.metric}` failed. The owner decides."
-            for p in cands] or ["None."]
+    out += [f"- #{pr} `{path}`{' §' + sec if sec else ''} — `{metric}` failed. The owner decides."
+            for pr, path, sec, metric in cands] or ["None."]
     out += ["", "## Metrics", "", "| id | window | prior | change | n |", "|---|---|---|---|---|"]
     out += metric_rows(run, lambda m: m.group not in (SELF_REPORT, LOOP))
     bds = [(mid, run.win[mid].breakdown) for mid in REGISTRY if run.win[mid].breakdown]
@@ -192,8 +208,8 @@ def issue_md(run: Run, verdicts: dict) -> str:
     out += ["", "Moved most (predictable, both windows ok):"]
     out += [f"- `{mid}`: {fmt(mid, p.value)} → {fmt(mid, w.value)} ({c:+.0f}%)" for _, mid, c, w, p in moved[:5]] or ["- none"]
     out += ["", "Delete candidates:"]
-    out += [f"- #{p.pr} `{p.for_path}` — `{p.metric}`" for p in delete_candidates(run, verdicts)] or ["- none"]
-    out += ["", "leak scan: pending", "", f"Report: `{run.date}/report.md`", ""]
+    out += [f"- #{pr} `{path}` — `{metric}`" for pr, path, _, metric in delete_candidates(run, verdicts)] or ["- none"]
+    out += ["", "critical pass: pending", "leak scan: pending", "", f"Report: `{run.date}/report.md`", ""]
     return "\n".join(out)
 
 

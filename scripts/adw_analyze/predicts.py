@@ -17,11 +17,12 @@ from .metrics import REGISTRY
 from .transcripts import ts_seconds
 
 MAX_DAYS = 49
-START = re.compile(r"^\s*`?predicts\s")
-LINE = re.compile(r"^\s*`?predicts\s+(?P<metric>[a-z0-9_.-]+)\s+(?P<dir>down|up)\s+(?P<amt>to-zero|\d+(?:\.\d+)?%?)"
-                  r"\s+by\s+(?P<by>\d{4}-\d{2}-\d{2})\s+for\s+(?P<path>\S+)(?:\s+§(?P<sec>\S+))?"
-                  r"(?:\s+repo\s+(?P<repo>\S+))?\s*`?\s*$")
-NONE = re.compile(r"^\s*`?predicts\s+none\s*(?:—|--|-)\s*(?P<reason>.*?\S)\s*`?\s*$")
+LEAD = r"^\s*(?:[-*]\s+)?`?predicts\s"
+START = re.compile(LEAD)
+LINE = re.compile(LEAD + r"*(?P<metric>[a-z0-9_.-]+)\s+(?P<dir>down|up)\s+(?P<amt>to-zero|\d+(?:\.\d+)?%?)"
+                  r"\s+by\s+(?P<by>\d{4}-\d{2}-\d{2})\s+for\s+(?P<path>[^\s`]+)(?:\s+§(?P<sec>[^\s`]+))?"
+                  r"(?:\s+repo\s+(?P<repo>[^\s`]+))?\s*`?\s*$")
+NONE = re.compile(LEAD + r"*none\s*(?:—|--|-)\s*(?P<reason>.*?[^\s`])\s*`?\s*$")
 
 
 @dataclass
@@ -57,23 +58,23 @@ class Rejected:
     kind = "rejected"
 
 
-def read_predictions(pr: PR, path_exists: Callable[[str, str], bool]) -> list:
+def read_predictions(pr: PR, path_exists: Callable[[str, str], bool], repos: set | None = None) -> list:
     if not pr.merged:
         return []
     out = []
     for raw in (pr.body or "").splitlines():
         if not START.match(raw):
             continue
-        line = raw.strip().strip("`").strip()
+        line = re.sub(r"^[-*]\s+", "", raw.strip()).strip("`").strip()
         n = NONE.match(raw)
         if n:
             out.append(NoPrediction(pr=pr.number, reason=n.group("reason")))
             continue
         m = LINE.match(raw)
-        if not m:
+        if not m or (m.group("amt") == "to-zero" and m.group("dir") == "up"):
             out.append(Rejected(pr=pr.number, line=line, reason="bad grammar"))
             continue
-        reason = check(m, pr, path_exists)
+        reason = check(m, pr, path_exists, repos)
         if reason:
             out.append(Rejected(pr=pr.number, line=line, reason=reason))
             continue
@@ -87,12 +88,14 @@ def read_predictions(pr: PR, path_exists: Callable[[str, str], bool]) -> list:
     return out
 
 
-def check(m: re.Match, pr: PR, path_exists: Callable[[str, str], bool]) -> str | None:
+def check(m: re.Match, pr: PR, path_exists: Callable[[str, str], bool], repos: set | None) -> str | None:
     metric = REGISTRY.get(m.group("metric"))
     if metric is None:
         return "unknown metric"
     if not metric.predictable:
         return "metric not predictable"
+    if m.group("repo") and repos is not None and m.group("repo") not in repos:
+        return "unknown repo"
     if not path_exists(pr.merge_sha or "", m.group("path")):
         return "path not at merge commit"
     days = (ts_seconds(m.group("by") + "T00:00:00Z") - ts_seconds(pr.merged)) / 86400

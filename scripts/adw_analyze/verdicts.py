@@ -22,6 +22,7 @@ from .predicts import Prediction
 from .transcripts import ts_seconds
 
 BASELINE_CAP_DAYS = 28
+EPS = 1e-9  # rates built from small counts land exactly on the predicted amount
 DATED = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -62,24 +63,34 @@ def git_path_exists(adw_dir: str) -> Callable[[str, str], bool]:
     return exists
 
 
-def git_watch_changed(repos: list[Repo]) -> Callable[[str | None, str, str], bool]:
-    def changed(repo_name: str | None, start: str, end: str) -> bool:
+def git_watch_changed(repos: list[Repo]) -> Callable[[str | None, str, str], str | None]:
+    """→ the confounding cause, or None. A git error is a cause too: silence must not read as "unchanged"."""
+    fetched = set()
+
+    def changed(repo_name: str | None, start: str, end: str) -> str | None:
         for r in repos:
-            if r.role != "app" or not r.watch or not r.checkout or (repo_name and r.name != repo_name):
+            if r.role != "app" or not r.watch or (repo_name and r.name != repo_name):
                 continue
-            out = subprocess.run(["git", "-C", r.checkout, "log", "--format=%H", f"origin/{r.base}", f"--since={start}",
-                                  f"--until={end}", "--", *r.watch], capture_output=True, text=True).stdout
-            if out.strip():
-                return True
-        return False
+            if r.name not in fetched:
+                fetched.add(r.name)
+                subprocess.run(["git", "-C", r.checkout or ".", "fetch", "-q", "origin", r.base], capture_output=True)
+            res = subprocess.run(["git", "-C", r.checkout or ".", "log", "--format=%H", f"origin/{r.base}",
+                                  f"--since={start}", f"--until={end}", "--", *r.watch], capture_output=True, text=True)
+            if not r.checkout or res.returncode != 0:
+                return f"watch check failed in {r.name}"
+            if res.stdout.strip():
+                return f"watch path changed in {r.name}"
+        return None
     return changed
 
 
-def spans(p: Prediction, facts: Facts) -> tuple[str, str]:
+def baseline_start(p: Prediction) -> str:
     m, by = ts_seconds(p.merged), ts_seconds(deadline(p))
-    start = iso(m - min(by - m, BASELINE_CAP_DAYS * 86400))
-    end = iso(min(by, ts_seconds(facts.until)))
-    return start, end
+    return iso(m - min(by - m, BASELINE_CAP_DAYS * 86400))
+
+
+def spans(p: Prediction, facts: Facts) -> tuple[str, str]:
+    return baseline_start(p), iso(min(ts_seconds(deadline(p)), ts_seconds(facts.until)))
 
 
 def overlapping(p: Prediction, others: list[Prediction], start: str) -> Prediction | None:
@@ -94,14 +105,14 @@ def overlapping(p: Prediction, others: list[Prediction], start: str) -> Predicti
 
 def met(p: Prediction, b: float, a: float) -> bool | None:
     if p.unit == "zero":
-        return a == 0
+        return abs(a) < EPS
     if p.unit == "pct":
         if b == 0:
             return None
         change = (a - b) / abs(b) * 100
     else:
         change = a - b
-    return (-change if p.direction == "down" else change) >= p.amount
+    return (-change if p.direction == "down" else change) >= p.amount - EPS
 
 
 def judge(p: Prediction, facts: Facts, all_predictions: list[Prediction], is_after: Callable[[str, str], bool | None],
@@ -115,12 +126,16 @@ def judge(p: Prediction, facts: Facts, all_predictions: list[Prediction], is_aft
     if ts_seconds(facts.until) < ts_seconds(deadline(p)):
         v.verdict = "too early"
         return v
+    if facts.since and ts_seconds(start) < ts_seconds(facts.since):
+        v.verdict, v.cause = "no data", "baseline starts before the data read"
+        return v
     other = overlapping(p, all_predictions, start)
     if other:
         v.verdict, v.cause = "confounded", f"overlaps #{other.pr}"
         return v
-    if watch_changed(p.repo, start, deadline(p)):
-        v.verdict, v.cause = "confounded", "watch path changed" + (f" in {p.repo}" if p.repo else "")
+    cause = watch_changed(p.repo, start, deadline(p))
+    if cause:
+        v.verdict, v.cause = "confounded", cause
         return v
     if baseline.status != "ok" or after.status != "ok":
         v.verdict = "no data"
@@ -133,14 +148,24 @@ def judge(p: Prediction, facts: Facts, all_predictions: list[Prediction], is_aft
     return v
 
 
+def committed(reports_dir: str) -> set | None:
+    """Dated folders whose metrics.json git tracks; None when the dir is not a git checkout."""
+    r = subprocess.run(["git", "-C", reports_dir, "ls-files", "--", "*/metrics.json"], capture_output=True, text=True)
+    if r.returncode != 0:
+        return None
+    return {line.split("/")[0] for line in r.stdout.splitlines()}
+
+
 def read_records(reports_dir: str) -> dict[str, dict]:
+    """The verdict of record per key: the first committed metrics.json that marks it of_record."""
     out = {}
     if not os.path.isdir(reports_dir):
         return out
     import json
+    tracked = committed(reports_dir)
     for name in sorted(os.listdir(reports_dir)):
         path = os.path.join(reports_dir, name, "metrics.json")
-        if not DATED.match(name) or not os.path.isfile(path):
+        if not DATED.match(name) or not os.path.isfile(path) or (tracked is not None and name not in tracked):
             continue
         try:
             with open(path) as f:
@@ -149,7 +174,7 @@ def read_records(reports_dir: str) -> dict[str, dict]:
             continue
         for key, v in (data.get("verdicts") or {}).items():
             if v.get("of_record") and key not in out:
-                out[key] = {"verdict": v.get("verdict"), "date": name}
+                out[key] = {**{k: v.get(k) for k in ("verdict", "pr", "metric", "for_path", "section", "line")}, "date": name}
     return out
 
 
