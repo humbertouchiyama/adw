@@ -779,7 +779,7 @@ its unbuilt units in the halting sub-PR's body (§4.1).
 | ~~Token burn~~ | — | **dropped.** No source exists; the draft asserted a metric nothing produces |
 | **Progress-condition state** — cycle counts (and what they resumed from), gate exit-code vector, boundary count | orchestrator-held during the run; recovered on resume from the `fix-attempt-N` / `fix(review):` commit prefixes (adw-build Phase 0 step 7) | free |
 | **Per-PR evidence block** — contract sha, cycles, phase split, `owner-wait`, gate vector, mutation coverage ratio, artifact ratio, `asks` (adw-core §7) | written into the **PR body** at adw-build §3.4, fetched forever by `gh pr view --json body` (adw-core §7.2) | free |
-| **The reader over all of the above** | `scripts/adw-metrics.sh` — scans every `[adw …]` PR body, emits the per-run table plus aggregates, and closes with an explicit `NOT MEASURED` block | free |
+| **The reader over all of the above** | `scripts/adw-analyze.py` — reads every `[adw …]` PR body, the session transcripts and the `predicts` lines of contract PRs; writes a dated report and `metrics.json` to the owner's private reports repo every week; closes with an explicit `NOT MEASURED` block (spec `docs/specs/2026-10-27-adw-self-improving-loop-design.md`) | free |
 
 Nothing else is stored. No run database, and no per-run artifacts — the prohibition is on
 run state, not on design docs; the specs and plans §3.4 produces are the latter. The two
@@ -795,9 +795,12 @@ the prohibition (§0). That distinction is load-bearing rather than convenient: 
 terminal-only, and a stop rule nothing preserves cannot be shown wrong. Adding a metric
 here without a durable home would repeat that.
 
-`scripts/adw-metrics.sh` is the **reader**, and it is inside the prohibition rather than an
-exception to it: it stores nothing, writes nothing, and computes on demand from `gh`. The
-PR body remains the only durable home. Delete the script and no measurement is lost — only
+`scripts/adw-analyze.py` is the **reader** (it replaced `scripts/adw-metrics.sh`, which read one
+evidence row and went stale). It computes on demand from `gh` and the session transcripts and
+keeps no state between runs. Dated analysis snapshots in the private reports repo are written by
+`scripts/adw-analyze.py` and never edited. They are the reader's output, not run state: nothing in
+them needs a person to keep it current, and a later run supersedes rather than updates them. The
+PR body remains the only durable home of run state. Delete the script and no measurement is lost — only
 the convenience of not re-deriving it by hand, which is precisely where it earns its place:
 hand-scanning these fields produced three separate mis-readings before the script existed,
 and two of them were **definition** errors rather than arithmetic, so a more careful human
@@ -994,7 +997,8 @@ Stop rather than tune if:
   inert until then and must not be cited as satisfied in the meantime.
 - **The six progress conditions (§4.8) never fire.** They replaced the 45-minute bound on
   the argument that a clock cannot distinguish a stuck run from a slow one — sound, and so
-  far untested: read the `progress-conditions` aggregate from `scripts/adw-metrics.sh`,
+  far untested: read the `progress-conditions` aggregate from `scripts/adw-analyze.py`
+  (`design.progress_fired.v1`, with `design.instrumented_units.v1` as the denominator),
   and read **only its `fired` bucket** — a body reading `… not consumed` records a
   condition that was evaluated and deliberately did *not* stop the loop, which is a
   non-firing. Pooling the two credits the conditions for work they did not do, and biases
@@ -1021,7 +1025,8 @@ Do not let anyone — including a future revision of this document — fill thes
 plausible prose:
 
 - **Optimal retry caps.** No published study, and none is coming. What *is* now local and
-  readable (`scripts/adw-metrics.sh`) is that the two caps are **not symmetric in effect**:
+  readable (`scripts/adw-analyze.py`: `design.fix_cap_reached.v1`, `design.review_cap_reached.v1`)
+  is that the two caps are **not symmetric in effect**:
   the fix cap has never been reached, while the review cap has, and the review cap — not
   any progress condition — is where `blocked` verdicts have actually come from. So `max 3`
   is untested headroom and `max 2` is the live constraint. That is a description of where
