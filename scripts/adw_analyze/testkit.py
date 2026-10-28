@@ -127,6 +127,22 @@ def pr_node(number: int, title: str, body: str = "", state: str = "MERGED", crea
     return n
 
 
+def make_pr(number: int, title: str, created: str, merged: str | None = None, state: str = "MERGED", block: str = "",
+            commits=(), labels_ever=(), labels_now=(), files=(), repo: str = "app", body: str | None = None,
+            merge_sha: str | None = None):
+    """A github.PR built directly (no gh); block is the evidence block text, fenced into the body."""
+    from .github import TITLE, PR, Commit, parse_block
+    body = body if body is not None else (f"```\n{block}\n```" if block else "")
+    b, n = parse_block(body)
+    cs = [Commit(oid=str(i), headline=h, date=created, inherited=h.startswith("[adw ")) for i, h in enumerate(commits)]
+    m = TITLE.match(title)
+    return PR(repo=repo, number=number, title=title, slug=m.group(1) if m else None, unit=m.group(2) if m else None,
+              adw=bool(m), state=state, created=created, merged=merged, closed=merged, last_edited=None,
+              base="develop", head="h", merge_sha=merge_sha, labels_now=set(labels_now),
+              labels_ever=set(labels_ever) | set(labels_now), commits=cs, files=list(files), body=body, block=b,
+              block_count=n)
+
+
 class FakeGh:
     def __init__(self, tmp: str):
         self.bin = os.path.join(tmp, "bin")

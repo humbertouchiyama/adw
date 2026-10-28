@@ -160,11 +160,16 @@ class Slice:
     """A time range, optionally one side of a contract-version split (spec §5.3)."""
 
     def __init__(self, facts: Facts, start: str, end: str, side: tuple[str, str] | None = None,
-                 is_after: Callable[[str, str], bool | None] | None = None):
+                 is_after: Callable[[str, str], bool | None] | None = None, split_at: str | None = None,
+                 repo: str | None = None):
+        """side = ("after"|"before", merge sha). An item with no contract sha falls back to the clock:
+        after when its time is at or past split_at; with no split_at it is on both sides."""
         if side and not is_after:
             raise ValueError("a side split needs is_after")
         self.facts, self.start, self.end, self.side, self.is_after = facts, start, end, side, is_after
         self.lo, self.hi = ts_seconds(start), ts_seconds(end)
+        self.split = ts_seconds(split_at) if split_at else None
+        self.repo = repo
         self.unknown_shas: set = set()
 
     @property
@@ -174,14 +179,20 @@ class Slice:
     def inside(self, ts: str | None) -> bool:
         return bool(ts) and self.lo <= ts_seconds(ts) < self.hi
 
-    def side_ok(self, sha: str | None) -> bool:
-        if not self.side or not sha:
+    def in_repo(self, repo: str | None) -> bool:
+        return self.repo is None or repo == self.repo
+
+    def side_ok(self, sha: str | None, ts: str | None = None) -> bool:
+        if not self.side:
             return True
+        after = self.side[0] == "after"
+        if not sha:
+            return self.split is None or not ts or (ts_seconds(ts) >= self.split) == after
         r = self.is_after(self.side[1], sha)
         if r is None:
             self.unknown_shas.add(sha)
             return False
-        return r == (self.side[0] == "after")
+        return r == after
 
     def pr_sha(self, p: PR) -> str | None:
         if p.contract_sha:
@@ -191,7 +202,8 @@ class Slice:
 
     def prs(self, field: str = "created", adw: bool = True) -> list[PR]:
         return [p for p in self.facts.prs if self.facts.role_of(p.repo) == "app" and (p.adw or not adw)
-                and self.inside(getattr(p, field)) and self.side_ok(self.pr_sha(p))]
+                and self.in_repo(p.repo) and self.inside(getattr(p, field))
+                and self.side_ok(self.pr_sha(p), getattr(p, field))]
 
     def contract_prs(self, field: str = "merged") -> list[PR]:
         return [p for p in self.facts.prs if self.facts.role_of(p.repo) == "contract" and self.inside(getattr(p, field))
@@ -200,12 +212,14 @@ class Slice:
     def sessions(self) -> list[SessionFacts]:
         out = []
         for s in self.facts.sessions:
-            if not self.inside(s.first_ts):
+            repo = self.facts.repo_of.get(s.path)
+            if not self.inside(s.first_ts) or not self.in_repo(repo):
                 continue
-            i = self.facts.intent(self.facts.repo_of.get(s.path), self.facts.slug_of.get(s.path))
-            if self.side_ok(i.contract_sha if i else None):
+            i = self.facts.intent(repo, self.facts.slug_of.get(s.path))
+            if self.side_ok(i.contract_sha if i else None, s.first_ts):
                 out.append(s)
         return out
 
     def intents(self, anchor: str = "last_merge") -> list[Intent]:
-        return [i for i in self.facts.intents if self.inside(getattr(i, anchor)) and self.side_ok(i.contract_sha)]
+        return [i for i in self.facts.intents if self.in_repo(i.repo) and self.inside(getattr(i, anchor))
+                and self.side_ok(i.contract_sha, getattr(i, anchor))]
