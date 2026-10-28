@@ -115,13 +115,13 @@ class Parse(TmpCase):
 
     def test_pr_links_and_captures(self):
         s = self.session([
-            user_prompt("2026-10-01T10:00:00Z", "/adw-build native-painel", gitBranch="adw/native-painel",
-                        cwd="/r/.claude/worktrees/adw-native-painel-u03"),
+            user_prompt("2026-10-01T10:00:00Z", "/adw-build panel", gitBranch="adw/panel",
+                        cwd="/r/.claude/worktrees/adw-panel-u03"),
             assistant("2026-10-01T10:00:01Z", "m1", tools=[tool_use("a1", "Agent", prompt="work in .claude/worktrees/adw-other-u01")]),
-            {"type": "pr-link", "timestamp": "2026-10-01T10:00:02Z", "prNumber": 41, "prRepository": "AXCMED/AXCMedApp"}])
-        self.assertEqual(s.pr_links, [("AXCMED/AXCMedApp", 41)])
-        self.assertEqual(s.captures["native-painel"], 2)          # branch adw/native-painel + /adw-build arg
-        self.assertEqual(s.captures["adw-native-painel-u03"], 1)  # worktree in cwd
+            {"type": "pr-link", "timestamp": "2026-10-01T10:00:02Z", "prNumber": 41, "prRepository": "o/app"}])
+        self.assertEqual(s.pr_links, [("o/app", 41)])
+        self.assertEqual(s.captures["panel"], 2)          # branch adw/panel + /adw-build arg
+        self.assertEqual(s.captures["adw-panel-u03"], 1)  # worktree in cwd
         self.assertEqual(dict(s.dispatches["a1"]), {"adw-other-u01": 1})
         self.assertNotIn("adw-other-u01", s.captures)
 
@@ -133,10 +133,10 @@ class Parse(TmpCase):
     def test_subagent_meta(self):
         projects = self.mkdir("projects")
         p = write_subagent(projects, "-x-app", "s1", "abc", [assistant("2026-10-01T10:00:00Z", "m1")], "toolu_1",
-                           parent_agent_id="def", worktreeBranch="adw/native-painel-u02")
+                           parent_agent_id="def", worktreeBranch="adw/panel-u02")
         s = read_session(p, GATES)
         self.assertEqual((s.session_id, s.agent_id, s.tool_use_id, s.parent_agent_id), ("s1", "abc", "toolu_1", "def"))
-        self.assertEqual(s.captures["native-painel-u02"], 1)
+        self.assertEqual(s.captures["panel-u02"], 1)
         self.assertEqual(s.project_dir, "-x-app")
 
     def test_peak_context(self):

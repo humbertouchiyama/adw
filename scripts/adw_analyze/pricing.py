@@ -1,4 +1,4 @@
-"""One dated price table (spec §5.1: the $3,856 → $3,267 restatement came from mixing tables)."""
+"""One dated price table (spec §5.1: one window was restated after two analyses mixed price tables)."""
 from __future__ import annotations
 
 from dataclasses import dataclass

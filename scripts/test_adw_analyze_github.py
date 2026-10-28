@@ -12,9 +12,9 @@ tier       orchestrator sonnet · author sonnet · impl sonnet · level u2+u3
 cycles     fix 1/3 · review v2 2/2      progress-conditions none fired
 phases     implement 9m · gates 14m · verify 7m · review 21m · reverify 6m
 owner-wait 1h 5m
-gates      g1 0 · g2 0 · g4 0 (base red: BedDragSnapshotTest — pré-existente)
+gates      g1 0 · g2 0 · g4 0 (base red: SnapshotTest — pré-existente)
 open-findings none — read 4 comments"""
-APP = Repo(name="AXCMedApp", slug="AXCMED/AXCMedApp", base="develop")
+APP = Repo(name="app", slug="o/app", base="develop")
 
 
 class Block(unittest.TestCase):
@@ -29,7 +29,7 @@ class Block(unittest.TestCase):
 
     def test_block_raw_strings_kept(self):
         rows, _ = github.parse_block(f"```\n{BLOCK}\n```")
-        self.assertEqual(rows["gates"], "g1 0 · g2 0 · g4 0 (base red: BedDragSnapshotTest — pré-existente)")
+        self.assertEqual(rows["gates"], "g1 0 · g2 0 · g4 0 (base red: SnapshotTest — pré-existente)")
         self.assertTrue(rows["contract"].startswith("abc1234def"))
 
     def test_two_blocks_counted(self):
@@ -89,7 +89,7 @@ class Prs(TmpCase):
     def test_gh_failure_raises_source_error(self):
         with self.assertRaises(github.SourceError) as e:
             self.fetch([pr_node(1, "x")], FAKE_GH_FAIL="api")
-        self.assertEqual(e.exception.repo, "AXCMedApp")
+        self.assertEqual(e.exception.repo, "app")
 
     def test_labels_ever(self):
         [pr] = self.fetch([pr_node(41, "[adw s u01] x", labeled=["blocked"], labels=["failed"])])

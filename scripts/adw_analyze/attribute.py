@@ -1,6 +1,6 @@
 """Session and subagent → intent slug (spec §5.1). Counting every session that merely names a slug
-mixed parallel intents and gave a 21 h lead time for a 7 h one; `native-painel` is a prefix of four
-slugs. So: longest slug first, a high bar for main threads, and the dispatching prompt for subagents."""
+mixed parallel intents and tripled one intent's lead time, and one slug can be a prefix of
+several others. So: longest slug first, a high bar for main threads, and the dispatching prompt for subagents."""
 from __future__ import annotations
 
 import collections

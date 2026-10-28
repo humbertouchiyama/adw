@@ -8,8 +8,8 @@ from adw_analyze import config
 from adw_analyze.testkit import TmpCase
 
 TWO_REPOS = {"schema": 1, "repos": [
-    {"name": "AXCMedApp", "slug": "AXCMED/AXCMedApp", "checkout": "/x/AXCMedApp", "base": "develop",
-     "transcripts": ["-x-AXCMedApp", "-x-AXCMedApp--claude-worktrees-*"],
+    {"name": "app", "slug": "o/app", "checkout": "/x/app", "base": "develop",
+     "transcripts": ["-x-app", "-x-app--claude-worktrees-*"],
      "watch": ["repo-profile.md"], "gates": {"gate 4": "testDebugUnitTest"}},
     {"name": "adw", "slug": "humbertouchiyama/adw", "role": "contract", "checkout": "/x/adw"},
 ]}
@@ -52,8 +52,8 @@ class Sources(TmpCase):
         d = self.mkdir("reports")
         self.write_json(os.path.join(d, "sources.json"), TWO_REPOS)
         app, adw = config.load_sources(d)
-        self.assertEqual((app.name, app.slug, app.base, app.role), ("AXCMedApp", "AXCMED/AXCMedApp", "develop", "app"))
-        self.assertEqual(app.transcripts, ["-x-AXCMedApp", "-x-AXCMedApp--claude-worktrees-*"])
+        self.assertEqual((app.name, app.slug, app.base, app.role), ("app", "o/app", "develop", "app"))
+        self.assertEqual(app.transcripts, ["-x-app", "-x-app--claude-worktrees-*"])
         self.assertEqual(app.gates, {"gate 4": "testDebugUnitTest"})
         self.assertEqual((adw.role, adw.transcripts, adw.watch), ("contract", [], []))
 

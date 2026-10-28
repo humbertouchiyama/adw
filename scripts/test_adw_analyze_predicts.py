@@ -28,9 +28,9 @@ class Parse(unittest.TestCase):
         self.assertTrue(p.key.startswith("12:"))
 
     def test_absolute_and_zero_and_repo(self):
-        a, z = read("predicts  outcome.fix_cycles_per_pr.v1 down 0.5 by 2026-11-20 for scripts/adw-run-clean.py repo AXCMedApp\n"
+        a, z = read("predicts  outcome.fix_cycles_per_pr.v1 down 0.5 by 2026-11-20 for scripts/adw-run-clean.py repo app\n"
                     "  predicts  outcome.ever_blocked_rate.v1 down to-zero by 2026-11-20 for commands/adw-build.md §3.7\n")
-        self.assertEqual((a.amount, a.unit, a.repo, a.section), (0.5, "abs", "AXCMedApp", None))
+        self.assertEqual((a.amount, a.unit, a.repo, a.section), (0.5, "abs", "app", None))
         self.assertEqual((z.amount, z.unit, z.section), (0.0, "zero", "3.7"))
 
     def test_none_line(self):

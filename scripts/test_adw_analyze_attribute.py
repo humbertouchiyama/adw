@@ -5,8 +5,8 @@ import unittest
 from adw_analyze.attribute import attribute_all, attribute_session, normalize
 from adw_analyze.transcripts import SessionFacts
 
-KNOWN = {"native-painel", "native-painel-shift-form", "x", "y"}
-REPO = "AXCMED/AXCMedApp"
+KNOWN = {"panel", "panel-shift-form", "x", "y"}
+REPO = "o/app"
 PRS = {41: "x", 42: "y"}
 
 
@@ -25,14 +25,14 @@ def sub(agent_id, sid="s1", tool_use_id=None, parent=None, captures=None, dispat
 
 class Normalize(unittest.TestCase):
     def test_longest_slug_first(self):
-        self.assertEqual(normalize("native-painel-shift-form", KNOWN), "native-painel-shift-form")
-        self.assertEqual(normalize("native-painel-shift-form-u02", KNOWN), "native-painel-shift-form")
-        self.assertEqual(normalize("native-painel-extra", KNOWN), "native-painel")
+        self.assertEqual(normalize("panel-shift-form", KNOWN), "panel-shift-form")
+        self.assertEqual(normalize("panel-shift-form-u02", KNOWN), "panel-shift-form")
+        self.assertEqual(normalize("panel-extra", KNOWN), "panel")
 
     def test_unit_and_close_names(self):
-        for c in ("adw-native-painel-u03", "adw-native-painel-u02+u03", "adw-close-native-painel",
-                  "pr-ready-native-painel-close-v2", "pr-ready-native-painel-u01"):
-            self.assertEqual(normalize(c, KNOWN), "native-painel", c)
+        for c in ("adw-panel-u03", "adw-panel-u02+u03", "adw-close-panel",
+                  "pr-ready-panel-close-v2", "pr-ready-panel-u01"):
+            self.assertEqual(normalize(c, KNOWN), "panel", c)
 
     def test_unknown_is_none(self):
         self.assertIsNone(normalize("something-else", KNOWN))
@@ -40,8 +40,8 @@ class Normalize(unittest.TestCase):
 
 class Main(unittest.TestCase):
     def test_longest_slug_wins_the_count(self):
-        s = main(captures={"native-painel-shift-form": 25})
-        self.assertEqual(attribute_session(s, KNOWN, PRS, REPO), "native-painel-shift-form")
+        s = main(captures={"panel-shift-form": 25})
+        self.assertEqual(attribute_session(s, KNOWN, PRS, REPO), "panel-shift-form")
 
     def test_threshold_19_hits_is_none(self):
         self.assertIsNone(attribute_session(main(captures={"x": 19}), KNOWN, PRS, REPO))
@@ -56,7 +56,7 @@ class Main(unittest.TestCase):
         self.assertEqual(attribute_session(s, KNOWN, PRS, REPO), "x")
 
     def test_release_and_other_repo_links_ignored(self):
-        s = main(captures={"y": 40}, pr_links=[(REPO, 7), ("AXCMED/Plantoes-app", 41)])
+        s = main(captures={"y": 40}, pr_links=[(REPO, 7), ("o/other", 41)])
         self.assertEqual(attribute_session(s, KNOWN, PRS, REPO), "y")
 
     def test_links_to_two_slugs_fall_back_to_counts(self):
@@ -66,10 +66,10 @@ class Main(unittest.TestCase):
 
 class Subagents(unittest.TestCase):
     def test_subagent_from_dispatch_prompt(self):
-        m = main(captures={"x": 50}, dispatches={"t1": {"adw-native-painel-u03": 1}})
+        m = main(captures={"x": 50}, dispatches={"t1": {"adw-panel-u03": 1}})
         a = sub("a1", tool_use_id="t1")
         got = attribute_all([m, a], KNOWN, PRS, REPO)
-        self.assertEqual(got[a.path], "native-painel")
+        self.assertEqual(got[a.path], "panel")
         self.assertEqual(got[m.path], "x")
 
     def test_subagent_inherits_parent(self):
@@ -87,8 +87,8 @@ class Subagents(unittest.TestCase):
 
     def test_own_worktree_capture_when_prompt_has_none(self):
         m = main(captures={"x": 50}, dispatches={"t1": {}})
-        a = sub("a1", tool_use_id="t1", captures={"native-painel-u02": 1})
-        self.assertEqual(attribute_all([m, a], KNOWN, PRS, REPO)[a.path], "native-painel")
+        a = sub("a1", tool_use_id="t1", captures={"panel-u02": 1})
+        self.assertEqual(attribute_all([m, a], KNOWN, PRS, REPO)[a.path], "panel")
 
 
 if __name__ == "__main__":
