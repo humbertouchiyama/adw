@@ -23,7 +23,16 @@ class Prices(unittest.TestCase):
         self.assertAlmostEqual(cost("claude-opus-5-5", cache_write_5m=M), 5.0)
         self.assertAlmostEqual(cost("claude-opus-5-5", cache_write_1h=M), 8.0)
         self.assertAlmostEqual(cost("claude-sonnet-5-5", output=M), 10.0)
-        self.assertEqual(pricing.PRICES_AS_OF, "2026-10-22")
+        self.assertEqual(pricing.PRICES_AS_OF, "2026-10-28")
+
+    def test_prices_by_model_not_family(self):
+        self.assertAlmostEqual(cost("claude-opus-5", input=M), 5.0)
+        self.assertAlmostEqual(cost("claude-haiku-5-5", output=M), 0.50)
+        self.assertAlmostEqual(cost("claude-haiku-4-5-20251001", output=M), 5.0)
+        self.assertAlmostEqual(cost("claude-fable-5-1", output=M), 50.0)
+        self.assertAlmostEqual(cost("claude-fable-5-1", cache_read=M), 0.25)
+        self.assertAlmostEqual(cost("claude-sonnet-5", output=M), 10.0)
+        self.assertIsNone(pricing.price_of("gpt-9"))
 
 
 class Parse(TmpCase):

@@ -16,7 +16,7 @@ NOT_MEASURED = [
     "owner-found device defects",
     "escape rate (no Sentry release attribution yet; design §8)",
     "base-red truth on a repo with no CI",
-    "any window before transcripts exist (earliest transcript read: {earliest})",
+    "transcript metrics in any window before complete transcripts (complete transcripts start {complete}; earliest transcript read: {earliest})",
 ]
 SELF_REPORT = "evidence"
 LOOP = "loop"
@@ -119,7 +119,9 @@ def metrics_json(run: Run, verdicts: dict, t: dict) -> dict:
         "predictions": {p.key: {"pr": p.pr, "line": p.line, "metric": p.metric, "by": p.by} for p in run.predictions},
         "verdicts": verdicts,
         "rejected": [{"pr": r.pr, "line": r.line, "reason": r.reason} for r in run.rejected],
-        "not_measured": [x.format(bg=t["background_gate_calls"], earliest=t["earliest_transcript"]) for x in NOT_MEASURED],
+        "not_measured": [x.format(bg=t["background_gate_calls"], earliest=t["earliest_transcript"],
+                                  complete=(run.facts.transcripts_since or "?")[:10]) for x in NOT_MEASURED],
+        "transcripts_since": run.facts.transcripts_since,
         **t,
     }
 
@@ -138,7 +140,7 @@ def report_md(run: Run, verdicts: dict, t: dict) -> str:
            f"Window {w0[:10]} → {w1[:10]}; prior {p0[:10]} → {p1[:10]}. Schema 1 · prices as of {PRICES_AS_OF} · "
            f"owner-wait gaps capped at {WAIT_CAP_H:g} h · sources {run.sources_hash}.",
            f"Sessions read {t['sessions']}, excluded {t['excluded_sessions']} (the analyzer's own) · bad lines "
-           f"{t['bad_lines']} · unknown record types {sum(t['unknown_types'].values())} · unpriced models {t['unknown_models']}.",
+           f"{t['bad_lines']} · unknown record types {sum(t['unknown_types'].values())} · unpriced model messages {t['unknown_models']} (counted as $0).",
            "", "## Verdicts", ""]
     if run.predictions:
         out += ["| PR | metric | predicts | baseline | after | verdict | note |", "|---|---|---|---|---|---|---|"]
@@ -178,7 +180,8 @@ def report_md(run: Run, verdicts: dict, t: dict) -> str:
     out += ["", "## Rejected predicts lines", ""]
     out += [f"- #{r.pr} `{r.line}` — {r.reason}" for r in run.rejected] or ["None."]
     out += ["", "## NOT MEASURED", ""]
-    out += [f"- {x.format(bg=t['background_gate_calls'], earliest=t['earliest_transcript'])}" for x in NOT_MEASURED]
+    out += [f"- {x.format(bg=t['background_gate_calls'], earliest=t['earliest_transcript'], complete=(run.facts.transcripts_since or '?')[:10])}"
+            for x in NOT_MEASURED]
     out += ["", "## Critical pass", "", "critical pass: pending", ""]
     return "\n".join(out)
 

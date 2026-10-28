@@ -98,6 +98,17 @@ class E2E(Fixture):
         r = self.run_cli("--reports", self.reports, "--projects", self.projects, "--transcript-dirs")
         self.assertEqual((r.returncode, r.stdout.splitlines()), (0, [os.path.join(self.projects, "-app")]))
 
+    def test_transcripts_complete_since_blanks_earlier_transcript_metrics(self):
+        with open(os.path.join(self.reports, "sources.json")) as f:
+            src = json.load(f)
+        self.write_json(os.path.join(self.reports, "sources.json"), {**src, "transcripts_complete_since": "2026-10-15"})
+        self.assertEqual(self.run_reader().returncode, 0)
+        m = json.loads(self.out("metrics.json"))
+        self.assertEqual(m["transcripts_since"], "2026-10-15T00:00:00Z")
+        self.assertEqual(m["metrics"]["cost.total_usd.v1"]["status_window"], "no data")
+        self.assertEqual(m["metrics"]["outcome.prs_opened.v1"]["window"], 1)
+        self.assertIn("complete transcripts start 2026-10-15", self.out("report.md"))
+
     def test_same_date_twice_exits_2(self):
         self.assertEqual(self.run_reader().returncode, 0)
         before = self.out("report.md")

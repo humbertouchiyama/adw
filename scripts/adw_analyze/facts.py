@@ -88,6 +88,7 @@ class Facts:
     excluded_sessions: int = 0
     predict_lines: dict = field(default_factory=dict)
     since: str | None = None
+    transcripts_since: str | None = None
 
     def role_of(self, repo_name: str) -> str:
         return next((r.role for r in self.repos if r.name == repo_name), "app")

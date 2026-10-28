@@ -100,6 +100,10 @@ def analyze(reports: str, repos: list, args) -> int:
         facts = build_facts(repos, args.projects, until, lookback_since(until, args.days, early))
     except SourceError as e:
         return fail(1, str(e))
+    complete = config.load_meta(reports).get("transcripts_complete_since")
+    floor = ts_seconds(until) - RETENTION_DAYS * 86400
+    facts.transcripts_since = stamp(datetime.fromtimestamp(
+        max(floor, ts_seconds(complete + "T00:00:00Z") if complete else floor), timezone.utc))
     lines = {p.number: read_predictions(p, exists, app_names) for p in facts.prs if facts.role_of(p.repo) == "contract"}
     facts.predict_lines = lines
     predictions = [x for xs in lines.values() for x in xs if x.kind == "prediction"]

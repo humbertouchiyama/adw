@@ -59,6 +59,20 @@ def load_sources(reports_dir: str) -> list[Repo]:
     return repos
 
 
+META = {"transcripts_complete_since"}
+
+
+def load_meta(reports_dir: str) -> dict:
+    """Top-level settings besides the repos. transcripts_complete_since: the first day with every session
+    still on disk (older days were cut by an earlier cleanup); transcript metrics before it are no data."""
+    with open(os.path.join(reports_dir, "sources.json")) as f:
+        data = json.load(f)
+    unknown = sorted(set(data) - META - {"schema", "repos"})
+    if unknown:
+        raise ConfigError(f"sources.json: unknown key {', '.join(unknown)}")
+    return {k: data[k] for k in META if k in data}
+
+
 def resolve_reports_dir(flag: str | None) -> str:
     d = flag or os.environ.get("ADW_ANALYSIS_DIR")
     if not d:

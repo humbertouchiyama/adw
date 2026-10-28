@@ -57,6 +57,13 @@ class Sources(TmpCase):
         self.assertEqual(app.gates, {"gate 4": "testDebugUnitTest"})
         self.assertEqual((adw.role, adw.transcripts, adw.watch), ("contract", [], []))
 
+    def test_transcripts_complete_since(self):
+        d = self.mkdir("reports")
+        self.write_json(os.path.join(d, "sources.json"), {**TWO_REPOS, "transcripts_complete_since": "2026-09-28"})
+        self.assertEqual(config.load_meta(d), {"transcripts_complete_since": "2026-09-28"})
+        self.write_json(os.path.join(d, "sources.json"), TWO_REPOS)
+        self.assertEqual(config.load_meta(d), {})
+
     def test_missing_file_and_unknown_key_exit_2(self):
         d = self.mkdir("reports")
         self.assertEqual(self.run_cli("--reports", d, "--check-config").returncode, 2)

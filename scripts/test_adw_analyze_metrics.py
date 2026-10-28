@@ -181,6 +181,15 @@ class Values(unittest.TestCase):
         self.assertEqual([p.number for p in after.contract_prs()], [])
         self.assertEqual([p.number for p in before.contract_prs()], [10])
 
+    def test_transcript_metrics_before_complete_transcripts_are_no_data(self):
+        self.facts.transcripts_since = "2026-10-06T00:00:00Z"
+        early = F.Slice(self.facts, "2026-10-05T00:00:00Z", END)
+        self.assertEqual(compute("cost.total_usd.v1", early).status, "no data")
+        self.assertEqual(compute("friction.compactions_idle.v1", early).status, "no data")
+        self.assertEqual(compute("outcome.prs_opened.v1", early).value, 3)
+        late = F.Slice(self.facts, "2026-10-06T00:00:00Z", END)
+        self.assertEqual(compute("cost.total_usd.v1", late).status, "ok")
+
     def test_loop_counts(self):
         self.facts.predict_lines = {10: [SimpleNamespace(kind="none")]}
         self.assertEqual(self.v("loop.contract_prs_merged.v1").value, 1)

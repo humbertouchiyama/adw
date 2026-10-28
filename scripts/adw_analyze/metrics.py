@@ -52,8 +52,14 @@ def metric(name: str, kind: str, min_n: int, unit: str, definition: str):
     return deco
 
 
+TRANSCRIPT_GROUPS = ("cost", "owner", "friction", "time")
+
+
 def compute(metric_id: str, sl: Slice) -> MetricValue:
     m = REGISTRY[metric_id]
+    ts_since = sl.facts.transcripts_since
+    if m.group in TRANSCRIPT_GROUPS and ts_since and sl.lo < ts_seconds(ts_since):
+        return MetricValue(None, 0, "no data", {})   # the slice starts before complete transcripts
     value, n, breakdown = FUNCS[metric_id](sl)
     if value is None or n == 0:
         return MetricValue(None, n, "no data", breakdown or {})

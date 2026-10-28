@@ -25,14 +25,14 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from .pricing import Usage, family, message_cost
+from .pricing import Usage, message_cost, price_of
 
 KNOWN_TYPES = {
     "user", "assistant", "system", "attachment", "queue-operation", "api-request", "api-request-blob",
     "api-request-shape", "bridge-session", "last-prompt", "atis-latch", "mode", "permission-mode", "ai-title",
     "custom-title", "agent-name", "agent-color", "pr-link", "file-history-snapshot", "file-history-delta",
     "history-suppression", "relocated", "worktree-state", "tools-used", "cost-state", "summary", "progress",
-    "fork-context-ref",
+    "fork-context-ref", "artifact-autoreact-ledger", "artifact-comment-monitor",
 }
 CAPTURES = [
     re.compile(r"\.claude/worktrees/([A-Za-z0-9._+-]+)"),
@@ -240,7 +240,7 @@ def read_assistant(s, o, ts, gate_rx, pending, tool_names) -> None:
             w1 = cc.get("ephemeral_1h_input_tokens") or 0
             if w5 + w1 == 0:
                 w5 = u.get("cache_creation_input_tokens") or 0
-            if prev is None and not family(model):
+            if prev is None and not price_of(model):
                 s.unknown_models += 1
             s.usage[mid] = Usage(model=model, ts=ts or "", input=u.get("input_tokens") or 0,
                                  output=u.get("output_tokens") or 0, cache_read=u.get("cache_read_input_tokens") or 0,
