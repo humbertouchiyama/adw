@@ -33,6 +33,61 @@ sys.exit(2)
 '''
 
 
+def usage(**over) -> dict:
+    u = {"input_tokens": 10, "output_tokens": 100, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
+    u.update(over)
+    return u
+
+
+def assistant(ts: str, msg_id: str, model: str = "claude-opus-5-5", usage_: dict | None = None, tools=(), text=None, **extra) -> dict:
+    content = list(tools) + ([{"type": "text", "text": text}] if text else [])
+    return {"type": "assistant", "timestamp": ts, **extra,
+            "message": {"id": msg_id, "model": model, "usage": usage_ or usage(), "content": content}}
+
+
+def tool_use(id: str, name: str, **input) -> dict:
+    return {"type": "tool_use", "id": id, "name": name, "input": input}
+
+
+def user_prompt(ts: str, text: str = "go", **extra) -> dict:
+    return {"type": "user", "timestamp": ts, "origin": {"kind": "human"}, "promptSource": "typed", **extra,
+            "message": {"role": "user", "content": text}}
+
+
+def tool_result(ts: str, tool_use_id: str, text: str = "", is_error: bool = False, **extra) -> dict:
+    return {"type": "user", "timestamp": ts, **extra, "message": {"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": tool_use_id, "content": text, "is_error": is_error}]}}
+
+
+def system(ts: str, subtype: str, **fields) -> dict:
+    return {"type": "system", "subtype": subtype, "timestamp": ts, **fields}
+
+
+def _write_lines(path: str, records) -> str:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        for r in records:
+            f.write((r if isinstance(r, str) else json.dumps(r)) + "\n")
+    return path
+
+
+def write_session(projects: str, project: str, sid: str, records) -> str:
+    """A string in records is written verbatim (a bad line)."""
+    return _write_lines(os.path.join(projects, project, sid + ".jsonl"), records)
+
+
+def write_subagent(projects: str, project: str, sid: str, agent_id: str, records, tool_use_id: str,
+                   parent_agent_id: str | None = None, **meta) -> str:
+    base = os.path.join(projects, project, sid, "subagents", "agent-" + agent_id)
+    m = {"toolUseId": tool_use_id, "spawnDepth": 2 if parent_agent_id else 1, **meta}
+    if parent_agent_id:
+        m["parentAgentId"] = parent_agent_id
+    os.makedirs(os.path.dirname(base), exist_ok=True)
+    with open(base + ".meta.json", "w") as f:
+        json.dump(m, f)
+    return _write_lines(base + ".jsonl", records)
+
+
 class FakeGh:
     def __init__(self, tmp: str):
         self.bin = os.path.join(tmp, "bin")
