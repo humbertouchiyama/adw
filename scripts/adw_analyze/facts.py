@@ -14,6 +14,17 @@ from .transcripts import SessionFacts, read_session, ts_seconds
 WAIT_CAP_H = 12.0
 
 
+def wait_h(s: SessionFacts) -> float:
+    """Σ min(gap, cap) over human prompts, gap = prompt − the assistant record before it."""
+    return sum(min(max(ts_seconds(t) - ts_seconds(prev), 0) / 3600, WAIT_CAP_H) for t, prev in s.human_prompts if t and prev)
+
+
+def run_h(s: SessionFacts) -> float:
+    """Wall time with every gap capped like the wait, so a share compares like with like."""
+    ts = [ts_seconds(t) for t in s.turn_ts]
+    return sum(min(b - a, WAIT_CAP_H * 3600) for a, b in zip(ts, ts[1:])) / 3600
+
+
 @dataclass
 class Intent:
     repo: str
@@ -52,21 +63,11 @@ class Intent:
 
     @property
     def owner_wait_h(self) -> float:
-        total = 0.0
-        for s in self.mains:
-            for t, prev in s.human_prompts:
-                if t and prev:
-                    total += min(max(ts_seconds(t) - ts_seconds(prev), 0) / 3600, WAIT_CAP_H)
-        return total
+        return sum(wait_h(s) for s in self.mains)
 
     @property
     def run_h(self) -> float:
-        """Main-thread wall time with every gap capped like the wait, so the share compares like with like."""
-        total = 0.0
-        for s in self.mains:
-            ts = [ts_seconds(t) for t in s.turn_ts]
-            total += sum(min(b - a, WAIT_CAP_H * 3600) for a, b in zip(ts, ts[1:])) / 3600
-        return total
+        return sum(run_h(s) for s in self.mains)
 
     @property
     def lead_h(self) -> float | None:

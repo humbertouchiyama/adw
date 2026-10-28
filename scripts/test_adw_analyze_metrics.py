@@ -149,6 +149,16 @@ class Values(unittest.TestCase):
         m1.turn_ts = ["2026-10-05T08:00:00Z", "2026-10-05T09:00:00Z", "2026-10-06T05:00:00Z"]
         self.assertAlmostEqual(alpha.run_h, 13.0)
 
+    def test_wait_share_over_main_threads_in_the_window(self):
+        turns = {"/p/m1.jsonl": ["2026-10-05T08:00:00Z", "2026-10-05T09:00:00Z", "2026-10-06T05:00:00Z"],
+                 "/p/m2.jsonl": ["2026-10-07T08:00:00Z", "2026-10-07T08:10:00Z"],
+                 "/p/m3.jsonl": ["2026-10-08T08:00:00Z", "2026-10-08T08:30:00Z"]}
+        for s in self.facts.sessions:
+            s.turn_ts = turns.get(s.path, s.turn_ts)
+        r = self.v("owner.wait_share.v1")
+        self.assertAlmostEqual(r.value, (12.5 + 5 / 60) / (13 + 10 / 60 + 0.5))
+        self.assertEqual(r.n, 3)
+
     def test_intents_without_sessions_are_not_zero_cost(self):
         F.Intent  # beta has sessions; add a third intent with a merged PR and no session
         self.facts.prs.append(pr(5, "[adw gamma u01] g", "2026-10-09T10:00:00Z", "2026-10-09T12:00:00Z"))

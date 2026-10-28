@@ -8,7 +8,7 @@ import re
 import statistics
 from dataclasses import dataclass, field
 
-from .facts import WAIT_CAP_H, Slice
+from .facts import WAIT_CAP_H, Slice, run_h, wait_h
 from .github import ROWS, cycles
 from .pricing import family, message_cost
 from .transcripts import ts_seconds
@@ -150,10 +150,10 @@ def _(sl):
     return median(xs), len(xs), {}
 
 
-@metric("owner.wait_share", "ratio", 8, "ratio", "Σ owner wait / Σ main-thread span, over intents")
+@metric("owner.wait_share", "ratio", 10, "ratio", "Σ capped owner wait / Σ capped wall time, over app-repo main threads")
 def _(sl):
-    its = sl.intents()
-    return ratio(sum(i.owner_wait_h for i in its), sum(i.run_h for i in its)), len(its), {}
+    ms = mains(sl)
+    return ratio(sum(wait_h(s) for s in ms), sum(run_h(s) for s in ms)), len(ms), {}
 
 
 @metric("owner.halts_per_merged_pr", "ratio", 10, "count", "human prompts while one of the intent's ADW PRs was open / merged PRs")
