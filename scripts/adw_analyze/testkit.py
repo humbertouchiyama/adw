@@ -28,6 +28,24 @@ if argv[:2] == ["repo", "view"]:
         sys.exit(1)
     print(vis)
     sys.exit(0)
+if argv[:2] == ["api", "graphql"]:
+    fields = {}
+    for i, a in enumerate(argv):
+        if a in ("-f", "-F") and "=" in argv[i + 1]:
+            k, v = argv[i + 1].split("=", 1)
+            fields[k] = v
+    slug = fields["owner"] + "/" + fields["name"]
+    kind = "open" if "states: OPEN" in fields["query"] else "prs"
+    nodes = data.get(kind, {}).get(slug, [])
+    if kind == "prs":
+        nodes = sorted(nodes, key=lambda n: n["createdAt"], reverse=True)
+    page = int(os.environ.get("FAKE_GH_PAGE", "2"))
+    start = int(fields.get("cursor") or 0)
+    chunk = nodes[start:start + page]
+    more = start + page < len(nodes)
+    print(json.dumps({"data": {"repository": {"pullRequests": {
+        "pageInfo": {"hasNextPage": more, "endCursor": str(start + page) if more else None}, "nodes": chunk}}}}))
+    sys.exit(0)
 print("unsupported fake gh call: " + " ".join(argv), file=sys.stderr)
 sys.exit(2)
 '''
@@ -86,6 +104,27 @@ def write_subagent(projects: str, project: str, sid: str, agent_id: str, records
     with open(base + ".meta.json", "w") as f:
         json.dump(m, f)
     return _write_lines(base + ".jsonl", records)
+
+
+def pr_node(number: int, title: str, body: str = "", state: str = "MERGED", created: str = "2026-10-10T10:00:00Z",
+            merged: str | None = "auto", closed: str | None = None, last_edited: str | None = None, base: str = "develop",
+            head: str = "h", merge_oid: str | None = None, commits=(), labels=(), labeled=(), files=None) -> dict:
+    """commits: (headline, date) pairs or headlines; labeled: label names from LABELED_EVENTs."""
+    if merged == "auto":
+        merged = created.replace("T10:", "T12:") if state == "MERGED" else None
+    cs = []
+    for i, c in enumerate(commits):
+        h, d = (c, created) if isinstance(c, str) else c
+        cs.append({"commit": {"oid": f"{number:04d}{i:036d}", "messageHeadline": h, "committedDate": d}})
+    n = {"number": number, "title": title, "body": body, "state": state, "createdAt": created, "mergedAt": merged,
+         "closedAt": closed or merged, "lastEditedAt": last_edited, "baseRefName": base, "headRefName": head,
+         "mergeCommit": {"oid": merge_oid} if merge_oid else None,
+         "labels": {"nodes": [{"name": x} for x in labels]},
+         "timelineItems": {"nodes": [{"label": {"name": x}} for x in labeled]},
+         "commits": {"nodes": cs}}
+    if files is not None:
+        n["files"] = {"nodes": [{"path": p} for p in files]}
+    return n
 
 
 class FakeGh:
