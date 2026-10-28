@@ -3,9 +3,22 @@ dated folder · 3 the reports dir is in a public or unverifiable GitHub checkout
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
+import os
+import shutil
 import sys
+from datetime import datetime, timedelta, timezone
 
 from . import config
+from .facts import Slice, build_facts
+from .github import SourceError
+from .metrics import REGISTRY, compute
+from .predicts import read_predictions
+from .report import Run, write_outputs
+from .verdicts import git_is_after, git_path_exists, git_watch_changed, judge, read_records
+
+LOOKBACK_DAYS = 77
 
 
 def parse(argv: list[str]) -> argparse.Namespace:
@@ -26,16 +39,81 @@ def fail(code: int, msg: str) -> int:
     return code
 
 
+def stamp(d: datetime) -> str:
+    return d.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse(sys.argv[1:] if argv is None else argv)
     try:
         reports = config.resolve_reports_dir(args.reports)
         config.check_reports_dir(reports)
-        config.load_sources(reports)
+        repos = config.load_sources(reports)
     except config.ConfigError as e:
         return fail(2, str(e))
     except config.PublicRepoError as e:
         return fail(3, str(e))
     if args.check_config:
         return 0
+    if args.scan:
+        from .scan import run_scan
+        return run_scan(reports, repos, args)
+    return analyze(reports, repos, args)
+
+
+def analyze(reports: str, repos: list, args) -> int:
+    if args.until:
+        try:
+            end = datetime.strptime(args.until, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return fail(2, f"--until must be YYYY-MM-DD, got {args.until}")
+    else:
+        end = datetime.now(timezone.utc).replace(microsecond=0)
+    until = stamp(end)
+    out = os.path.join(reports, until[:10])
+    if os.path.exists(out):
+        return fail(2, f"{out} exists; a dated report is never rewritten")
+    contract = next((r for r in repos if r.role == "contract"), None)
+    adw_dir = args.adw or (contract.checkout if contract else None)
+    if not adw_dir or not os.path.isdir(adw_dir):
+        return fail(2, "name the adw checkout with --adw or a contract repo checkout in sources.json")
+    window = (stamp(end - timedelta(days=args.days)), until)
+    prior = (stamp(end - timedelta(days=2 * args.days)), window[0])
+    try:
+        facts = build_facts(repos, args.projects, until, stamp(end - timedelta(days=LOOKBACK_DAYS)))
+    except SourceError as e:
+        return fail(1, str(e))
+    exists, is_after = git_path_exists(adw_dir), git_is_after(adw_dir)
+    lines = {p.number: read_predictions(p, exists) for p in facts.prs if facts.role_of(p.repo) == "contract"}
+    facts.predict_lines = lines
+    predictions = [x for xs in lines.values() for x in xs if x.kind == "prediction"]
+    rejected = [x for xs in lines.values() for x in xs if x.kind == "rejected"]
+    watch = git_watch_changed(repos)
+    run = Run(until=until, window=window, prior=prior, facts=facts,
+              win={m: compute(m, Slice(facts, *window)) for m in REGISTRY},
+              pri={m: compute(m, Slice(facts, *prior)) for m in REGISTRY},
+              predictions=predictions, verdicts=[judge(p, facts, predictions, is_after, watch) for p in predictions],
+              records=read_records(reports), rejected=rejected, legacy=load_legacy(reports),
+              sources_hash=sources_hash(reports))
+    tmp = os.path.join(reports, f".{until[:10]}.tmp")
+    shutil.rmtree(tmp, ignore_errors=True)
+    try:
+        write_outputs(tmp, run)
+        os.rename(tmp, out)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print(out)
     return 0
+
+
+def load_legacy(reports: str) -> list:
+    path = os.path.join(reports, "legacy-verdicts.json")
+    if not os.path.exists(path):
+        return []
+    with open(path) as f:
+        return json.load(f)
+
+
+def sources_hash(reports: str) -> str:
+    with open(os.path.join(reports, "sources.json"), "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()[:12]

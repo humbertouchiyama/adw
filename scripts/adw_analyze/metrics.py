@@ -156,7 +156,7 @@ def _(sl):
     return ratio(sum(i.owner_wait_h for i in its), sum(i.run_h for i in its)), len(its), {}
 
 
-@metric("owner.halts_per_merged_pr", "ratio", 10, "ratio", "human prompts while one of the intent's ADW PRs was open / merged PRs")
+@metric("owner.halts_per_merged_pr", "ratio", 10, "count", "human prompts while one of the intent's ADW PRs was open / merged PRs")
 def _(sl):
     its = sl.intents()
     halts, merged = 0, 0
