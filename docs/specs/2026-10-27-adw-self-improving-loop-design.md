@@ -6,31 +6,31 @@ Status: design, approved by the owner on 2026-10-27 after one critical review; �
 ## 1. Problem
 
 The owner improves the ADW contract from periodic run analyses. Three read-only recon passes
-over adw, Plantoes-app and AXCMedApp (sessions, PRs, the 2026-10-01 and 2026-10-22 analyses)
+over adw and the two app repos that run it (sessions, PRs, the 2026-10-01 and 2026-10-22 analyses)
 show:
 
-- **The analysis is cheap; everything around it is not.** The 10-22 analysis took 24 min and
-  $24; the 10-01 one 20 min and $14. The days go elsewhere: the owner starts each one by hand
+- **The analysis is cheap; everything around it is not.** The 10-22 analysis took 24 min; the 10-01
+  one 20 min. The days go elsewhere: the owner starts each one by hand
   (12 and 21 days apart), carries baselines from memory notes, and asks for a separate critical
   pass (17.5 h after the 10-22 report).
 - **Nothing survives.** About 50 and 57 throwaway scripts per analysis lived in session
   scratchpads. The 10-22 reports were deleted and had to be recovered from transcripts. The
-  only surviving reader, `scripts/adw-metrics.sh`, lives in Plantoes-app, reads one evidence
+  only surviving reader, `scripts/adw-metrics.sh`, lives in an app repo, reads one evidence
   row, and is stale against today's bodies.
-- **Numbers change between analyses.** Spend for the same window was restated $3,856 →
-  $3,267 (price table, output tokens, denominator). Owner wait 609 of 892 h reproduces only
+- **Numbers change between analyses.** Spend for the same window was restated by 15%
+  (price table, output tokens, denominator). Owner wait at 68% of run time reproduces only
   with an unstated 12 h gap cap. Intent agent time 21 h → 7 h (parallel intents mixed). The
-  10-22 "auto-compactions 7 → 65" is mostly the idle-compaction feature: 74 of 80 AXC
-  main-thread auto compactions are idle ones.
+  10-22 "auto-compactions 7 → 65" is mostly the idle-compaction feature: 74 of 80
+  main-thread auto compactions in one app repo are idle ones.
 - **Shipped fixes are rarely judged against a stated target.** Of about 15 checked changes, at
   most three had a target set before shipping: #9 and #16 in their PRs, #5 in its session. Lanes
   disagreed on #12's items. No fix measured as failing was ever deleted: #15's enforcer drafts
   and #12's handoff decide pass are still on main.
-- **The PR evidence block cannot be trusted alone.** AXC: 70 of 403 blocks were never edited
+- **The PR evidence block cannot be trusted alone.** In one app repo 70 of 403 blocks were never edited
   after the PR opened, and 20 of 71 `review 0/2` rows sit on PRs with `fix(review):` commits.
-  Plantoes: 54 of 317. `owner-wait` counts only halts inside a PR's own loop, so `0m` is often
-  right, yet 22 of 219 AXC PRs show over 30 min of owner gaps inside their build window.
-- **Transcripts expired after 30 days.** AXC W37–W39 (182 PRs) have none. Retention is now 90
+  In the other, 54 of 317. `owner-wait` counts only halts inside a PR's own loop, so `0m` is often
+  right, yet 22 of 219 PRs in the first repo show over 30 min of owner gaps inside their build window.
+- **Transcripts expired after 30 days.** Three weeks of one app repo (182 PRs) have none. Retention is now 90
   days (`cleanupPeriodDays` in the owner's user settings, 2026-10-28); see §5.6.
 
 ## 2. Goal
@@ -50,7 +50,7 @@ A loop the system runs, not the owner: **measure → predict → check → delet
 - **No self-editing contract.** The agent never changes the contract on its own. Every change
   is a PR the owner merges. (Harness² lets the agent edit its harness mid-run; this design
   deliberately does not.)
-- **No A/B re-runs of old tasks.** One ADW run costs $15 to $866 and hours, has human gates and
+- **No A/B re-runs of old tasks.** One ADW run costs from a few dollars to several hundred, and hours; has human gates and
   opens real PRs; n=1 per arm is noise.
 - **No run database** in the §5.1 sense: no state a person maintains. See §4.
 - Out of scope, separate PRs that consume this tool's output: hooks (the evidence-block check,
@@ -60,10 +60,10 @@ A loop the system runs, not the owner: **measure → predict → check → delet
 
 ## 4. Owner decisions (2026-10-27)
 
-- **Reports are committed, dated files in a private repo.** adw is public; AXCMedApp and
-  Plantoes-app are private, and a report carries their spend, PR numbers and local paths. So
-  the reports, the sources config and the legacy seed live in a new private repo (working name
-  `humbertouchiyama/adw-analysis`), and the reader code stays in adw. Design §5.1 forbids a run
+- **Reports are committed, dated files in a private repo.** adw is public; the app repos
+  are private, and a report carries their spend, PR numbers and local paths. So
+  the reports, the sources config and the legacy seed live in a new private repo (the owner's
+  private reports repo), and the reader code stays in adw. Design §5.1 forbids a run
   database because files a person must keep current go stale and then mislead. A dated snapshot
   the reader writes and nobody edits does not have that failure. §5.1 gets that exception in
   writing (§7).
@@ -82,7 +82,7 @@ Computes everything; stores nothing except its two output files.
 GitHub slug, the local checkout path, the transcript directory globs under
 `~/.claude/projects/` (the main dir plus `--claude-worktrees-*` dirs, and each session's
 `subagents/` folder), and the repo's **watch paths** (its repo-profile and gate scripts; §5.3
-uses them). Today: `humbertouchiyama/adw`, `AXCMED/Plantoes-app`, `AXCMED/AXCMedApp`. The
+uses them). Today: adw and two app repos. The
 reader finds the reports repo through `--reports <path>` or `ADW_ANALYSIS_DIR`, and refuses to
 write inside a checkout whose GitHub repo is public.
 
@@ -99,12 +99,12 @@ call.)*
 
 | Rule | Why |
 |---|---|
-| Dedupe `message.usage` by `message.id`; price from one dated table in the code; 5-minute and 1-hour cache writes priced separately | the $3,856 → $3,267 restatement |
+| Dedupe `message.usage` by `message.id`; price from one dated table in the code; 5-minute and 1-hour cache writes priced separately | the 15% spend restatement |
 | Never use the harness `cost-state` record as cost | resets per process, up to 18 per file, ratio 0.72–1.61 to usage |
 | Split compactions into context-limit and idle (a `Compacted while idle` notice within 10 s of the boundary) | the 7 → 65 misreading |
 | Time sessions from user and assistant records only | a "Remote Control disconnected" record is stamped into every open session |
 | Owner-wait gaps capped at 12 h, and the cap printed | the unstated cap |
-| Attribute a session to an intent by branch or worktree strings, longest slug first, top slug only at ≥20 hits and ≥3× the runner-up; attribute a subagent by the worktree in its dispatching prompt, joined through `toolUseId` in its `.meta.json`; use harness `pr-link` records as the session anchor, minus the release PR of the starting branch | the 21 h → 7 h error; `native-painel` is a prefix of four slugs |
+| Attribute a session to an intent by branch or worktree strings, longest slug first, top slug only at ≥20 hits and ≥3× the runner-up; attribute a subagent by the worktree in its dispatching prompt, joined through `toolUseId` in its `.meta.json`; use harness `pr-link` records as the session anchor, minus the release PR of the starting branch | a lead time tripled by mixing parallel intents; one slug is a prefix of four others |
 | A final PR inherits its units' commits: count its cycles after excluding the inherited `[adw …]` squash commits | double counting, without losing the final PR's own review loop |
 | Find the evidence block by its `contract <sha>` row wherever it sits (fenced, unfenced, inside `<details>`); keep the raw string; parse numbers by regex | 233 shapes of the `gates` row; Portuguese notes |
 | A `review N/2` row is checked against `fix(review):` commits, never against the presence of a review comment | a clean review posts a comment too (design §5.1) |
@@ -194,7 +194,7 @@ For each `predicts` line on a merged PR:
   - **failed** — at the deadline, it did not, with at least the minimum sample on both sides.
   - **confounded** — another `predicts` line on the same metric and repo overlaps the span, or
     one of the repo's watch paths (§5.1) changed inside it. Printed with the cause; never a
-    delete candidate. (AXC #599 cut gate 4 from 17 to 3.75 min; a contract fix would have been
+    delete candidate. (An app-repo PR cut one gate from 17 to 3.75 min; a contract fix would have been
     credited with it.)
   - **no data** — the metric cannot be computed, or the sample is below the minimum.
 - **Verdict of record.** The first committed `metrics.json` after the deadline records the

@@ -50,7 +50,7 @@ critical pass. A GitHub Actions cron in the private repo catches a dead loop.
    folder is left behind (Task 4, Task 8).
 3. **A second run on the same date** (manual run plus the weekly one): exit 2, the existing
    folder untouched (Task 8).
-4. **A checkout path with a space** (`~/dev/Projects/AXC MED/AXCMedApp` exists): every `git`
+4. **A checkout path with a space** (an app checkout under `~/dev/Projects/AXC MED/` exists): every `git`
    call passes paths as argv, never through a shell string (Task 1, Task 7).
 5. **The weekly job fails at any step**: the owner gets a GitHub issue naming the step, not
    silence for 10 days (Task 10).
@@ -107,9 +107,9 @@ call (spec §9 leaves the module layout to the builder).
 
 ```json
 {"schema": 1, "repos": [
-  {"name": "AXCMedApp", "slug": "AXCMED/AXCMedApp", "role": "app",
-   "checkout": "/Users/…/AXCMedApp", "base": "develop",
-   "transcripts": ["-Users-…-AXCMedApp", "-Users-…-AXCMedApp--claude-worktrees-*"],
+  {"name": "app", "slug": "owner/app", "role": "app",
+   "checkout": "$HOME/…/app", "base": "develop",
+   "transcripts": ["-…-app", "-…-app--claude-worktrees-*"],
    "watch": ["repo-profile.md", "scripts/gate*.sh"],
    "gates": {"gate 4": "testDebugUnitTest|allTests"}}]}
 ```
@@ -236,13 +236,13 @@ Rules:
 - [ ] **Step 1: Write the failing tests**
 
 ```python
-def test_longest_slug_first(self):   # known {"native-painel","native-painel-shift-form"}; 25 × "adw/native-painel-shift-form" → "native-painel-shift-form"
-def test_unit_and_close_names(self): # "adw-native-painel-u03", "adw-close-native-painel", "pr-ready-native-painel-close-v2" → "native-painel"
+def test_longest_slug_first(self):   # known {"panel","panel-shift-form"}; 25 × "adw/panel-shift-form" → "panel-shift-form"
+def test_unit_and_close_names(self): # "adw-panel-u03", "adw-close-panel", "pr-ready-panel-close-v2" → "panel"
 def test_threshold_19_hits_is_none(self)
 def test_ratio_below_3x_is_none(self):  # 30 vs 12 → None
 def test_pr_link_overrides_counts(self): # pr_links [41] where 41 is "[adw x u01]", captures say y × 40 → "x"
 def test_release_pr_link_ignored(self):  # pr_links [7] where 7 is not an ADW PR → falls back to counts
-def test_subagent_from_dispatch_prompt(self)    # worktree adw-native-painel-u03 in the prompt → "native-painel"
+def test_subagent_from_dispatch_prompt(self)    # worktree adw-panel-u03 in the prompt → "panel"
 def test_subagent_inherits_parent(self)         # no capture in prompt → parent's slug; depth 2 resolves through parent_agent_id
 ```
 
@@ -300,7 +300,7 @@ def test_minutes(self)                          # "1h 5m" → 65.0; "0m" → 0.0
 def test_cycles(self)                           # "fix 1/3 · review v2 2/2      progress-conditions none fired" → fix 1, fix_cap 3, review 2, review_cap 2, progress "none"
 def test_final_pr_excludes_inherited(self)      # final PR with "[adw s u01] …" and "fix-attempt-2: x" own → fix_cycles 2, inherited excluded
 def test_fetch_paginates_and_stops_at_since(self)  # fake gh: 2 pages, stops before the older one
-def test_gh_failure_raises_source_error(self)   # FAKE_GH_FAIL=api → SourceError("AXCMedApp", …)
+def test_gh_failure_raises_source_error(self)   # FAKE_GH_FAIL=api → SourceError("app", …)
 def test_labels_ever(self)                      # LABELED_EVENT blocked, label removed since → in labels_ever, not labels_now
 ```
 
@@ -650,8 +650,8 @@ Content to write:
 
 **Files (in the new repo `~/dev/Projects/adw-analysis`):** `sources.json`, `legacy-verdicts.json`, `.github/workflows/stale-report.yml`, `README.md` (two lines: what this is, never make it public).
 
-- [ ] **Step 1: Ask the owner** to approve `gh repo create humbertouchiyama/adw-analysis --private --clone`. Stop until they answer.
-- [ ] **Step 2: Write `sources.json`.** Find each app repo's checkout (`git -C <dir> remote get-url origin` over `~/dev/Projects/AXC MED/*` and `~/dev/Projects/plantoes/*`) and every matching transcript dir (`ls ~/.claude/projects | grep -i <repo>`; today both `-…-AXC-MED-<repo>` and `-…-plantoes-<repo>` exist; list both). `base`: AXCMedApp `develop`; Plantoes-app from its repo profile. `watch`: `git ls-files | grep -E 'repo-profile|scripts/(gate|audit)'`. `gates`: the gate commands named in each repo profile's §5 table. adw: role `contract`, `transcripts: []`.
+- [ ] **Step 1: Ask the owner** to approve creating the private reports repo with `gh repo create <owner>/adw-analysis --private --clone`. Stop until they answer.
+- [ ] **Step 2: Write `sources.json`.** Find each app repo's checkout (`git -C <dir> remote get-url origin` over the owner's project folders) and every matching transcript dir (`ls ~/.claude/projects | grep -i <repo>`; list every one that has files). `base`: from each repo profile. `watch`: `git ls-files | grep -E 'repo-profile|scripts/(gate|audit)'`. `gates`: the gate commands named in each repo profile's §5 table. adw: role `contract`, `transcripts: []`.
 - [ ] **Step 3: Write `legacy-verdicts.json`**: #12 handoff decide pass `failed` (16 of 22 handoffs still stopped, 10-22 analysis); #15 enforcer drafts `failed` (nothing landed); orchestrator-on-Sonnet `failed for a cause outside the contract` (saved `/model opus` default).
 - [ ] **Step 4: Write `stale-report.yml`**: `on: schedule: - cron: "0 12 * * *"` and `workflow_dispatch`; `permissions: issues: write, contents: read`; find the newest folder matching `^20[0-9]{2}-[0-9]{2}-[0-9]{2}$`; if none, or older than 10 days, and no open issue titled `No ADW analysis report for 10 days`, create it with `gh issue create` (`GH_TOKEN: ${{ github.token }}`).
 - [ ] **Step 5: Commit and push**; run the workflow once with `gh workflow run stale-report.yml` and check `gh run list` shows success (no report yet → it opens the issue; close it after the first report).
@@ -660,7 +660,7 @@ Content to write:
 
 ### Task 13: Golden run, dry run, install, PR
 
-- [ ] **Step 1: Golden run** into a scratch reports dir: `python3 scripts/adw-analyze.py --reports <scratch> --until 2026-10-22 --days 20 --adw .` (copy `sources.json` there first). Compare with the 10-22 analysis (`project-run-analysis-2026-10-22` memory): $3,907 total; $15.2 per merged PR; ever-blocked 22.5 %; denials 258 (3.10 / 1k); orchestrator auto compactions 65 (expect most of them idle now); implementers and authors over 250k 92; gate wall 183 h (expect lower: foreground only); owner wait 68 % with the 12 h cap. Write every gap over 10 % with its cause to `~/dev/Projects/adw-analysis/golden-2026-10-22.md` and commit it there.
+- [ ] **Step 1: Golden run** into a scratch reports dir: `python3 scripts/adw-analyze.py --reports <scratch> --until 2026-10-22 --days 20 --adw .` (copy `sources.json` there first). Compare with the headline numbers of the 10-22 analysis (spend, spend per merged PR, ever-blocked, denials per 1k calls, orchestrator auto compactions, subagents over 250k, gate wall time, owner wait share); the numbers live in the private repo. Write every gap over 10 % with its cause to `~/dev/Projects/adw-analysis/golden-2026-10-22.md` and commit it there.
 - [ ] **Step 2: Fix any defect the golden run shows**, with a test first, then rerun Step 1.
 - [ ] **Step 3: Dry run** — `ADW_ANALYSIS_DIR=<scratch clone of the reports repo> bash scripts/adw-analyze-weekly.sh --dry-run` → a dated folder with the critical pass filled or marked `missing`, `leak scan: clean`, nothing pushed.
 - [ ] **Step 4: Whole suite** — `cd scripts && python3 -m unittest -v` → OK.
