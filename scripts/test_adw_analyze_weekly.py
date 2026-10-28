@@ -18,16 +18,19 @@ reports=""; prev=""
 for a in "$@"; do [ "$prev" = "--reports" ] && reports="$a"; prev="$a"; done
 case " $* " in
   *" --scan "*) echo "leak scan: stub"; exit "${FAKE_SCAN_EXIT:-0}";;
+  *" --transcript-dirs "*) echo "$FAKE_TDIR"; exit 0;;
 esac
 [ "${FAKE_READER_EXIT:-0}" = 0 ] || exit "$FAKE_READER_EXIT"
 d="$reports/$(date -u +%Y-%m-%d)"
 mkdir -p "$d"
 printf '# ADW analysis\n\n## Critical pass\n\ncritical pass: pending\n' > "$d/report.md"
-printf 'Verdicts: none\n\nleak scan: pending\n' > "$d/issue.md"
+printf 'Verdicts: none\n\ncritical pass: pending\nleak scan: pending\n' > "$d/issue.md"
 echo '{"schema": 1}' > "$d/metrics.json"
 '''
 FAKE_CLAUDE = r'''#!/bin/bash
 echo "claude $*" >> "$STUB_LOG"
+echo "claude-stderr-marker" >&2
+[ -n "${FAKE_CLAUDE_SLEEP:-}" ] && sleep "$FAKE_CLAUDE_SLEEP"
 [ -n "${FAKE_CLAUDE_SILENT:-}" ] && exit 1
 printf -- '- `cost.total_usd.v1` moved +40%%: fewer intents, not a regression.\n' > "$(pwd)/$(date -u +%Y-%m-%d)/critical-pass.md"
 '''
@@ -70,6 +73,7 @@ class Weekly(TmpCase):
         e = {**os.environ, **self.gh.env(), "HOME": self.home, "STUB_LOG": os.path.join(self.tmp, "stub.log"),
              "ADW_ANALYSIS_DIR": self.reports, "ADW_REPO": self.adw, "ADW_WEEKLY_WORKTREE": os.path.join(self.tmp, "adw weekly"),
              "ADW_WEEKLY_PATH": f"{self.stubs}:{self.gh.bin}:/usr/bin:/bin", "ADW_ANALYSIS_SLUG": "o/adw-analysis",
+             "FAKE_TDIR": os.path.join(self.tmp, "projects dir", "-app"),
              "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
         e.pop("ADW_WEEKLY_REEXEC", None)
         e.update(extra)
@@ -103,14 +107,63 @@ class Weekly(TmpCase):
             log = f.read()
         self.assertIn("--model sonnet", log)
         self.assertIn("--permission-mode dontAsk", log)
-        self.assertIn("--disallowedTools Bash", log)
+        self.assertIn("--tools Read Grep Glob Edit Write", log)
+        self.assertIn("--strict-mcp-config", log)
+        self.assertIn("--add-dir " + os.path.join(self.tmp, "projects dir", "-app"), log)
+        self.assertNotIn("--add-dir " + os.path.join(self.home, ".claude", "projects") + " ", log)
+        self.assertIn("claude-stderr-marker", r.stderr)
         self.assertTrue(os.path.isdir(os.path.join(self.tmp, "adw weekly")))
+        with open(os.path.join(self.reports, self.date, "issue.md")) as f:
+            self.assertIn("critical pass: ok", f.read())
+
+    def test_default_path_finds_claude(self):
+        with open(WRAPPER) as f:
+            self.assertIn('$HOME/.local/bin', next(line for line in f if line.startswith("ADW_WEEKLY_PATH=")))
+
+    def test_hung_critical_pass_is_cut_off(self):
+        import time
+        t0 = time.time()
+        r = self.run_wrapper(FAKE_CLAUDE_SLEEP="30", ADW_CRITICAL_TIMEOUT="2")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertLess(time.time() - t0, 20)
+        self.assertIn("critical pass: missing", self.report())
+
+    def test_missing_script_on_the_ref_opens_an_issue(self):
+        self.git("rm", "-q", "scripts/adw-analyze-weekly.sh", cwd=self.adw)
+        self.git("commit", "-q", "-m", "drop", cwd=self.adw)
+        self.git("push", "-q", "origin", "main", cwd=self.adw)
+        runner = os.path.join(self.tmp, "runner.sh")
+        shutil.copy(WRAPPER, runner)
+        r = subprocess.run(["bash", runner, "run"], capture_output=True, text=True, env=self.env())
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(self.issues(), [f"ADW analysis {self.date} failed at re-exec"])
+
+    def test_a_branch_can_be_dry_run(self):
+        self.git("checkout", "-q", "-b", "feature", cwd=self.adw)
+        self.git("push", "-q", "origin", "feature", cwd=self.adw)
+        self.git("checkout", "-q", "main", cwd=self.adw)
+        self.git("rm", "-q", "scripts/adw-analyze-weekly.sh", cwd=self.adw)
+        self.git("commit", "-q", "-m", "drop", cwd=self.adw)
+        self.git("push", "-q", "origin", "main", cwd=self.adw)
+        runner = os.path.join(self.tmp, "runner.sh")
+        shutil.copy(WRAPPER, runner)
+        r = subprocess.run(["bash", runner, "--dry-run"], capture_output=True, text=True,
+                           env=self.env(ADW_WEEKLY_REF="origin/feature"))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_failure_after_the_reader_removes_the_uncommitted_folder(self):
+        r = self.run_wrapper(FAKE_SCAN_EXIT="1")
+        self.assertEqual(r.returncode, 1)
+        self.assertFalse(os.path.exists(os.path.join(self.reports, self.date)))
+        self.assertEqual(self.issues(), [f"ADW analysis {self.date} failed at leak scan"])
 
     def test_missing_critical_pass_is_marked_and_still_committed(self):
         r = self.run_wrapper(FAKE_CLAUDE_SILENT="1")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("critical pass: missing", self.report())
         self.assertEqual(self.pushed(), f"report {self.date}")
+        with open(os.path.join(self.reports, self.date, "issue.md")) as f:
+            self.assertIn("critical pass: missing", f.read())
 
     def test_scan_hit_deletes_folder_and_opens_failure_issue(self):
         r = self.run_wrapper(FAKE_SCAN_EXIT="4")
@@ -131,6 +184,8 @@ class Weekly(TmpCase):
         self.assertEqual(self.issues(), [])
         self.assertIn("would open issue", r.stdout)
         self.assertIn("fewer intents", self.report())
+        local = subprocess.run(["git", "-C", self.reports, "log", "--format=%s"], capture_output=True, text=True).stdout
+        self.assertEqual(local.split(), ["init"])
 
     def test_install_and_uninstall(self):
         r = self.run_wrapper("--install")

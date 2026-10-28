@@ -22,13 +22,13 @@ class Guard(TmpCase):
         self.assertEqual(self.run_cli("--reports", repo).returncode, 3)
 
     def test_gh_error_is_refused(self):
-        repo = self.git_repo("reports", remote="git@github.com:humbertouchiyama/adw-analysis.git")
-        self.gh.set(visibility={"humbertouchiyama/adw-analysis": "PRIVATE"})
+        repo = self.git_repo("reports", remote="git@github.com:o/adw-analysis.git")
+        self.gh.set(visibility={"o/adw-analysis": "PRIVATE"})
         self.assertEqual(self.run_cli("--reports", repo, FAKE_GH_FAIL="repo").returncode, 3)
 
     def test_private_checkout_passes(self):
-        repo = self.git_repo("reports", remote="git@github.com:humbertouchiyama/adw-analysis.git")
-        self.gh.set(visibility={"humbertouchiyama/adw-analysis": "PRIVATE"})
+        repo = self.git_repo("reports", remote="git@github.com:o/adw-analysis.git")
+        self.gh.set(visibility={"o/adw-analysis": "PRIVATE"})
         with mock.patch.dict(os.environ, self.gh.env()):
             self.assertIsNone(config.check_reports_dir(repo))
 
@@ -41,8 +41,8 @@ class Guard(TmpCase):
         self.assertEqual(self.gh.calls(), [])
 
     def test_path_with_a_space(self):
-        repo = self.git_repo("AXC MED/reports", remote="git@github.com:humbertouchiyama/adw-analysis.git")
-        self.gh.set(visibility={"humbertouchiyama/adw-analysis": "PRIVATE"})
+        repo = self.git_repo("AXC MED/reports", remote="git@github.com:o/adw-analysis.git")
+        self.gh.set(visibility={"o/adw-analysis": "PRIVATE"})
         self.write_json(os.path.join(repo, "sources.json"), TWO_REPOS)
         self.assertEqual(self.run_cli("--reports", repo, "--check-config").returncode, 0)
 

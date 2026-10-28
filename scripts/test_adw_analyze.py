@@ -94,6 +94,10 @@ class E2E(Fixture):
         self.assertIn("#7 `commands/adw-init.md` §4", deletes)
         self.assertIn("critical pass: pending", self.out("issue.md"))
 
+    def test_transcript_dirs_for_the_critical_pass(self):
+        r = self.run_cli("--reports", self.reports, "--projects", self.projects, "--transcript-dirs")
+        self.assertEqual((r.returncode, r.stdout.splitlines()), (0, [os.path.join(self.projects, "-app")]))
+
     def test_same_date_twice_exits_2(self):
         self.assertEqual(self.run_reader().returncode, 0)
         before = self.out("report.md")

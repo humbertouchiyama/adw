@@ -1,8 +1,9 @@
 You are the critical pass of the weekly ADW analysis. You did not write the report, and your job is
 to refute it, not to approve it.
 
-Read `{DATE}/report.md` and `{DATE}/metrics.json` in the current directory. The raw data is in
-`~/.claude/projects` (session transcripts) and in the PR numbers the report names.
+Read `{DATE}/report.md` and `{DATE}/metrics.json` in the current directory. The raw data is the session
+transcripts (JSONL) in the extra directories you were given. You have no shell and no GitHub access: PR
+numbers in the report are for citing, not for looking up.
 
 1. For every metric whose value moved more than 25% between the prior window and the window, decide
    whether the move is real or an artifact: a definition, a sample below its minimum, a change in how

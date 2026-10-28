@@ -7,15 +7,17 @@
 #
 # Usage: adw-analyze-weekly.sh [run | --dry-run | --install | --uninstall]
 #   run         refresh the adw worktree, analyze, critical pass, leak scan, commit, push, open the issue
-#   --dry-run   the same without push or issue (prints them)
+#   --dry-run   the same without commit, push or issue (prints them); the dated folder stays to read
 #   --install   write the launchd agent (Mondays 07:00 local) and load it; --uninstall removes it
 set -euo pipefail
 
 ADW_ANALYSIS_DIR="${ADW_ANALYSIS_DIR:-$HOME/dev/Projects/adw-analysis}"
 ADW_REPO="${ADW_REPO:-$HOME/dev/Projects/adw}"
 ADW_WEEKLY_WORKTREE="${ADW_WEEKLY_WORKTREE:-$HOME/dev/Projects/adw-weekly}"
-ADW_WEEKLY_PATH="${ADW_WEEKLY_PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin}"
-export PATH="$ADW_WEEKLY_PATH" ADW_ANALYSIS_DIR ADW_REPO ADW_WEEKLY_WORKTREE ADW_WEEKLY_PATH
+ADW_WEEKLY_PATH="${ADW_WEEKLY_PATH:-$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin}"
+ADW_WEEKLY_REF="${ADW_WEEKLY_REF:-origin/main}"          # another ref dry-runs a branch before it merges
+ADW_CRITICAL_TIMEOUT="${ADW_CRITICAL_TIMEOUT:-1800}"     # seconds; a hung pass must not block every later run
+export PATH="$ADW_WEEKLY_PATH" ADW_ANALYSIS_DIR ADW_REPO ADW_WEEKLY_WORKTREE ADW_WEEKLY_PATH ADW_WEEKLY_REF
 
 LABEL=dev.adw.analyze-weekly
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
@@ -35,6 +37,11 @@ slug() {
 on_exit() {
   local code=$?
   [ "$STEP" = done ] && return
+  case "$STEP" in
+    reader|"critical pass"|"leak scan"|commit)
+      # an uncommitted dated folder would block a same-day retry and is never a record
+      git -C "$R" ls-files --error-unmatch -- "$D/report.md" >/dev/null 2>&1 || rm -rf "${R:?}/$D" ;;
+  esac
   local title="ADW analysis $D failed at $STEP"
   if [ "$DRY" = 1 ]; then
     echo "would open issue: $title"
@@ -58,10 +65,27 @@ replace_line() {
 worktree() {
   if [ ! -d "$WT" ]; then
     git -C "$ADW_REPO" fetch -q origin
-    git -C "$ADW_REPO" worktree add -q --detach "$WT" origin/main
+    git -C "$ADW_REPO" worktree add -q --detach "$WT" "$ADW_WEEKLY_REF"
   fi
   git -C "$WT" fetch -q origin
-  git -C "$WT" checkout -q --detach origin/main
+  git -C "$WT" checkout -q --detach "$ADW_WEEKLY_REF"
+}
+
+# The critical pass: tools limited to reading and writing files, reads limited to the reports checkout
+# and the app transcript dirs (the leak scan covers the same dirs), no MCP servers, a hard timeout.
+critical_pass() {
+  local prompt d dirs=()
+  prompt="$(sed -e "s#{DATE}#$D#g" "$WT/.claude/skills/adw-analyze/critical-pass.md")"
+  while IFS= read -r d; do
+    [ -n "$d" ] && dirs+=(--add-dir "$d")
+  done < <(python3 "$WT/scripts/adw-analyze.py" --reports "$R" --transcript-dirs)
+  # perl runs claude in its own process group and kills the whole group when the time is up
+  (cd "$R" && perl -e 'my $t = shift; my $pid = fork; if ($pid == 0) { setpgrp(0, 0); exec @ARGV or exit 127 }
+     $SIG{ALRM} = sub { kill "TERM", -$pid; sleep 2; kill "KILL", -$pid; exit 124 }; alarm $t; waitpid($pid, 0); exit($? >> 8)' \
+     "$ADW_CRITICAL_TIMEOUT" \
+     claude -p "$prompt" --model sonnet --permission-mode dontAsk --strict-mcp-config \
+     --tools Read Grep Glob Edit Write ${dirs[@]+"${dirs[@]}"} \
+     --allowedTools Read Grep Glob "Edit($D/critical-pass.md)" --disallowedTools Bash WebFetch WebSearch Agent) >&2 || true
 }
 
 run() {
@@ -69,6 +93,8 @@ run() {
   STEP=worktree
   worktree
   if [ -z "${ADW_WEEKLY_REEXEC:-}" ]; then
+    STEP=re-exec
+    bash -n "$WT/scripts/adw-analyze-weekly.sh"
     export ADW_WEEKLY_REEXEC=1
     trap - EXIT
     exec bash "$WT/scripts/adw-analyze-weekly.sh" "$MODE"
@@ -81,40 +107,37 @@ run() {
   python3 "$WT/scripts/adw-analyze.py" --reports "$R" --adw "$WT"
 
   STEP="critical pass"
-  local prompt findings="$R/$D/critical-pass.md"
-  prompt="$(sed -e "s#{DATE}#$D#g" "$WT/.claude/skills/adw-analyze/critical-pass.md")"
-  (cd "$R" && claude -p "$prompt" --model sonnet --permission-mode dontAsk --add-dir "$HOME/.claude/projects" \
-     --allowedTools Read Grep Glob "Edit($D/critical-pass.md)" --disallowedTools Bash WebFetch WebSearch Agent) \
-     >/dev/null 2>&1 || true
+  local findings="$R/$D/critical-pass.md" status=missing
+  critical_pass
   if [ -s "$findings" ]; then
     replace_line "$R/$D/report.md" "critical pass: pending" "$findings"
-    rm -f "$findings"
+    status=ok
   else
-    rm -f "$findings"
     replace_line "$R/$D/report.md" "critical pass: pending" "critical pass: missing"
   fi
+  rm -f "$findings"
+  replace_line "$R/$D/issue.md" "critical pass: pending" "critical pass: $status"
 
   STEP="leak scan"
   local rc=0
   python3 "$WT/scripts/adw-analyze.py" --reports "$R" --scan --date "$D" || rc=$?
-  if [ "$rc" -ne 0 ]; then
-    [ "$rc" -eq 4 ] && rm -rf "${R:?}/$D"
-    exit 1
-  fi
+  [ "$rc" -eq 0 ] || exit 1
   replace_line "$R/$D/issue.md" "leak scan: pending" "leak scan: clean"
 
+  if [ "$DRY" = 1 ]; then
+    echo "dry run: $R/$D written, not committed (delete it before a real run today)"
+    echo "would commit and push $D"
+    echo "would open issue: ADW analysis $D"
+    STEP=done
+    return
+  fi
   STEP=commit
   git -C "$R" add -- "$D"
   git -C "$R" commit -q -m "report $D"
-  if [ "$DRY" = 1 ]; then
-    echo "would push $R to origin"
-    echo "would open issue: ADW analysis $D"
-  else
-    STEP=push
-    git -C "$R" push -q origin HEAD
-    STEP=issue
-    gh issue create -R "$(slug)" --title "ADW analysis $D" --body-file "$R/$D/issue.md"
-  fi
+  STEP=push
+  git -C "$R" push -q origin HEAD
+  STEP=issue
+  gh issue create -R "$(slug)" --title "ADW analysis $D" --body-file "$R/$D/issue.md"
   STEP=done
 }
 

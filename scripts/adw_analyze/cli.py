@@ -33,6 +33,8 @@ def parse(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--scan", action="store_true", help="leak-scan the dated folder named by --date")
     p.add_argument("--date", help="with --scan: the dated folder to scan")
     p.add_argument("--check-config", action="store_true", help="stop after the guard and sources.json")
+    p.add_argument("--transcript-dirs", action="store_true",
+                   help="print the app transcript dirs, one per line (the critical pass may read only these)")
     return p.parse_args(argv)
 
 
@@ -56,6 +58,15 @@ def main(argv: list[str] | None = None) -> int:
     except config.PublicRepoError as e:
         return fail(3, str(e))
     if args.check_config:
+        return 0
+    if args.transcript_dirs:
+        import glob
+        projects = os.path.expanduser(args.projects)
+        for r in repos:
+            if r.role == "app":
+                for pattern in r.transcripts:
+                    for d in sorted(glob.glob(os.path.join(projects, pattern))):
+                        print(d)
         return 0
     if args.scan:
         from .scan import run_scan
