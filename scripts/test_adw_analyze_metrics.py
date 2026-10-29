@@ -205,13 +205,15 @@ class Values(unittest.TestCase):
 
     def test_a_definition_change_is_a_new_id(self):
         from adw_analyze.metrics import FUNCS, metric
-        metric("loop.example", "rate", 1, "ratio", "test only", version=2)(lambda sl: (None, 0, {}))
+        metric("loop.example", "rate", 1, "ratio", "test only")(lambda sl: (None, 0, {}))
+        metric("loop.example", "rate", 1, "ratio", "test only, new definition", version=2)(lambda sl: (None, 0, {}))
         try:
+            self.assertIn("loop.example.v1", REGISTRY)   # the old id stays judgeable beside the new one
             self.assertIn("loop.example.v2", REGISTRY)
-            self.assertNotIn("loop.example.v1", REGISTRY)
         finally:
-            REGISTRY.pop("loop.example.v2", None)
-            FUNCS.pop("loop.example.v2", None)
+            for mid in ("loop.example.v1", "loop.example.v2"):
+                REGISTRY.pop(mid, None)
+                FUNCS.pop(mid, None)
 
     def test_every_registry_id_computes(self):
         for mid in REGISTRY:

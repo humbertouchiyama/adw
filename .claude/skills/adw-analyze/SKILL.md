@@ -22,6 +22,8 @@ The weekly launchd job runs this every Monday. Run it by hand when the owner ask
 This repo is public; the reports repo is private. Never copy report lines, spend, app-repo PR numbers
 or local paths into a commit, PR or issue in this repo.
 
-To change what is measured, change `scripts/adw_analyze/metrics.py` and pass the next `version=` to
-that metric's `@metric(...)` (`version=2` makes the id end in `.v2`): a definition change is a new
-id, so old verdicts stay comparable.
+To change what is measured, add the new definition to `scripts/adw_analyze/metrics.py` as a second
+`@metric(...)` with the same name and the next `version=` (`version=2` makes the id end in `.v2`):
+a definition change is a new id, so old verdicts stay comparable. Keep the old one registered until
+every `predicts` line that names it has a verdict of record: a line naming an id that is gone is
+rejected as an unknown metric and never judged.
