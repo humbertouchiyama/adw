@@ -219,3 +219,40 @@ class Lookback(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReportFixes(unittest.TestCase):
+    def issue(self, mid, prior, window):
+        from types import SimpleNamespace
+        from adw_analyze.metrics import MetricValue
+        from adw_analyze.report import issue_md
+        win = {m: MetricValue(None, 0, "no data") for m in REGISTRY}
+        pri = dict(win)
+        win[mid], pri[mid] = MetricValue(*window, "ok"), MetricValue(*prior, "ok")
+        run = SimpleNamespace(date=UNTIL, window=("2026-10-22", UNTIL), predictions=[], records={}, win=win, pri=pri)
+        return issue_md(run, {})
+
+    def test_one_event_move_is_not_listed(self):
+        text = self.issue("outcome.failed_rate.v1", (1 / 387, 387), (0.0, 324))
+        self.assertNotIn("outcome.failed_rate.v1", text)
+
+    def test_twenty_to_forty_events_is_listed(self):
+        text = self.issue("outcome.failed_rate.v1", (20 / 400, 400), (40 / 400, 400))
+        self.assertIn("outcome.failed_rate.v1", text)
+
+    def test_per1k_events_use_the_thousand_divisor(self):
+        mid = "friction.denials_per_1k_calls.v1"
+        self.assertNotIn(mid, self.issue(mid, (2.0, 1000), (1.0, 1000)))   # 2 and 1 events
+        self.assertIn(mid, self.issue(mid, (20.0, 1000), (40.0, 1000)))
+
+
+class MetricsJsonMeaning(Fixture):
+    def test_every_metric_has_its_meaning(self):
+        r = self.run_reader()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        ms = json.loads(self.out("metrics.json"))["metrics"]
+        for mid, m in REGISTRY.items():
+            e = ms[mid]
+            self.assertEqual((e["definition"], e["kind"], e["min_n"]), (m.definition, m.kind, m.min_n))
+        self.assertEqual(ms["cost.total_usd.v1"]["source"], "transcripts")
+        self.assertEqual(ms["outcome.failed_rate.v1"]["source"], "github")

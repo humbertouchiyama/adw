@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass, field
 
 from .facts import WAIT_CAP_H, Facts, Slice
-from .metrics import REGISTRY, MetricValue, uncovered
+from .metrics import REGISTRY, TRANSCRIPT_GROUPS, MetricValue, uncovered
 from .pricing import PRICES, PRICES_AS_OF
 from .verdicts import record_entry
 
@@ -110,7 +110,9 @@ def metrics_json(run: Run, verdicts: dict, t: dict) -> dict:
     for mid in REGISTRY:
         w, p = run.win[mid], run.pri[mid]
         ms[mid] = {"window": w.value, "prior": p.value, "n_window": w.n, "n_prior": p.n, "status_window": w.status,
-                   "status_prior": p.status, "breakdown": w.breakdown}
+                   "status_prior": p.status, "breakdown": w.breakdown, "definition": REGISTRY[mid].definition,
+                   "kind": REGISTRY[mid].kind, "min_n": REGISTRY[mid].min_n,
+                   "source": "transcripts" if REGISTRY[mid].group in TRANSCRIPT_GROUPS else "github"}
     return {
         "schema": 1, "until": run.until, "window": list(run.window), "prior": list(run.prior),
         "prices": {"as_of": PRICES_AS_OF, "per_mtok_in_out_cacheread": PRICES, "cache_write_5m_x_in": 1.25,
@@ -200,6 +202,22 @@ def metric_rows(run: Run, keep) -> list:
     return rows
 
 
+MIN_MOVE_EVENTS = 5
+
+
+def events(mid: str, v: MetricValue) -> float | None:
+    """Events behind a rate or ratio value; None for a metric that counts none (medians)."""
+    m = REGISTRY[mid]
+    if m.kind not in ("rate", "ratio") or v.value is None:
+        return None
+    return v.value * v.n / 1000 if m.unit == "per1k" else v.value * v.n
+
+
+def one_event_move(mid: str, w: MetricValue, p: MetricValue) -> bool:
+    ew, ep = events(mid, w), events(mid, p)
+    return ew is not None and ep is not None and ew < MIN_MOVE_EVENTS and ep < MIN_MOVE_EVENTS
+
+
 def issue_md(run: Run, verdicts: dict) -> str:
     out = [f"ADW analysis {run.date}, window {run.window[0][:10]} → {run.window[1][:10]}.", "", "Verdicts reached this run:"]
     reached = [p for p in run.predictions if verdicts[p.key]["of_record"]]
@@ -208,7 +226,7 @@ def issue_md(run: Run, verdicts: dict) -> str:
     for mid, m in REGISTRY.items():
         w, p = run.win[mid], run.pri[mid]
         c = change(w, p)
-        if m.predictable and w.status == "ok" and p.status == "ok" and c is not None:
+        if m.predictable and w.status == "ok" and p.status == "ok" and c is not None and not one_event_move(mid, w, p):
             moved.append((abs(c), mid, c, w, p))
     moved.sort(reverse=True)
     out += ["", "Moved most (predictable, both windows ok):"]
