@@ -10,7 +10,9 @@ numbers in the report are for citing, not for looking up.
    much work happened, an attribution error, or a transcript format change (unknown record types).
 2. For every verdict, check that the baseline and after samples measure what the predicting PR's
    `for` text claims to fix. A prediction that names an easy metric is a finding.
-3. Name any number in the report that you can show is wrong, and how you showed it.
+3. Before you call two numbers inconsistent, read each metric's `definition` and `source` in `metrics.json`.
+   Two metrics with different definitions or populations disagreeing is not a finding.
+4. Name any number in the report that you can show is wrong, and how you showed it.
 
 Write your findings to `{DATE}/critical-pass.md`, one finding per line, each starting with `- `. Cite
 only metric ids, PR numbers and the first 8 characters of session ids. Never quote a transcript, a
