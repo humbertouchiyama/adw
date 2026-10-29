@@ -94,6 +94,15 @@ class E2E(Fixture):
         self.assertIn("#7 `commands/adw-init.md` §4", deletes)
         self.assertIn("critical pass: pending", self.out("issue.md"))
 
+    def test_a_contract_pr_without_predicts_is_named(self):
+        prs = self.gh.data["prs"]
+        prs["o/adw"].append(pr_node(11, "adw-init: y", created="2026-10-12T10:00:00Z", merge_oid=self.merge,
+                                    files=["commands/adw-init.md"]))
+        self.gh.set(prs=prs)
+        self.assertEqual(self.run_reader().returncode, 0)
+        line = next(x for x in self.out("report.md").splitlines() if "with no predicts line" in x)
+        self.assertTrue(line.endswith(": #11"), line)
+
     def test_transcript_dirs_for_the_critical_pass(self):
         r = self.run_cli("--reports", self.reports, "--projects", self.projects, "--transcript-dirs")
         self.assertEqual((r.returncode, r.stdout.splitlines()), (0, [os.path.join(self.projects, "-app")]))

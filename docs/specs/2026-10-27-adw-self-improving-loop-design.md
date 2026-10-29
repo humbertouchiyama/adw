@@ -246,9 +246,10 @@ Transcripts are local files, so a cloud routine cannot read them. The run is loc
   to `origin/main`, pull the reports repo, run the reader, run the leak scan, commit and push,
   open the issue. No model is needed for any of it.
 - **Only the critical pass uses a model:** `claude -p` with `--model sonnet` and an explicit
-  `--allowedTools` list (reads, the reader's own commands, and writing the findings file). It
-  never pushes or opens anything. The wrapper checks that the findings section exists and
-  otherwise marks the report `critical pass: missing` and still commits it. *(Designer's call,
+  `--allowedTools` list (reads scoped to the reports checkout and the app transcript dirs, and
+  writing the findings file). It never pushes or opens anything. The wrapper checks that the
+  findings section exists and otherwise marks the report `critical pass: missing`, or `critical
+  pass: timed out` when the pass hit its time limit, and still commits it. *(Designer's call,
   from the critical review: an unattended `claude -p` cannot answer a prompt, so a denied push
   would fail silently.)*
 - **launchd** runs the wrapper weekly, installed and removed by `--install` / `--uninstall`.

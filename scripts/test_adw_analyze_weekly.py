@@ -21,18 +21,23 @@ case " $* " in
   *" --transcript-dirs "*) echo "$FAKE_TDIR"; exit 0;;
 esac
 [ "${FAKE_READER_EXIT:-0}" = 0 ] || exit "$FAKE_READER_EXIT"
-d="$reports/$(date -u +%Y-%m-%d)"
+d="$reports/${FAKE_READER_DATE:-$(date -u +%Y-%m-%d)}"
+[ -e "$d" ] && { echo "$d exists" >&2; exit 2; }
 mkdir -p "$d"
 printf '# ADW analysis\n\n## Critical pass\n\ncritical pass: pending\n' > "$d/report.md"
 printf 'Verdicts: none\n\ncritical pass: pending\nleak scan: pending\n' > "$d/issue.md"
 echo '{"schema": 1}' > "$d/metrics.json"
+echo "$d"
 '''
 FAKE_CLAUDE = r'''#!/bin/bash
 echo "claude $*" >> "$STUB_LOG"
 echo "claude-stderr-marker" >&2
+out=""
+for a in "$@"; do case "$a" in "Edit("*) out="${a#Edit(}"; out="${out%)}";; esac; done
+[ -n "${FAKE_CLAUDE_PARTIAL:-}" ] && printf -- '- partial finding\n' > "$out"
 [ -n "${FAKE_CLAUDE_SLEEP:-}" ] && sleep "$FAKE_CLAUDE_SLEEP"
 [ -n "${FAKE_CLAUDE_SILENT:-}" ] && exit 1
-printf -- '- `cost.total_usd.v1` moved +40%%: fewer intents, not a regression.\n' > "$(pwd)/$(date -u +%Y-%m-%d)/critical-pass.md"
+printf -- '- `cost.total_usd.v1` moved +40%%: fewer intents, not a regression.\n' > "$out"
 '''
 FAKE_LAUNCHCTL = '#!/bin/bash\necho "launchctl $*" >> "$STUB_LOG"\n'
 
@@ -109,7 +114,10 @@ class Weekly(TmpCase):
         self.assertIn("--permission-mode dontAsk", log)
         self.assertIn("--tools Read Grep Glob Edit Write", log)
         self.assertIn("--strict-mcp-config", log)
-        self.assertIn("--add-dir " + os.path.join(self.tmp, "projects dir", "-app"), log)
+        tdir = os.path.join(self.tmp, "projects dir", "-app")
+        self.assertIn("--add-dir " + tdir, log)
+        self.assertIn(f"--allowedTools Read(./**) Read(/{tdir}/**) Edit({self.date}/critical-pass.md) --disallowedTools", log)
+        self.assertIn(f"report: {self.reports}/{self.date}/report.md", r.stdout)
         self.assertNotIn("--add-dir " + os.path.join(self.home, ".claude", "projects") + " ", log)
         self.assertIn("claude-stderr-marker", r.stderr)
         self.assertTrue(os.path.isdir(os.path.join(self.tmp, "adw weekly")))
@@ -126,7 +134,36 @@ class Weekly(TmpCase):
         r = self.run_wrapper(FAKE_CLAUDE_SLEEP="30", ADW_CRITICAL_TIMEOUT="2")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertLess(time.time() - t0, 20)
-        self.assertIn("critical pass: missing", self.report())
+        self.assertIn("critical pass: timed out", self.report())
+
+    def test_a_timed_out_pass_is_not_ok_even_with_a_partial_file(self):
+        r = self.run_wrapper(FAKE_CLAUDE_PARTIAL="1", FAKE_CLAUDE_SLEEP="30", ADW_CRITICAL_TIMEOUT="2")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("critical pass: timed out", self.report())
+        self.assertNotIn("partial finding", self.report())
+        with open(os.path.join(self.reports, self.date, "issue.md")) as f:
+            self.assertIn("critical pass: timed out", f.read())
+
+    def test_a_dry_run_does_not_block_a_real_run_that_day(self):
+        self.assertEqual(self.run_wrapper("--dry-run").returncode, 0)
+        r = self.run_wrapper()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.pushed(), f"report {self.date}")
+        self.assertEqual(self.issues(), [f"ADW analysis {self.date}"])
+
+    def test_a_committed_report_still_blocks_a_second_run(self):
+        self.assertEqual(self.run_wrapper().returncode, 0)
+        r = self.run_wrapper()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertTrue(os.path.exists(os.path.join(self.reports, self.date, "report.md")))
+        self.assertEqual(self.issues()[-1], f"ADW analysis {self.date} failed at reader")
+
+    def test_the_folder_is_the_one_the_reader_wrote(self):
+        r = self.run_wrapper(FAKE_READER_DATE="2099-01-01")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.pushed(), "report 2099-01-01")
+        with open(os.path.join(self.reports, "2099-01-01", "report.md")) as f:
+            self.assertIn("fewer intents", f.read())
 
     def test_missing_script_on_the_ref_opens_an_issue(self):
         self.git("rm", "-q", "scripts/adw-analyze-weekly.sh", cwd=self.adw)

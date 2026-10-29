@@ -65,7 +65,10 @@ question is: "(1) For each Blocking in the last report, is it fixed at the PR he
 `fixed` or `open`, with `file:line`. (2) For each rule the new commits (`git diff <sha>..pr/<N>`)
 add or change, search the repo at the PR head for stale or missing sites, and walk each changed
 step as written. (3) For every other open PR `<M>`: `git merge-tree --write-tree pr/<N> pr/<M>`,
-report a conflict. Before your `VERDICT:` line write `PRS CHECKED: <the #M whose merge-tree ran>`."
+report a conflict. (4) If the PR touches `commands/` or `scripts/`, does its body now carry
+`predicts` lines in README's grammar ("Changing the contract"), one per fix it bundles, including
+each fix the new commits add, or `predicts  none — <reason>`? A missing or malformed line is a
+Warning. Before your `VERDICT:` line write `PRS CHECKED: <the #M whose merge-tree ran>`."
 Read only the changed files whole, and grep the rest. Step 3 hands over that lane's `POSITIVE`
 claims and every `open` line as a `POSITIVE`, and skips `NEGATIVE` ones. A delta review with no
 claim and no `open` line skips step 3.

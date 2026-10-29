@@ -8,6 +8,7 @@
 # Usage: adw-analyze-weekly.sh [run | --dry-run | --install | --uninstall]
 #   run         refresh the adw worktree, analyze, critical pass, leak scan, commit, push, open the issue
 #   --dry-run   the same without commit, push or issue (prints them); the dated folder stays to read
+#               until the next run on that UTC date replaces it
 #   --install   write the launchd agent (Mondays 07:00 local) and load it; --uninstall removes it
 set -euo pipefail
 
@@ -34,13 +35,16 @@ slug() {
   git -C "$R" remote get-url origin | sed -E 's#^.*github\.com[:/]##; s#\.git$##'
 }
 
+# An uncommitted dated folder (a failed run, a dry run) is never a record, and it would block the reader.
+drop_uncommitted() {
+  git -C "$R" ls-files --error-unmatch -- "$D/report.md" >/dev/null 2>&1 || rm -rf "${R:?}/$D"
+}
+
 on_exit() {
   local code=$?
   [ "$STEP" = done ] && return
   case "$STEP" in
-    reader|"critical pass"|"leak scan"|commit)
-      # an uncommitted dated folder would block a same-day retry and is never a record
-      git -C "$R" ls-files --error-unmatch -- "$D/report.md" >/dev/null 2>&1 || rm -rf "${R:?}/$D" ;;
+    reader|"critical pass"|"leak scan"|commit) drop_uncommitted ;;
   esac
   local title="ADW analysis $D failed at $STEP"
   if [ "$DRY" = 1 ]; then
@@ -73,11 +77,12 @@ worktree() {
 
 # The critical pass: tools limited to reading and writing files, reads limited to the reports checkout
 # and the app transcript dirs (the leak scan covers the same dirs), no MCP servers, a hard timeout.
+# Read rules also scope Grep and Glob; `//` starts an absolute path in a rule. Exit 124 is the timeout.
 critical_pass() {
-  local prompt d dirs=()
+  local prompt d dirs=() reads=("Read(./**)")
   prompt="$(sed -e "s#{DATE}#$D#g" "$WT/.claude/skills/adw-analyze/critical-pass.md")"
   while IFS= read -r d; do
-    [ -n "$d" ] && dirs+=(--add-dir "$d")
+    [ -n "$d" ] && dirs+=(--add-dir "$d") && reads+=("Read(/$d/**)")
   done < <(python3 "$WT/scripts/adw-analyze.py" --reports "$R" --transcript-dirs)
   # perl runs claude in its own process group and kills the whole group when the time is up
   (cd "$R" && perl -e 'my $t = shift; my $pid = fork; if ($pid == 0) { setpgrp(0, 0); exec @ARGV or exit 127 }
@@ -85,7 +90,7 @@ critical_pass() {
      "$ADW_CRITICAL_TIMEOUT" \
      claude -p "$prompt" --model sonnet --permission-mode dontAsk --strict-mcp-config \
      --tools Read Grep Glob Edit Write ${dirs[@]+"${dirs[@]}"} \
-     --allowedTools Read Grep Glob "Edit($D/critical-pass.md)" --disallowedTools Bash WebFetch WebSearch Agent) >&2 || true
+     --allowedTools "${reads[@]}" "Edit($D/critical-pass.md)" --disallowedTools Bash WebFetch WebSearch Agent) >&2
 }
 
 run() {
@@ -104,16 +109,23 @@ run() {
   git -C "$R" pull -q --ff-only origin "$(git -C "$R" rev-parse --abbrev-ref HEAD)"
 
   STEP=reader
-  python3 "$WT/scripts/adw-analyze.py" --reports "$R" --adw "$WT"
+  drop_uncommitted
+  local out
+  out="$(python3 "$WT/scripts/adw-analyze.py" --reports "$R" --adw "$WT")"
+  D="$(basename "$out")"   # the folder the reader wrote: its UTC date can differ from ours across midnight
 
   STEP="critical pass"
-  local findings="$R/$D/critical-pass.md" status=missing
-  critical_pass
-  if [ -s "$findings" ]; then
-    replace_line "$R/$D/report.md" "critical pass: pending" "$findings"
+  local findings="$R/$D/critical-pass.md" status=missing pass=0
+  critical_pass || pass=$?
+  if [ "$pass" -eq 124 ]; then
+    status="timed out"   # a pass cut off mid-write is not a finished pass
+  elif [ -s "$findings" ]; then
     status=ok
+  fi
+  if [ "$status" = ok ]; then
+    replace_line "$R/$D/report.md" "critical pass: pending" "$findings"
   else
-    replace_line "$R/$D/report.md" "critical pass: pending" "critical pass: missing"
+    replace_line "$R/$D/report.md" "critical pass: pending" "critical pass: $status"
   fi
   rm -f "$findings"
   replace_line "$R/$D/issue.md" "critical pass: pending" "critical pass: $status"
@@ -123,9 +135,10 @@ run() {
   python3 "$WT/scripts/adw-analyze.py" --reports "$R" --scan --date "$D" || rc=$?
   [ "$rc" -eq 0 ] || exit 1
   replace_line "$R/$D/issue.md" "leak scan: pending" "leak scan: clean"
+  echo "report: $R/$D/report.md"
 
   if [ "$DRY" = 1 ]; then
-    echo "dry run: $R/$D written, not committed (delete it before a real run today)"
+    echo "dry run: $R/$D written, not committed (the next run on this UTC date replaces it)"
     echo "would commit and push $D"
     echo "would open issue: ADW analysis $D"
     STEP=done

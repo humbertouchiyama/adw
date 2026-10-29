@@ -196,6 +196,23 @@ class Values(unittest.TestCase):
         self.assertEqual(self.v("loop.contract_prs_predicts_none.v1").value, 1)
         self.assertAlmostEqual(self.v("loop.predicts_coverage.v1").value, 1.0)
 
+    def test_uncovered_names_contract_prs_with_no_line(self):
+        from adw_analyze.metrics import uncovered
+        self.facts.predict_lines = {}
+        self.assertEqual([p.number for p in uncovered(F.Slice(self.facts, START, END))], [10])
+        self.facts.predict_lines = {10: [SimpleNamespace(kind="none")]}
+        self.assertEqual(uncovered(F.Slice(self.facts, START, END)), [])
+
+    def test_a_definition_change_is_a_new_id(self):
+        from adw_analyze.metrics import FUNCS, metric
+        metric("loop.example", "rate", 1, "ratio", "test only", version=2)(lambda sl: (None, 0, {}))
+        try:
+            self.assertIn("loop.example.v2", REGISTRY)
+            self.assertNotIn("loop.example.v1", REGISTRY)
+        finally:
+            REGISTRY.pop("loop.example.v2", None)
+            FUNCS.pop("loop.example.v2", None)
+
     def test_every_registry_id_computes(self):
         for mid in REGISTRY:
             r = compute(mid, self.win)

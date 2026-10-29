@@ -6,8 +6,8 @@ import json
 import os
 from dataclasses import dataclass, field
 
-from .facts import WAIT_CAP_H, Facts
-from .metrics import REGISTRY, MetricValue
+from .facts import WAIT_CAP_H, Facts, Slice
+from .metrics import REGISTRY, MetricValue, uncovered
 from .pricing import PRICES, PRICES_AS_OF
 from .verdicts import record_entry
 
@@ -175,6 +175,9 @@ def report_md(run: Run, verdicts: dict, t: dict) -> str:
     out += metric_rows(run, lambda m: m.group == SELF_REPORT)
     out += ["", "## The loop", "", "| id | window | prior | change | n |", "|---|---|---|---|---|"]
     out += metric_rows(run, lambda m: m.group == LOOP)
+    missing = sorted(p.number for p in uncovered(Slice(run.facts, *run.window)))
+    out += ["", "Contract PRs merged in the window with no predicts line: "
+            + (", ".join(f"#{n}" for n in missing) if missing else "none.")]
     out += ["", "## Legacy verdicts (information only)", ""]
     out += [f"- #{x.get('pr')} {x.get('for')} — {x.get('verdict')}. {x.get('note', '')}".rstrip() for x in run.legacy] or ["None."]
     out += ["", "## Rejected predicts lines", ""]

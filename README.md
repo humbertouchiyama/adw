@@ -115,7 +115,8 @@ predicts  none — <reason>
 ```
 
 One line per fix the PR bundles. The amount is a change against the baseline before the merge, the
-deadline is at most 49 days after it, and the metric must be a rate, ratio or median from
+deadline is at most 49 days after it, and the metric is a full id with its version suffix, as the
+report's Metrics table prints it (`friction.denials_per_1k_calls.v1`): a rate, ratio or median from
 `scripts/adw_analyze/metrics.py`. The weekly report judges each line after its deadline (worked,
 failed, confounded or no data), and a failed fix is listed for deletion. The reports go to the
 owner's private reports repo, never to this one.

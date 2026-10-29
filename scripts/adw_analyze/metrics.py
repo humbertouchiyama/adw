@@ -43,9 +43,10 @@ REGISTRY: dict[str, Metric] = {}
 FUNCS = {}
 
 
-def metric(name: str, kind: str, min_n: int, unit: str, definition: str):
+def metric(name: str, kind: str, min_n: int, unit: str, definition: str, version: int = 1):
     def deco(fn):
-        m = Metric(id=name + ".v1", group=name.split(".")[0], kind=kind, min_n=min_n, unit=unit, definition=definition)
+        m = Metric(id=f"{name}.v{version}", group=name.split(".")[0], kind=kind, min_n=min_n, unit=unit,
+                   definition=definition)
         REGISTRY[m.id] = m
         FUNCS[m.id] = fn
         return fn
@@ -441,7 +442,12 @@ def _(sl):
     return sum(1 for p in ps for x in sl.facts.predict_lines.get(p.number, []) if getattr(x, "kind", None) == "rejected"), len(ps) or 1, {}
 
 
+def uncovered(sl) -> list:
+    """Contract PRs merged in the slice with no predicts line at all: what loop.predicts_coverage misses."""
+    return [p for p in sl.contract_prs() if not kinds(sl, p) & {"prediction", "none"}]
+
+
 @metric("loop.predicts_coverage", "ratio", 3, "ratio", "contract PRs with any predicts line (a prediction or none) / contract PRs merged")
 def _(sl):
     ps = sl.contract_prs()
-    return ratio(sum(1 for p in ps if kinds(sl, p) & {"prediction", "none"}), len(ps)), len(ps), {}
+    return ratio(len(ps) - len(uncovered(sl)), len(ps)), len(ps), {}

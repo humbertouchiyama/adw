@@ -804,13 +804,14 @@ PR body remains the only durable home of run state. Delete the script and no mea
 the convenience of not re-deriving it by hand, which is precisely where it earns its place:
 hand-scanning these fields produced three separate mis-readings before the script existed,
 and two of them were **definition** errors rather than arithmetic, so a more careful human
-would have made them too. Both are now encoded in the script's header:
+would have made them too. Both are now encoded in the reader:
 
 - `review N/2` counts review cycles that **applied findings**. `0/2` is a review that ran
   and came back clean, *not* a review that was skipped — the opposite reading inverts the
   headline conclusion, since it turns the system's healthiest runs into its worst. The
-  script's `rv` / `rv+` columns are the independent check, fetched the way `/pr-ready` §5
-  fetches it rather than inferred from the counter.
+  reader's `evidence.review0_with_fixreview_rate.v1` is the independent check: it counts
+  `0/N` review rows on PRs that still carry `fix(review):` commits, read from the PR's
+  commits rather than inferred from the counter.
 - `progress-conditions` is **hyphenated**. A grep for the spaced form matches nothing and
   reports an empty result set, which reads identically to "no conditions fired".
 
