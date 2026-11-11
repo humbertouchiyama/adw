@@ -10,8 +10,13 @@ numbers in the report are for citing, not for looking up.
    much work happened, an attribution error, or a transcript format change (unknown record types).
 2. For every verdict, check that the baseline and after samples measure what the predicting PR's
    `for` text claims to fix. A prediction that names an easy metric is a finding.
-3. Before you call two numbers inconsistent, read each metric's `definition` and `source` in `metrics.json`.
-   Two metrics with different definitions or populations disagreeing is not a finding.
+3. Before you call two numbers inconsistent, read each metric's `definition`, `source`, `n_window` and
+   `n_prior` in `metrics.json`. A definition that says "them", "those" or "the same" means the
+   population its metric id names. For a share of $ or wall time, `n` counts the sessions or main
+   threads behind it, not $ or hours. A per-PR or per-intent metric also counts GitHub PRs, whatever its
+   `source`. Two metrics over different populations may disagree: that is not a finding. Two numbers
+   that must agree by their definitions, and do not, are a finding: a total and its per-merged-PR ratio
+   times that ratio's `n`, or two metrics with the same numerator or the same denominator.
 4. Name any number in the report that you can show is wrong, and how you showed it.
 
 Write your findings to `{DATE}/critical-pass.md`, one finding per line, each starting with `- `. Cite

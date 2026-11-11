@@ -206,9 +206,10 @@ MIN_MOVE_EVENTS = 5
 
 
 def events(mid: str, v: MetricValue) -> float | None:
-    """Events behind a rate or ratio value; None for a metric that counts none (medians)."""
+    """Events behind a rate, or a ratio of counts; None where value × n counts no events (a median,
+    a share of $ or wall time, $ or hours per PR)."""
     m = REGISTRY[mid]
-    if m.kind not in ("rate", "ratio") or v.value is None:
+    if not (m.kind == "rate" or (m.kind == "ratio" and m.unit == "count")) or v.value is None:
         return None
     return v.value * v.n / 1000 if m.unit == "per1k" else v.value * v.n
 
@@ -222,15 +223,22 @@ def issue_md(run: Run, verdicts: dict) -> str:
     out = [f"ADW analysis {run.date}, window {run.window[0][:10]} → {run.window[1][:10]}.", "", "Verdicts reached this run:"]
     reached = [p for p in run.predictions if verdicts[p.key]["of_record"]]
     out += [f"- #{p.pr} `{p.metric}`: {verdicts[p.key]['verdict']}" for p in reached] or ["- none"]
-    moved = []
+    moved, small = [], 0
     for mid, m in REGISTRY.items():
         w, p = run.win[mid], run.pri[mid]
         c = change(w, p)
-        if m.predictable and w.status == "ok" and p.status == "ok" and c is not None and not one_event_move(mid, w, p):
+        if not (m.predictable and w.status == "ok" and p.status == "ok" and c is not None):
+            continue
+        if not one_event_move(mid, w, p):
             moved.append((abs(c), mid, c, w, p))
+        elif c:
+            small += 1
     moved.sort(reverse=True)
     out += ["", "Moved most (predictable, both windows ok):"]
-    out += [f"- `{mid}`: {fmt(mid, p.value)} → {fmt(mid, w.value)} ({c:+.0f}%)" for _, mid, c, w, p in moved[:5]] or ["- none"]
+    rows = [f"- `{mid}`: {fmt(mid, p.value)} → {fmt(mid, w.value)} ({c:+.0f}%)" for _, mid, c, w, p in moved[:5]]
+    if small:
+        rows.append(f"- {small} more left out: under {MIN_MOVE_EVENTS} events in both windows (see report.md)")
+    out += rows or ["- none"]
     out += ["", "Delete candidates:"]
     out += [f"- #{pr} `{path}` — `{metric}`" for pr, path, _, metric in delete_candidates(run, verdicts)] or ["- none"]
     out += ["", "critical pass: pending", "leak scan: pending", "", f"Report: `{run.date}/report.md`", ""]
