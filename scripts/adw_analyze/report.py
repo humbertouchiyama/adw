@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass, field
 
 from .facts import WAIT_CAP_H, Facts, Slice
-from .metrics import REGISTRY, MetricValue, uncovered
+from .metrics import REGISTRY, TRANSCRIPT_GROUPS, MetricValue, uncovered
 from .pricing import PRICES, PRICES_AS_OF
 from .verdicts import record_entry
 
@@ -110,7 +110,9 @@ def metrics_json(run: Run, verdicts: dict, t: dict) -> dict:
     for mid in REGISTRY:
         w, p = run.win[mid], run.pri[mid]
         ms[mid] = {"window": w.value, "prior": p.value, "n_window": w.n, "n_prior": p.n, "status_window": w.status,
-                   "status_prior": p.status, "breakdown": w.breakdown}
+                   "status_prior": p.status, "breakdown": w.breakdown, "definition": REGISTRY[mid].definition,
+                   "kind": REGISTRY[mid].kind, "min_n": REGISTRY[mid].min_n,
+                   "source": "transcripts" if REGISTRY[mid].group in TRANSCRIPT_GROUPS else "github"}
     return {
         "schema": 1, "until": run.until, "window": list(run.window), "prior": list(run.prior),
         "prices": {"as_of": PRICES_AS_OF, "per_mtok_in_out_cacheread": PRICES, "cache_write_5m_x_in": 1.25,
@@ -200,19 +202,43 @@ def metric_rows(run: Run, keep) -> list:
     return rows
 
 
+MIN_MOVE_EVENTS = 5
+
+
+def events(mid: str, v: MetricValue) -> float | None:
+    """Events behind a rate, or a ratio of counts; None where value × n counts no events (a median,
+    a share of $ or wall time, $ or hours per PR)."""
+    m = REGISTRY[mid]
+    if not (m.kind == "rate" or (m.kind == "ratio" and m.unit == "count")) or v.value is None:
+        return None
+    return v.value * v.n / 1000 if m.unit == "per1k" else v.value * v.n
+
+
+def one_event_move(mid: str, w: MetricValue, p: MetricValue) -> bool:
+    ew, ep = events(mid, w), events(mid, p)
+    return ew is not None and ep is not None and ew < MIN_MOVE_EVENTS and ep < MIN_MOVE_EVENTS
+
+
 def issue_md(run: Run, verdicts: dict) -> str:
     out = [f"ADW analysis {run.date}, window {run.window[0][:10]} → {run.window[1][:10]}.", "", "Verdicts reached this run:"]
     reached = [p for p in run.predictions if verdicts[p.key]["of_record"]]
     out += [f"- #{p.pr} `{p.metric}`: {verdicts[p.key]['verdict']}" for p in reached] or ["- none"]
-    moved = []
+    moved, small = [], 0
     for mid, m in REGISTRY.items():
         w, p = run.win[mid], run.pri[mid]
         c = change(w, p)
-        if m.predictable and w.status == "ok" and p.status == "ok" and c is not None:
+        if not (m.predictable and w.status == "ok" and p.status == "ok" and c is not None):
+            continue
+        if not one_event_move(mid, w, p):
             moved.append((abs(c), mid, c, w, p))
+        elif c:
+            small += 1
     moved.sort(reverse=True)
     out += ["", "Moved most (predictable, both windows ok):"]
-    out += [f"- `{mid}`: {fmt(mid, p.value)} → {fmt(mid, w.value)} ({c:+.0f}%)" for _, mid, c, w, p in moved[:5]] or ["- none"]
+    rows = [f"- `{mid}`: {fmt(mid, p.value)} → {fmt(mid, w.value)} ({c:+.0f}%)" for _, mid, c, w, p in moved[:5]]
+    if small:
+        rows.append(f"- {small} more left out: under {MIN_MOVE_EVENTS} events in both windows (see report.md)")
+    out += rows or ["- none"]
     out += ["", "Delete candidates:"]
     out += [f"- #{pr} `{path}` — `{metric}`" for pr, path, _, metric in delete_candidates(run, verdicts)] or ["- none"]
     out += ["", "critical pass: pending", "leak scan: pending", "", f"Report: `{run.date}/report.md`", ""]
