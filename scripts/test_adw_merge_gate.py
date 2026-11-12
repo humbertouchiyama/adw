@@ -410,6 +410,114 @@ class TestSmokeNone(Gate):
         self.assertHold(9)
 
 
+class Trial(unittest.TestCase):
+    """trial / discard against a temp bare remote: the base merged into the head in a detached tree."""
+
+    def setUp(self):
+        self.tmp = os.path.realpath(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.env = dict(os.environ, GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", GIT_AUTHOR_NAME="t",
+                        GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+        self.origin = os.path.join(self.tmp, "origin.git")
+        self.main = os.path.join(self.tmp, "App Repo")   # a space, on purpose
+        self.other = os.path.join(self.tmp, "other")
+        self.git("init", "-q", "--bare", "-b", "develop", self.origin, cwd=self.tmp)
+        self.git("clone", "-q", self.origin, self.main, cwd=self.tmp)
+        self.git("checkout", "-q", "-b", "develop")
+        self.commit(self.main, {"a.txt": "a\n", "c.txt": "c\n"}, "base")
+        self.git("push", "-q", "origin", "develop")
+        self.git("checkout", "-q", "-b", "feat")
+        self.commit(self.main, {"a.txt": "a head\n"}, "head")
+        self.git("push", "-q", "origin", "feat")
+        self.head = self.git("rev-parse", "HEAD")
+        self.git("checkout", "-q", "develop")
+        self.git("clone", "-q", "-b", "develop", self.origin, self.other, cwd=self.tmp)
+        self.tree = os.path.join(self.main, ".claude", "worktrees", "adw-trial-foo-pr7")
+
+    def git(self, *args, cwd=None):
+        p = subprocess.run(["git", *args], cwd=cwd or self.main, env=self.env, capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        return p.stdout.strip()
+
+    def commit(self, root, files, msg):
+        for rel, text in files.items():
+            path = os.path.join(root, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w") as f:
+                f.write(text)
+        self.git("add", "-A", cwd=root)
+        self.git("commit", "-qm", msg, cwd=root)
+
+    def move_base(self, files):
+        self.commit(self.other, files, "base moves")
+        self.git("push", "-q", "origin", "develop", cwd=self.other)
+        return self.git("rev-parse", "HEAD", cwd=self.other)
+
+    def gate(self, *args):
+        p = subprocess.run([sys.executable, SCRIPT, *args], env=self.env, capture_output=True, text=True)
+        return p.returncode, p.stdout.strip(), p.stderr
+
+    def trial(self):
+        return self.gate("trial", "--checkout", self.main, "--pr", "7", "--slug", "foo", "--base", "develop", "--head", self.head)
+
+    def registered(self):
+        return [l[len("worktree "):] for l in self.git("worktree", "list", "--porcelain").splitlines() if l.startswith("worktree ")]
+
+    def test_unmoved_base(self):
+        rc, out, err = self.trial()
+        self.assertEqual((rc, out), (0, "base unmoved"), err)
+        self.assertFalse(os.path.exists(self.tree))
+
+    def test_moved_disjoint_files_gives_tree(self):
+        tip = self.move_base({"c.txt": "c base\n"})
+        rc, out, err = self.trial()
+        self.assertEqual((rc, out), (0, "tree %s base %s" % (self.tree, tip)), err)
+        with open(os.path.join(self.tree, "a.txt")) as f:
+            self.assertEqual(f.read(), "a head\n")
+        with open(os.path.join(self.tree, "c.txt")) as f:
+            self.assertEqual(f.read(), "c base\n")
+        self.assertEqual(self.git("rev-parse", "feat"), self.head)
+        self.assertEqual(self.git("ls-remote", self.origin, "refs/heads/feat").split()[0], self.head)
+        self.assertEqual(self.git("rev-parse", "--abbrev-ref", "HEAD", cwd=self.tree), "HEAD")   # detached
+
+    def test_overlap_holds(self):
+        self.move_base({"a.txt": "a base\n"})
+        rc, out, err = self.trial()
+        self.assertEqual((rc, out), (1, "hold 6 overlap: a.txt"), err)
+        self.assertNotIn(self.tree, self.registered())
+
+    def test_conflict_holds_and_leaves_no_worktree(self):
+        # disjoint paths that still conflict: the base adds a file `d`, the head a directory `d/`
+        self.git("checkout", "-q", "feat")
+        self.commit(self.main, {"d/x.txt": "x\n"}, "head adds d/")
+        self.git("push", "-q", "origin", "feat")
+        self.head = self.git("rev-parse", "HEAD")
+        self.git("checkout", "-q", "develop")
+        self.move_base({"d": "a file\n"})
+        rc, out, err = self.trial()
+        self.assertEqual(rc, 1, out + err)
+        self.assertTrue(out.startswith("hold 6 conflict: "), out)
+        self.assertNotIn(self.tree, self.registered())
+        self.assertFalse(os.path.exists(self.tree))
+
+    def test_discard_removes_tree(self):
+        self.move_base({"c.txt": "c base\n"})
+        self.assertEqual(self.trial()[0], 0)
+        rc, out, err = self.gate("discard", "--checkout", self.main, "--tree", self.tree)
+        self.assertEqual(rc, 0, out + err)
+        self.assertNotIn(self.tree, self.registered())
+        self.assertFalse(os.path.exists(self.tree))
+
+    def test_discard_keeps_a_tree_with_other_changes(self):
+        self.move_base({"c.txt": "c base\n"})
+        self.assertEqual(self.trial()[0], 0)
+        with open(os.path.join(self.tree, "a.txt"), "w") as f:
+            f.write("edited after the merge\n")
+        rc, out, err = self.gate("discard", "--checkout", self.main, "--tree", self.tree)
+        self.assertEqual(rc, 1, out + err)
+        self.assertIn(self.tree, self.registered())
+
+
 class TestErrors(Gate):
     def test_gh_failure_is_hold_0(self):
         self.fx["fail_all"] = True

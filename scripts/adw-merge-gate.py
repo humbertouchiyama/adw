@@ -8,7 +8,17 @@ Every condition is read fresh from GitHub or the profile, never from the run's m
 `pass` (exit 0), or `hold <n> <reason>` (exit 1) for the first condition that fails, in this order:
 1 flag (the specs' `merge: auto`, both profiles' `auto-merge default`, no `adw:hold`), 2 base, 3 verified head,
 4 paths (merge-protected, money lines), 5 GitHub (mergeable, checks), 7 the walk, 8 the screenshots,
-9 `Smoke: none` / `Screens: none` against the UI paths. Condition 6 is the base trial (`trial`).
+9 `Smoke: none` / `Screens: none` against the UI paths. Condition 6 is the base trial:
+
+  python3 adw-merge-gate.py trial --checkout <main checkout> --pr <N> --slug <slug> --base <branch> --head <sha>
+  python3 adw-merge-gate.py discard --checkout <main checkout> --tree <path>
+
+`trial` prints `base unmoved` (exit 0) when origin/<base> is still the fork point; `hold 6 overlap: <files>`
+(exit 1) when the base's new commits touch a file the PR touches; else it merges origin/<base> into the head
+in a detached worktree `.claude/worktrees/adw-trial-<slug>-pr<N>` and prints `tree <path> base <sha>` (exit 0),
+or aborts, removes the tree and prints `hold 6 conflict: <files>` (exit 1). The PR head never moves, so
+`ready`, the walk and the screenshots still hold. The caller runs the gates in the tree, then `discard`
+removes it, never with --force: a tree with any change past the merge stays, and discard exits 1.
 A gh call that fails, or a bad flag, prints `hold 0 gate error: <message>` and exits 2: the contract
 treats it as a hold. ADW_GATE_POLL_SECONDS (default 30) spaces the re-queries: 5 for an UNKNOWN
 mergeable state, 16 (8 min at the default) for a pending check.
@@ -344,6 +354,56 @@ def check(a) -> None:
         raise Hold(9, "the body has neither ## Smoke cases nor a Smoke: none line")
 
 
+def git(checkout: str, *args: str) -> str:
+    p = subprocess.run(["git", "-C", checkout, *args], capture_output=True, text=True)
+    if p.returncode != 0:
+        raise GateError("git %s: %s" % (args[0], (p.stderr.strip().splitlines() or ["exit %d" % p.returncode])[-1]))
+    return p.stdout
+
+
+def changed(checkout: str, a: str, b: str) -> set[str]:
+    return {n for n in git(checkout, "diff", "--no-renames", "--name-only", a, b).splitlines() if n}
+
+
+def trial(a) -> int:
+    co = a.checkout
+    git(co, "fetch", "-q", "origin")
+    if subprocess.run(["git", "-C", co, "cat-file", "-e", a.head + "^{commit}"], capture_output=True).returncode != 0:
+        git(co, "fetch", "-q", "origin", a.head)
+    tip = git(co, "rev-parse", "origin/" + a.base).strip()
+    fork = git(co, "merge-base", tip, a.head).strip()
+    if tip == fork:
+        print("base unmoved")
+        return 0
+    overlap = sorted(changed(co, fork, tip) & changed(co, fork, a.head))
+    if overlap:
+        print("hold 6 overlap: %s" % ", ".join(overlap))
+        return 1
+    tree = os.path.join(co, ".claude", "worktrees", "adw-trial-%s-pr%d" % (a.slug, a.pr))
+    if os.path.exists(tree):
+        raise GateError("%s exists from an earlier trial; discard it first" % tree)
+    git(co, "worktree", "add", "-q", "--detach", tree, a.head)
+    m = subprocess.run(["git", "-C", tree, "merge", "--no-edit", "-q", tip], capture_output=True, text=True)
+    if m.returncode != 0:
+        files = sorted(n for n in git(tree, "diff", "--name-only", "--diff-filter=U").splitlines() if n)
+        subprocess.run(["git", "-C", tree, "merge", "--abort"], capture_output=True)
+        git(co, "worktree", "remove", tree)
+        print("hold 6 conflict: %s" % (", ".join(files) or (m.stdout + m.stderr).strip().splitlines()[-1]))
+        return 1
+    print("tree %s base %s" % (tree, tip))
+    return 0
+
+
+def discard(a) -> int:
+    status = git(a.tree, "status", "--porcelain")
+    if status.strip():
+        print("kept %s: it has changes past the merge (%s)" % (a.tree, ", ".join(l[3:] for l in status.splitlines()[:3])))
+        return 1
+    git(a.checkout, "worktree", "remove", a.tree)
+    print("discarded %s" % a.tree)
+    return 0
+
+
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         print("hold 0 gate error: %s" % message)
@@ -358,8 +418,21 @@ def main(argv: list[str]) -> int:
     c.add_argument("--pr", type=int, required=True)
     c.add_argument("--profile", required=True)
     c.add_argument("--spec-path", action="append", required=True)
+    t = sub.add_parser("trial")
+    t.add_argument("--checkout", required=True)
+    t.add_argument("--pr", type=int, required=True)
+    t.add_argument("--slug", required=True)
+    t.add_argument("--base", required=True)
+    t.add_argument("--head", required=True)
+    d = sub.add_parser("discard")
+    d.add_argument("--checkout", required=True)
+    d.add_argument("--tree", required=True)
     a = p.parse_args(argv)
     try:
+        if a.cmd == "trial":
+            return trial(a)
+        if a.cmd == "discard":
+            return discard(a)
         check(a)
     except Hold as h:
         print("hold %d %s" % (h.n, h.reason))
