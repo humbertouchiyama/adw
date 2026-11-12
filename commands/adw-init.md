@@ -557,10 +557,10 @@ Three ordered steps, no discretion:
    bodies OUT of context:** do not re-read, quote or summarise them at the boundary, and
    drop the Phase 3 agents' returned text. Build's Phase 0 resolves every spec from disk
    itself, and the whole cost of collapsing the round-trip is that build no longer starts
-   on a fresh window — the `subscription-locks` run compacted 8 times, and adw-build's
-   session-boundary rule (§ "Session-boundary provenance") turns a mid-chain compaction
-   into a halt with a `ready` sub-PR left human-owned. Carrying init's spec text into build
-   buys nothing and pays that cost directly.
+   on a fresh window — the `subscription-locks` run compacted 8 times, and every compaction
+   drops the contract text the run needs next. A compaction no longer leaves a `ready` sub-PR
+   to the owner: its `verified` row lets the resumed run merge it (adw-build §3.7). Carrying
+   init's spec text into build buys nothing and pays that cost directly.
 
 Unanswered `needs you` items on the handoff ship with the recommended default, recorded in the
 spec — but note that an unanswered item is exactly what step 1 stops on, so this applies to a later

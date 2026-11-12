@@ -138,7 +138,7 @@ The Rules lines, verbatim:
   owner in this pane. There your status is blocked and your one line is "approval surface ready".`
 - `Task: free` — `Do the Intent. Write any long result to a file and print its path. Do not
   summarise long output in the pane.`
-- Always — `Never merge a PR unless the Intent says so in those words.`
+- Always — `Never merge a PR unless the Intent says so in those words, or adw-build §3.7's gate merges it.`
 - Always — `When you stop, for any reason, run:
   python3 "<CHILD_DISPATCH>" finish <name> <done|blocked|failed> "<PR URL or report path>"`
 - `Reply: notify` or `monitor` — `Then run:

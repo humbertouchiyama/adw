@@ -85,9 +85,9 @@ new slug (adw-init Phase 0.5).
   two *folders* for one slug is the bug.
 - **Extend is proposed, never automatic** — a different `base:`, or a different subject,
   is a new intent (run-7's per-team-module-toggles feature was correctly split out).
-- The pipeline still never merges a PR it did not open this session (§6, adw-build
-  session-boundary provenance): extending across sessions builds new units, and the
-  earlier open PRs stay the owner's.
+- A merge rests on durable facts, never on the session (§6, adw-build §3.7): extending across
+  sessions builds new units, and an earlier open PR of the intent goes through adw-build §3.7
+  like any other. A PR whose head moved off its `verified` row stays the owner's.
 
 Mapa cirúrgico ran as three disconnected intents across three sessions; the second
 restarted ids at `u1` against a live `u1–u5` and had to reconstruct a cross-batch
@@ -291,7 +291,8 @@ unit's output** (disjoint file lists do NOT prove independence).
 One exception: a port unit never shares a PR or sub-PR (§3 Port shape); it chains instead.
 
 Default when it could go either way: **group**. A separate base-targeting PR is earned,
-never chosen — each costs the owner +1 review, +1 local preview, +1 merge consent.
+never chosen — each costs the owner +1 review, +1 local preview, and, for a `merge: hold`
+intent, +1 merge consent (a `merge: auto` intent's PR merges behind adw-build §3.7's gate).
 
 ## 5. Chain conventions (contract, not style)
 
@@ -309,9 +310,11 @@ never chosen — each costs the owner +1 review, +1 local preview, +1 merge cons
   ```bash
   gh label create adw:blocked --color D93F0B --description "ADW: escalated finding or gate-file diff — needs the owner" || true
   gh label create adw:failed  --color B60205 --description "ADW: fix cycles exhausted or environment fault" || true
+  gh label create adw:hold    --color FBCA04 --description "ADW: the owner holds this PR — the run will not merge it" || true
+  gh label create adw:auto-merged --color 0E8A16 --description "ADW: merged by the run after its gate passed" || true
   ```
 
-  After the creates, `gh label list --search adw` MUST list both — the `|| true`
+  After the creates, `gh label list --search adw` MUST list all four — the `|| true`
   swallows a gh outage that otherwise resurfaces far from the cause as a failed
   `--add-label`.
 
@@ -329,13 +332,23 @@ never chosen — each costs the owner +1 review, +1 local preview, +1 merge cons
 
 ## 6. Consent carve-out (exact)
 
-The pipeline may merge ONLY: a sub-PR **it opened itself**, for a unit of the **current
-intent**, whose base is that intent's **integration branch**, whose loop reached
-**`ready`** or **`blocked`** (a blocked sub-PR merges as a *carried block*, below). Provenance
-is the authority — a PR that merely targets some `adw/*` branch
-does not qualify. Any PR targeting the default base, the production branch (`repo-profile §3`),
-or the intent's `base:` branch (§2) requires explicit human consent, always — a `base:` override
-does not open a consent side-door. The carve-out never widens past the integration branch.
+The pipeline may merge ONLY:
+
+- a sub-PR for a unit of the **current intent**, whose base is that intent's **integration
+  branch**, whose loop reached **`ready`** or **`blocked`** (a blocked sub-PR merges as a
+  *carried block*, below), and whose evidence block's `verified` row equals its head (adw-build
+  §3.4, §3.7). Provenance is the authority — a PR that merely targets some `adw/*` branch does not
+  qualify;
+- an independent or final PR of the **current intent**, into the intent's `base:` or the default
+  base, when the intent's specs say `merge: auto` (§2) and adw-build §3.7's merge gate passes.
+  The owner's `approve` on a surface that printed `merge   auto` is the consent (§7).
+
+Provenance is durable, not the session's: the `merge:` flag, the `verified` row, the walk line
+and the labels survive a compaction and a new session, so any run building that slug may merge
+when they allow it. A run never merges a PR of another slug. The production branch
+(`repo-profile §3`) never: no flag opens it. Any other PR targeting the default base or the
+intent's `base:` branch (§2) requires explicit human consent, always — a `base:` override does not
+open a consent side-door.
 
 **A chain asks the owner once, at the final PR.** The consent for every sub-PR merge of a chain
 was given when the owner typed `approve` on a cut that shows the chain (§7). So:
@@ -347,7 +360,9 @@ was given when the owner typed `approve` on a cut that shows the chain (§7). So
   intent's base, the default base and the production branch: the one consent this section keeps
   for the owner. It stops a sub-PR merge only when it names sub-PRs or the integration branch
   ("do not merge sub-PRs", "stop after each unit"). A session that writes a brief for another
-  session never adds a no-merge line of its own.
+  session never adds a no-merge line of its own. An approved `merge   auto` line is the owner's
+  word for that intent, given after any standing line; a standing line still binds an intent
+  whose flag is `hold`.
 - **A `blocked` sub-PR does not stop the chain. It is carried.** The sub-PR keeps its
   `adw:blocked` label and its PR body, is merged into the integration branch, and the chain builds
   on its recommended default. The final PR then lands `blocked`, never `ready`, and lists every
@@ -355,9 +370,8 @@ was given when the owner typed `approve` on a cut that shows the chain (§7). So
 - **What still stops a chain:** a `failed` sub-PR; a `blocked` sub-PR the next unit cannot build
   on (adw-build §3.7 names three cases: a `depth escalation` or `shape escalation`, whose
   default replaces the unit, a red gate on the pushed head (but a port unit that is `port not converged` is carried), and a driver that returned no
-  `verified <sha7>`); a sub-PR whose provenance this
-  session did not establish (adw-build, Session-boundary provenance); and a merge-time assertion
-  mismatch (adw-build §3.7). Each of these is a line on the run report, not a question.
+  `verified <sha7>`); a sub-PR whose head is not its `verified` row (adw-build §3.7); and a
+  merge-time assertion mismatch (adw-build §3.7). Each of these is a line on the run report, not a question.
 
 Thirteen sub-PR merge questions reached the owner in twelve days of runs (2026-09-20 to 10-01):
 eight for a `blocked` sub-PR, two from a no-merge line a dispatching session wrote into a brief,
@@ -504,11 +518,11 @@ surface must own:
   `approve → cut + build`, why every hazard is a `⚠` line the brief surface still prints,
   and why the `⚠` split above is not cosmetic. The merge carve-out (§6) does not move:
   sub-PRs still merge only into the intent's own integration branch, and the PR to
-  `base:` still needs explicit human consent. On a cut with a chain, `approve` is also the
-  consent for every sub-PR merge of that chain (§6): the run does not ask again per sub-PR.
-  On a surface that prints `merge   auto`, `approve` is also the owner's explicit consent for
-  that intent's merges into `base:` once the merge gate passes (§6, adw-build §3.7). On
-  `merge   hold`, the owner merges the PR to `base:`.
+  `base:` still needs the owner's consent, which an approved `merge   auto` line gives: on
+  that surface, `approve` is the owner's explicit consent for the intent's merges into
+  `base:` once adw-build §3.7's merge gate passes (§6). On `merge   hold`, the owner merges
+  the PR to `base:`. On a cut with a chain, `approve` is also the consent for every sub-PR
+  merge of that chain (§6): the run does not ask again per sub-PR.
 - **The `merge` line always prints**, `auto` or `hold`, with the base it names. `merge auto` and
   `merge hold` re-render the surface with the new value, and the run writes it to every spec of
   the intent before the build starts. `merge auto` is refused when the base is the production
@@ -587,8 +601,9 @@ Unanswered items ship with the recommended default, recorded in the spec. A sing
 ### run report — build exit (async, end of `/adw-build`)
 
 ```
-Next: review + preview + merge PR #NNN (<which>)
-ready    #NNN  <desc> — <units> · gates green · review clean · ⏱ <N>m
+Next: review + preview + merge PR #NNN (<which>)   ← or, nothing left for the owner: Next: when you test, gh pr list --state merged --label adw:auto-merged
+merged   #NNN  <desc> — <units> · walk clean · screens <url> · polish <p> · refuted <r> · ⏱ <N>m   ← merged by adw-build §3.7's gate
+ready    #NNN  <desc> — <units> · gates green · review clean · ⏱ <N>m   ← a PR the gate held ends · held <n>: <reason>
 blocked  #NNN  <unit> — <one sentence>; default: <recommended default> · ⏱ <N>m
 failed   none
 unbuilt  none
@@ -612,9 +627,14 @@ dated after the last production-code commit (NOT `$VSHA` — a docs-only amendme
 demand a re-review the void rule exempts). None → the line is `blocked`; so is any `[Blocking]` a
 review lists under `🔧 To fix` that `/pr-ready` §5's grader cannot close, and so is a grade that did
 not run (`fetch failed`, `NOT RUN`). One line per PR, ordered
-ready → blocked → failed → unbuilt. These four keywords are the
+merged → ready → blocked → failed → unbuilt. These five keywords are the
 only PR states — a PR whose `ready` was voided by a post-review amendment (adw-build
-§3.6) prints on the `blocked` row, never as a fifth state and never as `failed`.
+§3.6) prints on the `blocked` row, never as a sixth state and never as `failed`. `merged` is
+a PR adw-build §3.7's merge gate merged this run; `screens <url>` links its screenshots
+comment, and `polish <p>` and `refuted <r>` count the walk's rows that print but do not stop a
+merge. A `ready` PR the gate held ends `· held <n>: <reason>`, the evidence block's `merge`
+row: the owner merges it, or clears the reason and re-runs. When every PR line is `merged`,
+`Next:` is `Next: when you test, gh pr list --state merged --label adw:auto-merged`.
 Multiple `ready` PRs → the `Next:` line lists them in merge order. `· ⏱ <N>m` is
 unconditional on every PR line — **net of owner wait**, exactly as §7.1 computes it
 run-wide (`machine = (T3 − T0) − gate`): the per-PR number must not charge the human's
@@ -745,8 +765,8 @@ inverting the one distinction §7.1 exists to draw. A fresh `/adw-build` invocat
 this case (it starts its own series at `gate 0m`); mid-run compaction is. If the pair
 genuinely cannot be reconstructed, say so on a run-report `note` line rather than reporting a
 number the transcript cannot back. Recovery is scoped to the stamps: a readable transcript
-never re-establishes merge provenance, which §6 keys on the session, not on what is
-legible from disk.
+never re-establishes merge provenance, which §6 keys on the durable facts it names (the flag,
+the `verified` row, the walk line, the labels), not on what else is legible from disk.
 
 It exists because the two numbers were conflated in the only direction that matters:
 run-7 read as a 24-hour run and was 2h38m of work behind a 20-hour approval gate. Without
