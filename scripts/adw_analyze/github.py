@@ -13,12 +13,12 @@ from dataclasses import dataclass, field
 from .config import Repo
 
 ROWS = ("contract", "tier", "cycles", "phases", "owner-wait", "asks", "gates", "mutation", "artifact",
-        "open-findings", "smoke")
+        "open-findings", "smoke", "verified", "merge")
 ROW_RX = re.compile(r"^\s*`?(" + "|".join(re.escape(r) for r in ROWS) + r")`?\s+(.*?)\s*$")
 CONTRACT_RX = re.compile(r"^\s*`?contract`?\s+`?([0-9a-f]{7,40})\b")
 TITLE = re.compile(r"^\[adw ([^\]\s]+)(?: ([^\]]+))?\]")
 FIX_ATTEMPT = re.compile(r"^fix-attempt-(\d+)\b")
-BLOCK_LINES = 15
+BLOCK_LINES = 20
 
 QUERY = """query($owner: String!, $name: String!, $cursor: String) {
   repository(owner: $owner, name: $name) {

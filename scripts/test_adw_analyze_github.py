@@ -44,6 +44,29 @@ class Block(unittest.TestCase):
     def test_no_contract_row_is_none(self):
         self.assertEqual(github.parse_block("```\nowner-wait 0m\ncycles fix 0/3\n```"), (None, 0))
 
+    def test_verified_and_merge_rows_parse(self):
+        sha = "0123456789abcdef0123456789abcdef01234567"
+        full = "\n".join([
+            "contract   abc1234            depth D2       resumed-from 0",
+            "tier       orchestrator sonnet · author sonnet · impl sonnet · level u1",
+            "cycles     fix 1/3 · review 1/2      progress-conditions none fired",
+            "phases     implement 9m · gates 14m · verify 7m · review 21m · reverify 6m",
+            "owner-wait 0m",
+            "asks       shown 1: owner 1",
+            "gates      g1 0 · g2 0",
+            "mutation   aggregate red · per-file 4/4",
+            "artifact   plan 260L / diff 71L = 3.66x",
+            "open-findings none — read 4 comments",
+            "smoke      walk 1 · 0 defects (0 blocking) · 0 gaps · valid 0 · refuted 0 · fixed 0 (0 unconfirmed) · cases 3/3 · audit 0 · 21m",
+            "verified   " + sha,
+            "merge      hold 7 — G1 is a gap on AC-2 · at abc1234",
+        ])
+        rows, n = github.parse_block("```\n%s\n```" % full)
+        self.assertEqual(n, 1)
+        self.assertEqual(rows["verified"], sha)
+        self.assertEqual(rows["merge"], "hold 7 — G1 is a gap on AC-2 · at abc1234")
+        self.assertEqual(len(rows), 13)
+
     def test_minutes(self):
         self.assertEqual(github.minutes("1h 5m"), 65.0)
         self.assertEqual(github.minutes("0m"), 0.0)
