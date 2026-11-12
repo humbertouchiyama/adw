@@ -1005,7 +1005,8 @@ row from the re-pass, the §5 review-evidence count, the `/pr-ready` §5 open-fi
 and on `blocked` the question with its default. The brief also asks the driver one question before
 `/pr-ready`: **does the PR body's `## Screens` list every screen that a changed file under
 `repo-profile §3`'s `UI paths` renders?** A screen it misses is a finding like any other: the driver
-adds its line to `## Screens` and a step that reaches it to a case (`gh pr edit <N> --body-file`), and
+adds its line to `## Screens` and, when a case can reach it, a step that reaches it to that case
+(`gh pr edit <N> --body-file`), and
 returns `screens: +<n> <SCREEN ids>`, `screens: complete`, or `screens: no UI paths row`. **A `ready` return without the open-findings lines
 has not returned:** the PR is `blocked` with `default: run /pr-ready <N>` — not `/adw-build <slug>`,
 which halts at Phase 0 on the still-open PR. A `blocked` decided before `/pr-ready` §5 (a red gate,
@@ -1240,8 +1241,8 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
    return `smoke not run — cases: <the check's message>` and stop.
 3. Runs §21's Build floor, after `date +%s` printed once. Exit 0 → go on. Non-zero → wait as step 4
    does, with Build floor as `<test>`, `sleep 60` in place of `sleep 5`, that epoch as `<start>`
-   and Max minutes as `<n>`. `DEADLINE` → return `smoke not run — build floor: <what Build floor
-   printed last>` and stop; nothing has launched. Two of six walks died of a host that could not
+   and Max minutes as `<n>`. `DEADLINE` → run Build floor once more and return `smoke not run — build
+   floor: <what it printed>` and stop; nothing has launched. Two of six walks died of a host that could not
    finish the build. Then it starts §21's Launch with `<N>`, `$VSHA`, `<D>/cases.md`,
    `--screens <D>/screens.md` when that file is not empty, and the devices §21's Devices row derives
    from the cases' `Device` lines, and keeps every value §21's Wait test, Result, Evidence, Audit and
@@ -1287,9 +1288,9 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
 **Then the screenshot relay posts the images**, after the smoke relay returns and before the record
 below is written. It runs when the walk ran (a Result exists), the return names a `screens/`
 directory, and `<D>/screens.md` holds a `- SCREEN-` row; otherwise its line is `screens none — <the
-condition that failed>`. **Images leave the machine only from a scratch database:** when §21's Data
-row lets the walk run on a copy of real data (a template clone), no screenshot relay runs, and its
-line is `screens none — data row allows real data`. Otherwise dispatch one `model: sonnet` relay
+condition that failed>`. **Images leave the machine only from a scratch database:** unless §21's
+Data row says the walk runs on a scratch database, never on a copy of real data, no screenshot relay
+runs, and its line is `screens none — §21 Data names no scratch database`. Otherwise dispatch one `model: sonnet` relay
 (adw-core §8's Re-execute and relay row, `subagent_type: general-purpose`). Its brief carries `<N>`,
 `$VSHA` in full, the walk number `<k>`, the command below with every value written in, and
 `review-core.md` §11's brief floor. It runs the command once, in one Bash call, and returns the line
@@ -1302,8 +1303,9 @@ test -f "$R/.claude/adw/cache/scripts/adw-screens.py" || R="$(git rev-parse --sh
 python3 "$R/.claude/adw/cache/scripts/adw-screens.py" --repo "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" --checkout "$R" --pr <N> --head <VSHA> --walk <k> --screens "<D>/screens.md" --dir "<the screens/ directory>" --ref refs/adw-screens
 ```
 
-It prints `screens <comment url> · <n> images` or `screens none — <why>`. Exit 1 means the push or the
-comment failed after one retry: the line is then `screens not posted — <what it printed>`. The
+It prints `screens <comment url> · <n> images` or `screens none — <why>`, and exits 0. Any other exit
+(1: the push or the comment failed after one retry) makes the line `screens not posted — <the last
+line it printed>`. The
 images go to `refs/adw-screens`, a ref a default `git fetch` does not download, and the comment
 links each one by its commit, so it never changes under the owner. A walk with no images is a
 reported gap, never a pass.
@@ -1371,10 +1373,12 @@ section and the evidence row before anything moves the head (smoke fix cycle ste
   PR replaces the section, never adds one, and keeps every `fixed:` line.
 - **Evidence block:** the `smoke` row (§3.4), counted from the rows by §21's Result row.
 - **Run-report PR line:** the last walk has no defect rows, no gap rows, Audit `0`, no `not
-  runnable` line, and `<passed>` equal to `<total>` → `· smoke clean` after `review clean` (a `blocked` line has none:
+  runnable` line, `<passed>` equal to `<total>`, and a screenshot relay line that does not start
+  `screens not posted` → `· smoke clean` after `review clean` (a `blocked` line has none:
   after its default).
   Otherwise one trailing flag, the first that applies: `· ⚠ smoke not runnable: <reason>`,
-  `· ⚠ smoke not run — <reason>`, `· ⚠ smoke unaudited — <failing check>`, or `· ⚠ smoke: <d>
+  `· ⚠ smoke not run — <reason>`, `· ⚠ smoke unaudited — <failing check>`, `· ⚠ screens not posted —
+  <reason>`, or `· ⚠ smoke: <d>
   defects (<b> blocking, <v> valid), <g> gaps, cases <passed>/<total>`. Either form ends
   `· fixed <f>` when smoke fix cycles fixed `<f>` rows, and `· fixed <f>, <u> unconfirmed` when `<u>`
   of those `fixed:` lines still end `, unconfirmed`.
