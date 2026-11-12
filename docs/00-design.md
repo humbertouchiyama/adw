@@ -544,8 +544,8 @@ practice, not a concession to a clock. Baseline-red is the one exception (§4.2'
 `⚠ no trustworthy gate` flag, and `⚠ baseline red` for a red proved at `<BASE>`).
 
 **App smoke (TRIAL, 2026-10-19).** No gate looks at the running app, and on a native client the
-gates cannot render native chrome at all. Where `repo-profile §21` declares a runner, every PR the
-human merges (each independent PR, each chain's final PR, never a sub-PR) gets one walk of the
+gates cannot render native chrome at all. Where `repo-profile §21` declares a runner, every independent
+and final PR (never a sub-PR) gets one walk of the
 `## Smoke` cases its body carries, on the verified head, after its state is decided (adw-build
 §3.8). Its verdict is a model reading a screen, and its false-positive rate is unmeasured, so no
 defect row is fixed on the walk's word: a `model: opus` refuter rebuilds each `blocking` and

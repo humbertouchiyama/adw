@@ -294,7 +294,9 @@ gate file to get green · let a subagent create its own worktree.
   worktree, nothing is serialised. **Never a lock file, a lock script, `flock` or a wait-for-lock
   loop**, in this session or in any brief. The rule above named no mechanism, so each run wrote
   its own: 581 lock commands across 9 sessions, four permission denials and 12 hours of owner time
-  on one PR, and a three-hour stall on another when a verifier died holding the lock.
+  on one PR, and a three-hour stall on another when a verifier died holding the lock. The ban does
+  not reach the lock `repo-profile §21`'s Lock row names: the repo's runner owns it, and a run waits
+  on it only where §3.8 says.
 
   **A sibling that merges first leaves its twin behind, and that is fine — do not rebase
   it.** Both branched from the same `origin/adw/<slug>`; when the first merges, the second is
@@ -910,9 +912,10 @@ semantic-conflict risk.
   ```
   `0` → write the block now, before any other step. 13 of 28 final PRs had no block, and 36 blocks
   still read `review 0/2` on PRs that carry `fix(review):` commits (2026-09-20 to 10-01).
-- **Every adw PR body whose change a user can see or trigger carries a `## Smoke` section:** one to
-  five cases a person, or §3.8's runner, walks to see the change work, written from the spec's
-  acceptance criteria, each in this shape:
+- **Every adw PR body whose change a user can see or trigger carries a `## Smoke` section:** at least
+  one case a person, or §3.8's runner, walks to see the change work, written from the spec's
+  acceptance criteria; more than five only where `## Screens` needs it. Each case has this shape, and
+  `## Screens` and `## For your check` follow the closing marker:
   ```
   ## Smoke
   ### AC-1 <screen> — <what the user sees>
@@ -925,6 +928,14 @@ semantic-conflict risk.
   - **Expected**:
     1. <result of step 1>
   <!-- /smoke -->
+
+  ## Screens
+  - SCREEN-1 · <screen title as the app shows it> · <device>, <device>
+
+  ## For your check
+  ### CHECK-1 <what to try>
+  Checks: <the spec criteria it covers, as `u1 AC 3`> — <what only a person or a real device can judge>
+  <steps, as a case writes them>
   ```
   In the body, drop this file's two-space indent: the `##` and `###` headings and the closing
   `<!-- /smoke -->` line start at column 0, because §3.8 finds the cases by them and stops at that
@@ -932,15 +943,36 @@ semantic-conflict risk.
   after it. The marker closes the whole section once, after the last case, never after each case;
   on a final PR it follows the last renumbered case, and a unit's own marker is dropped. Every acceptance criterion that only a look at the running
   app can check (it names a simulator, a device or a manual check, or says no gate covers it) has a
-  case. **A case whose rule holds on more
+  case or a CHECK. **A case whose rule holds on more
   than one screen ends with a step that repeats the check on each of them, by name**
   (`On <screen>, <screen>: repeat step 2; expect the same`): a screen that differs from its siblings
-  is the defect no gate sees. Preconditions name data, never "any record": §3.8's runner makes what
+  is the defect no gate sees. Name there only the screens that should match. A screen whose change
+  differs from its siblings gets its own step and its own `Expected`. Preconditions name data, never "any record": §3.8's runner makes what
   its fixture lacks (`repo-profile §21`'s Data row). The final PR's cases are its units' cases, in
-  unit order, renumbered `AC-1`, `AC-2`, … in one sequence, each with its `Checks` line. A unit
-  with nothing to see says `Smoke: none — <why>`. Gates were green on three fixes the owner then
+  unit order, renumbered `AC-1`, `AC-2`, … in one sequence, each with its `Checks` line. Its
+  `## Screens` joins its units' lists: one line per screen, with the devices of every unit that lists
+  it, renumbered `SCREEN-1`, `SCREEN-2`, …, and each case step that names a screen keeps naming it by
+  title. Its `## For your check` joins its units' CHECKs, renumbered the same way. A unit
+  with nothing to see says `Smoke: none — <why>`. A PR with cases that changes no screen writes
+  `Screens: none — <why>` in place of the list. Gates were green on three fixes the owner then
   found still broken on the device, and the owner asked six runs for this list by hand. Then a list
   that named the three broken screens shipped unwalked on AXCMedApp #580, which is why §3.8 walks it.
+- **`## Screens` lists every screen the change alters**, one line each: `SCREEN-<n>`, the screen's
+  title as the app shows it, and the `repo-profile §21` Devices tokens to see it on (with no §21, the
+  device a person would use). §3.8 keeps an image of each listed screen on each listed device, passed
+  or failed, and posts them on the PR. The walk captures a screen only where a case reaches it, so
+  each listed screen a case can reach appears in a case's steps. A changed screen no case can reach
+  (behind the camera, say) is still listed: it gets no image, and the PR waits for the owner. When `repo-profile §3` has a `UI paths` row, every
+  changed file under it renders on at least one listed screen; a changed UI file no listed screen
+  shows is a missing line, added before the PR opens.
+- **`## For your check` holds what a walk cannot do**: a camera capture, a push notification, a real
+  network, what a real AI answer looks like. Each is a `### CHECK-<n>` with its `Checks` line and its
+  steps. A CHECK is not a case: §3.8 never reads it, and the owner finds it on the PR after the merge.
+  **A CHECK does not excuse a changed screen:** the screen is still listed. A PR with nothing for the owner to check has no such section.
+- **Before the cases are final, read the code at the PR head** for every field, control and screen a
+  step names. A case that names what the code does not have is rewritten. Code that lacks what its
+  criterion asks for is a defect: fix it before the walk, back through §3.1. The walk never finds
+  this out on its own.
 - Every adw PR body carries one depth-conditional line, naming the spec/plan dirs
   (`repo-profile §2`) — D3:
   `<specs-dir>/<plans-dir> in this PR = the unit's contract, authored and critical-passed
@@ -970,7 +1002,12 @@ brief): the `ready|blocked` machine
 line with `verified <sha7>`, the review cycle count and tier, the per-gate table and mutation
 row from the re-pass, the §5 review-evidence count, the `/pr-ready` §5 open-findings lines
 (`closed:` / `open:`, or `open-findings: none` / `fetch failed` / `NOT RUN`), the §8 cleanup line,
-and on `blocked` the question with its default. **A `ready` return without the open-findings lines
+and on `blocked` the question with its default. The brief also asks the driver one question before
+`/pr-ready`: **does the PR body's `## Screens` list every screen that a changed file under
+`repo-profile §3`'s `UI paths` renders?** A screen it misses is a finding like any other: the driver
+adds its line to `## Screens` and, when a case can reach it, a step that reaches it to that case
+(`gh pr edit <N> --body-file`), and
+returns `screens: +<n> <SCREEN ids>`, `screens: complete`, or `screens: no UI paths row`. **A `ready` return without the open-findings lines
 has not returned:** the PR is `blocked` with `default: run /pr-ready <N>` — not `/adw-build <slug>`,
 which halts at Phase 0 on the still-open PR. A `blocked` decided before `/pr-ready` §5 (a red gate,
 an escalation, a count of `0`) carries no lines and needs none. **`ready` needs `open-findings:
@@ -1130,7 +1167,7 @@ left, an escalated finding, a gate-file diff, open findings `/pr-ready` §5 coul
 carried. A carried gate-file diff is still in the final PR's diff, so §3.4's gate-file tripwire
 fires on the final PR and the owner signs it there.
 
-### 3.8 App smoke — the PRs the human merges: walk, check, fix
+### 3.8 App smoke — independent and final PRs: walk, check, fix
 
 **No gate looks at the running app.** On AXCMedApp #580 (units #577, #579) every gate, both
 verifier passes and a full review were green. A simulator walk the owner asked for afterwards found
@@ -1189,10 +1226,12 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
 2. Extracts the cases, in one Bash call that prints the directory, and copies that path as a literal
    into every later call:
    ```bash
-   D="$(mktemp -d)"; gh pr view <N> --json body --jq .body | awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && (/^## / || /^<!-- \/smoke -->/) {exit} f' > "$D/cases.md"; echo "$D"
+   D="$(mktemp -d)"; gh pr view <N> --json body --jq .body > "$D/body.md"; awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && (/^## / || /^<!-- \/smoke -->/) {exit} f' "$D/body.md" > "$D/cases.md"; awk '/^## Screens[[:space:]]*$/ {f=1; print; next} f && /^## / {exit} f' "$D/body.md" > "$D/screens.md"; [ -s "$D/screens.md" ] || grep -m1 '^Screens: none — ' "$D/body.md" > "$D/screens.md"; echo "$D"
    ```
+   `<D>/screens.md` holds the PR's `## Screens` list (§3.5), or its `Screens: none` line, or nothing.
    Before it runs anything from §21, it checks §21's Cases check, Devices, Launch, Driver probe, Wait
-   test, Result, Evidence, Audit, Max minutes and Abandon rows: a row that is missing or empty →
+   test, Result, Evidence, Audit, Max minutes, Abandon and Build floor rows (the Lock and Second
+   account rows are optional): a row that is missing or empty →
    return `smoke not run — §21 <row> is empty` and stop; a Max minutes that is not a whole number →
    return `smoke not run — §21 Max minutes is not a whole number` and stop. Nothing has launched, so
    there is nothing to abandon. Then it compares the case counts:
@@ -1200,11 +1239,23 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
    (`gh pr view <N> --json body --jq .body`); unequal → return `smoke not run — cases: the section
    is cut short` and stop. Then it runs §21's Cases check on `<D>/cases.md`. A non-zero exit →
    return `smoke not run — cases: <the check's message>` and stop.
-3. Prints `date +%s` once and keeps the value as `<start>`. Then starts §21's Launch with `<N>`,
-   `$VSHA`, `<D>/cases.md`, and the devices §21's Devices row derives from the cases' `Device`
-   lines, and keeps every value §21's Wait test, Result, Evidence, Audit and Abandon rows name, as literals. A
-   launch that stops before the runner runs (its lock is held, its stack will not come up, the
-   build fails, a Bash call of it is cut off at the 600000 ms limit) → run §21's Abandon, then
+3. Runs §21's Build floor, after `date +%s` printed once. Exit 0 → go on. Non-zero → wait as step 4
+   does, with Build floor as `<test>`, `sleep 60` in place of `sleep 5`, that epoch as `<start>`
+   and Max minutes as `<n>`. `DEADLINE` → run Build floor once more and return `smoke not run — build
+   floor: <what it printed>` and stop; nothing has launched. Two of six walks died of a host that could not
+   finish the build. Then it starts §21's Launch with `<N>`, `$VSHA`, `<D>/cases.md`,
+   `--screens <D>/screens.md` when that file is not empty, and the devices §21's Devices row derives
+   from the cases' `Device` lines, and keeps every value §21's Wait test, Result, Evidence, Audit and
+   Abandon rows name, as literals. **`<start>`** is the `<epoch>` of the runner's `adw-lock: taken
+   <epoch>` line, so a walk that waited for the lock does not spend its own Max minutes; a runner
+   that prints no lock line takes `date +%s`, printed once just before Launch. **Queued:** a runner
+   that prints `adw-lock: held by <s> since <e>` has not started its walk. Run §21's Abandon (it
+   releases what this launch took; a lock this walk does not hold stays). With a §21 Lock row, wait
+   as step 4 does, with `[ ! -e <the Lock row's file> ]` as `<test>`, `sleep 30`, `<e>` as `<start>`
+   and Max minutes as `<n>`; on `done`, Launch once more. Held again, or `DEADLINE` → return
+   `smoke not run — queued behind <s>` and stop. Without a Lock row → return `smoke not run — lock
+   held` and stop. Any other launch that stops before the runner runs (its stack will not come up,
+   the build fails, a Bash call of it is cut off at the 600000 ms limit) → run §21's Abandon, then
    return `smoke not run — <the runner's own reason>`, with what Abandon printed, and stop. A
    launch that stops leaves what it took (a lock, booted devices, a stack) held, and the next walk
    would find them. §21's Driver probe
@@ -1226,12 +1277,38 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
    does not reach. Without that clause the wait ends before the runner lets go of its devices. On `DEADLINE`, it
    runs §21's Abandon and returns `smoke not run — exceeded <n> min`, with what Abandon printed.
 5. Runs §21's Audit, then returns this and nothing else: the Result file's path; the directory §21's Evidence row's
-   image paths are relative to; its verdict line;
+   image paths are relative to; the `screens/` directory that row names for the listed screens, as an
+   absolute path, or `none`; `<D>`; the devices passed to Launch; its verdict line;
    every row of its table, verbatim; the Audit's exit code and its failing lines; the case count as
    `<passed>/<total>`, `<passed>` counted as §21's Result row says and `<total>` the number of ids
    step 2's check printed; and the minutes from `<start>` to `done`. When §21's Result row says the
    file shows the driver lost mid-walk, the first line of the return is `smoke not runnable: <what
    the file says>`, and the rest follows it.
+
+**Then the screenshot relay posts the images**, after the smoke relay returns and before the record
+below is written. It runs when the walk ran (a Result exists), the return names a `screens/`
+directory, and `<D>/screens.md` holds a `- SCREEN-` row; otherwise its line is `screens none — <the
+condition that failed>`. **Images leave the machine only from a scratch database:** unless §21's
+Data row says the walk runs on a scratch database, never on a copy of real data, no screenshot relay
+runs, and its line is `screens none — §21 Data names no scratch database`. Otherwise dispatch one `model: sonnet` relay
+(adw-core §8's Re-execute and relay row, `subagent_type: general-purpose`). Its brief carries `<N>`,
+`$VSHA` in full, the walk number `<k>`, the command below with every value written in, and
+`review-core.md` §11's brief floor. It runs the command once, in one Bash call, and returns the line
+the command printed and its exit code. This relay alone pushes to the screens ref; the smoke relay
+still posts nothing.
+
+```bash
+R="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"   # the main checkout
+test -f "$R/.claude/adw/cache/scripts/adw-screens.py" || R="$(git rev-parse --show-toplevel)"
+python3 "$R/.claude/adw/cache/scripts/adw-screens.py" --repo "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" --checkout "$R" --pr <N> --head <VSHA> --walk <k> --screens "<D>/screens.md" --dir "<the screens/ directory>" --ref refs/adw-screens
+```
+
+It prints `screens <comment url> · <n> images` or `screens none — <why>`, and exits 0. Any other exit
+(1: the push or the comment failed after one retry) makes the line `screens not posted — <the last
+line it printed>`. The
+images go to `refs/adw-screens`, a ref a default `git fetch` does not download, and the comment
+links each one by its commit, so it never changes under the owner. A walk with no images is a
+reported gap, never a pass.
 
 **Which rows can lead to a fix.** Only rows of a walk that ran and passed its audit. A `smoke not
 run` or `smoke not runnable` return, or an Audit exit other than `0`, has no defect anyone can
@@ -1281,24 +1358,29 @@ section and the evidence row before anything moves the head (smoke fix cycle ste
 
 - **PR body:** a `## Smoke result` section. On a `ready` PR it goes right after the PR's opening
   summary. On a `blocked` PR it goes right after the reason line, above the `<details>` fold: the
-  owner decides the merge on it. Its first line is `<verdict line> · walk <k> at <sha7> · <m>m`,
-  with `· unaudited: <failing check>` appended when the Audit exit is not `0`. Then the returned
+  owner decides the merge on it. Its first line is `<verdict line> · walk <k> at <sha7> · devices
+  <token>,<token> · <m>m`, the devices passed to Launch, with `· unaudited: <failing check>` appended
+  when the Audit exit is not `0`. Then the returned
   rows, as they came. Then one line per checked row: `valid: <id> — <the three links>`,
   `refuted: <id> — <the link that breaks>` or `unchecked: <id>`. Then one `fixed: <id> (walk <k>)
   in <sha7>, unconfirmed` line per row a smoke fix cycle fixed, `<sha7>` being the head that cycle
   pushed; a later walk that passes its audit and leaves no `valid` row drops `, unconfirmed` from
   every such line. Then `smoke fix cycle <c> running — the head moves past <sha7>` while a cycle
-  runs. Then `evidence: <Result path>, on the machine that ran the build`. A
+  runs. Then `evidence: <Result path>, on the machine that ran the build · <the screenshot relay's
+  line>`. A
   `smoke not run` or `smoke not runnable` return with no Result writes the section with that one
   line, plus any `fixed:` lines; one with a Result puts that line first. A later walk of the same
   PR replaces the section, never adds one, and keeps every `fixed:` line.
 - **Evidence block:** the `smoke` row (§3.4), counted from the rows by §21's Result row.
 - **Run-report PR line:** the last walk has no defect rows, no gap rows, Audit `0`, no `not
-  runnable` line, and `<passed>` equal to `<total>` → `· smoke clean` after `review clean` (a `blocked` line has none:
+  runnable` line, `<passed>` equal to `<total>`, and a screenshot relay line that does not start
+  `screens not posted` → `· smoke clean` after `review clean` (a `blocked` line has none:
   after its default).
   Otherwise one trailing flag, the first that applies: `· ⚠ smoke not runnable: <reason>`,
   `· ⚠ smoke not run — <reason>`, `· ⚠ smoke unaudited — <failing check>`, or `· ⚠ smoke: <d>
-  defects (<b> blocking, <v> valid), <g> gaps, cases <passed>/<total>`. Either form ends
+  defects (<b> blocking, <v> valid), <g> gaps, cases <passed>/<total>`. A screenshot relay line
+  `screens not posted — <reason>` adds `· ⚠ screens not posted — <reason>` after that flag, or alone
+  when no other flag applies. Either form ends
   `· fixed <f>` when smoke fix cycles fixed `<f>` rows, and `· fixed <f>, <u> unconfirmed` when `<u>`
   of those `fixed:` lines still end `, unconfirmed`.
 
@@ -1420,7 +1502,8 @@ code — catching a real auto-merge defect on the way, with no escalation raised
 
 Otherwise the final PR (`adw/<slug>` → `<INTENT_BASE>`) runs the FULL Phase 3 loop on the
 composition — gates, 3.4 verify against `origin/<INTENT_BASE>`, **and 3.6's review** — and
-waits `ready` for the one human consent. After the carried blocks below are listed, it runs §3.8's
+waits `ready` for the one human consent. Its body's `## Screens` and `## For your check` join its
+units' lists (§3.5). After the carried blocks below are listed, it runs §3.8's
 app smoke on its verified head, with its smoke fix cycles: the one smoke of the chain. A smoke fix
 cycle's commits land on the integration branch from the close worktree, and its pushed head takes
 the rule below for an answer commit that changes code, once per cycle (§3.8 step 5).

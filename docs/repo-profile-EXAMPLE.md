@@ -656,23 +656,25 @@ that names a screen (its score, and any per-screen delete or filter) is a per-ro
 ## §21 — App smoke (optional)
 
 A profile that keeps this section declares a runner that drives the built app through a case file,
-and `/adw-build` §3.8 then walks the `## Smoke` cases of every PR the human merges (each independent
-PR and each chain's final PR), checks each defect the walk reports, and fixes the ones that hold up.
+and `/adw-build` §3.8 then walks the `## Smoke` cases of every independent and final PR, checks each defect the walk reports, and fixes the ones that hold up.
 **Delete the whole section unless the repo has one**:
 absent → no smoke runs and nothing about it prints. Fill every row with a value, not with the
 description:
 
 | | |
 |---|---|
-| **Launch** | how to start one smoke, unattended: a command, or a tracked skill and its arguments, taking the PR number, the head sha, a case file and a device list. It refuses a build that talks to production, edits no code, commits, pushes and posts nothing, and never reports by typing into the caller's terminal or chat: the caller is an agent, and that text would reach it as if the owner wrote it. Say where it prints every value the rows below need (a run directory, a slot, a run name), and at which point of it the Driver probe runs: after the devices boot and the app installs, before the walk |
+| **Launch** | how to start one smoke, unattended: a command, or a tracked skill and its arguments, taking the PR number, the head sha, a case file, a device list and, when the PR lists screens, a screens file (adw-build §3.8 passes `--screens <file>`; the runner keeps one image per listed screen and device in the Evidence row's `screens/`). It refuses a build that talks to production, edits no code, commits, pushes and posts nothing, and never reports by typing into the caller's terminal or chat: the caller is an agent, and that text would reach it as if the owner wrote it. Say where it prints every value the rows below need (a run directory, a slot, a run name), and at which point of it the Driver probe runs: after the devices boot and the app installs, before the walk. When the runner holds a lock, it prints `adw-lock: taken <epoch>` when it takes it, and `adw-lock: held by <holder> since <epoch>` before it exits when another walk holds it (adw-build §3.8) |
 | **Cases check** | a command that reads a case file in adw-build §3.5's shape and exits 0 when the runner can walk it, non-zero with the reason when it cannot |
 | **Devices** | the device classes the runner offers, the simulator or emulator runtimes it is valid on (tested, with the date and the driver version), how a case's `Device` line maps onto them, and the set used when no case names one |
 | **Driver probe** | a command, run once per device before the walk, that taps one control, then reads back the screen that tap must open, and exits non-zero when it did not open. A read alone is not a probe: a driver can read a screen and still refuse every tap (adw-build §3.8) |
-| **Data** | what data exists when the runner starts (accounts, a seeded fixture), and how a case gets the data its Preconditions name that the fixture lacks. Never production data, never a person's own account |
-| **Wait test** | a shell test, judged by its exit status alone (its output is discarded), that is true once the run has finished and released what it holds (devices, a lock), so the next smoke can start |
+| **Data** | what data exists when the runner starts (accounts, a seeded fixture), and how a case gets the data its Preconditions name that the fixture lacks. A scratch DB; a template clone of real data is never allowed for a walk whose images leave the machine (adw-build §3.8 posts them on the PR). Never production data, never a person's own account |
+| **Wait test** | a shell test, judged by its exit status alone (its output is discarded), that is true once THIS walk has finished and released what it holds (devices, its lock), so the next smoke can start. Another walk's lock does not make it false |
 | **Result** | the file the run writes; its verdict line; which of its table rows are defects and with what severity, which are gaps, and which are neither; how to count the cases that passed; and which line in it shows the driver was lost mid-walk |
-| **Evidence** | for a defect row, where the files that show it are: the image a row cites, or the entry it cites and the image that entry names, with the directory each path is relative to, and which line of an entry holds the path. The §3.8 refuter opens those images and judges from them, not from the walk's own words |
+| **Evidence** | for a defect row, where the files that show it are: the image a row cites, or the entry it cites and the image that entry names, with the directory each path is relative to, and which line of an entry holds the path. The §3.8 refuter opens those images and judges from them, not from the walk's own words. Also where the files showing a defect row are, and `screens/`: one image per `## Screens` pair (adw-build §3.5), named `SCREEN-<n>-<device>.png`, passed or failed |
 | **Audit** | a command that checks the result's evidence (the screenshots it cites exist, the build is the one asked for), and its exit codes |
-| **Max minutes** | a whole number: the longest one walk may run, counted from before Launch; `/adw-build`'s relay runs Abandon at its first wait check past it, and on any Launch that stops before the walk |
+| **Max minutes** | a whole number: the longest one walk may run, counted from the runner's `adw-lock: taken` line, or from before Launch when there is no lock; `/adw-build`'s relay runs Abandon at its first wait check past it, and on any Launch that stops before the walk |
 | **Abandon** | what to run at that deadline: stop the run, release what it holds, and print the last state it reached |
+| **Build floor** | a command that exits 0 when the host can finish a build now (enough free memory, no other build running) and non-zero with the reason when it cannot. The relay runs it before Launch and waits on it up to Max minutes |
+| **Second account** | optional: the roles the walk can sign in as (the default first) and the command that switches a device to another, so a case that needs two users switches in its steps |
+| **Lock** | optional: the command that takes the runner's lock, the one that releases it, and the lock file, whose existence means a walk or a build holds the host. The relay waits on the file while a walk is queued (adw-build §3.8) |
 
