@@ -21,7 +21,7 @@ or aborts, removes the tree and prints `hold 6 conflict: <files>` (exit 1). The 
 removes it, never with --force: a tree with any change past the merge stays, and discard exits 1.
 A gh call that fails, or a bad flag, prints `hold 0 gate error: <message>` and exits 2: the contract
 treats it as a hold. ADW_GATE_POLL_SECONDS (default 30) spaces the re-queries: 5 for an UNKNOWN
-mergeable state, 16 (8 min at the default) for a pending check, and all polling stops after
+mergeable state, 16 for a pending check, and all polling stops after
 ADW_GATE_BUDGET_SECONDS (default 420), so the line prints inside a 600000 ms Bash call.
 """
 from __future__ import annotations
