@@ -127,7 +127,9 @@ gate file to get green · let a subagent create its own worktree.
    — parse both into one manifest.
 4. Parse every spec header (adw-core §2). Any missing required field, duplicate unit id,
    an `intent:` value that does not equal the slug, an `after` cycle, a `base:`
-   present on some units but not all (or with differing values), or a `shape: port` unit
+   present on some units but not all (or with differing values), a `merge:` present on some
+   units but not all (or with differing values, or a value other than `auto` or `hold`), a
+   `merge: auto` whose base is the production branch (`repo-profile §3`), or a `shape: port` unit
    whose depth is not D1, that shares a PR or sub-PR with another unit, or whose repo profile
    has no complete §20 (adw-core §2) → refuse the whole
    run, print what to fix, stop. No partial builds on a broken manifest.

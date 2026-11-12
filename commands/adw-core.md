@@ -106,6 +106,7 @@ after: [u1, u2]                   # in-chain ordering; [] when independent
 verify: <a command per the rules below and repo-profile §5's allowlist>
 base: <a branch that exists on origin>   # OPTIONAL — omitted = repo-profile §3's default base
 shape: port                       # OPTIONAL — §3 Port shape; D1 only, needs a complete repo-profile §20 (below)
+merge: auto | hold                # OPTIONAL — omitted = hold
 ```
 
 Rules:
@@ -130,8 +131,16 @@ Rules:
   a command in backticks (Renders, Score), a command or env var (Fast mode), a number of minutes
   (Gate mode), a path or command (References), path globs (Port surface), a number of rounds (Stop
   rule) — and the fail-closed `verify` template below the table.
+- **`merge:` is optional, and `auto` or `hold` are its only values.** It says whether the intent's
+  PRs merge without the owner after a clean walk (adw-build §3.7). Intent-wide, like `base:`: every
+  spec of one intent carries the same value or none, and `/adw-build` refuses a mixed set.
+  **Missing means `hold`**, and so does a repo profile with no `auto-merge default` row
+  (`repo-profile §3`): no run infers `auto` from silence. `auto` is never valid when the base is
+  the production branch (`repo-profile §3`); `/adw-build` refuses it (Phase 0 step 4). `/adw-init`'s
+  triage proposes it (its item 9); the owner overrides it with `--hold` or at the approval gate
+  (§7), and the spec header carries the value the gate printed.
 - No spec, no build: `/adw-build` refuses a unit whose header is missing any of the six
-  required fields.
+  required fields. `base:`, `shape:` and `merge:` are optional and do not count among the six.
 
 ## 3. Depth ladder
 
@@ -408,6 +417,7 @@ Five rules (owner feedback, structural after prose failed twice):
 ```
 Intent: <one line>
 base    <branch> — <one clause why>        ← only when not the default base (§2 base:)
+merge   auto → <base>, after a clean walk  ← or: merge   hold — <why>; ALWAYS prints (§2 merge:)
 extends <slug> · u1–u6: merged u1 u2 u3 u5 · open u4 (#820) · unbuilt u6   ← extend mode (§1.1)
 
 needs you  2                               ← or: none — answer by number; blank = defaults
@@ -429,7 +439,7 @@ cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · 
    uncharted territory>                    ← these print only when they exist
 
 approve → cut + build · decide → you settle the open questions, then build · specs only → stop after specs ·
-detail · re-cut "<instruction>" · regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port" · reopen Q3   ← `decide` only when `needs you` is not `none`; `shape` only when repo-profile has a complete §20 (§2); `reopen` only when a `decided` line prints
+detail · re-cut "<instruction>" · regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port" · merge auto · merge hold · reopen Q3   ← `merge auto` only when the base is not the production branch (§2 merge:); `decide` only when `needs you` is not `none`; `shape` only when repo-profile has a complete §20 (§2); `reopen` only when a `decided` line prints
 
                         ← nothing follows this block: no summary, no narration
 ```
@@ -496,6 +506,13 @@ surface must own:
   sub-PRs still merge only into the intent's own integration branch, and the PR to
   `base:` still needs explicit human consent. On a cut with a chain, `approve` is also the
   consent for every sub-PR merge of that chain (§6): the run does not ask again per sub-PR.
+  On a surface that prints `merge   auto`, `approve` is also the owner's explicit consent for
+  that intent's merges into `base:` once the merge gate passes (§6, adw-build §3.7). On
+  `merge   hold`, the owner merges the PR to `base:`.
+- **The `merge` line always prints**, `auto` or `hold`, with the base it names. `merge auto` and
+  `merge hold` re-render the surface with the new value, and the run writes it to every spec of
+  the intent before the build starts. `merge auto` is refused when the base is the production
+  branch (§2 merge:).
 - **The collapse is gated on a clean exit.** A non-empty `needs you` on the handoff stops
   there exactly as `specs only` would — a pending critical-pass question is the whole
   reason the round-trip existed, and auto-defaulting it sight-unseen would bake the answer
