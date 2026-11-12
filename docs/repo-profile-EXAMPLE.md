@@ -656,8 +656,7 @@ that names a screen (its score, and any per-screen delete or filter) is a per-ro
 ## §21 — App smoke (optional)
 
 A profile that keeps this section declares a runner that drives the built app through a case file,
-and `/adw-build` §3.8 then walks the `## Smoke` cases of every PR the human merges (each independent
-PR and each chain's final PR), checks each defect the walk reports, and fixes the ones that hold up.
+and `/adw-build` §3.8 then walks the `## Smoke` cases of every independent and final PR, checks each defect the walk reports, and fixes the ones that hold up.
 **Delete the whole section unless the repo has one**:
 absent → no smoke runs and nothing about it prints. Fill every row with a value, not with the
 description:

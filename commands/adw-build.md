@@ -910,9 +910,10 @@ semantic-conflict risk.
   ```
   `0` → write the block now, before any other step. 13 of 28 final PRs had no block, and 36 blocks
   still read `review 0/2` on PRs that carry `fix(review):` commits (2026-09-20 to 10-01).
-- **Every adw PR body whose change a user can see or trigger carries a `## Smoke` section:** one to
-  five cases a person, or §3.8's runner, walks to see the change work, written from the spec's
-  acceptance criteria, each in this shape:
+- **Every adw PR body whose change a user can see or trigger carries a `## Smoke` section:** at least
+  one case a person, or §3.8's runner, walks to see the change work, written from the spec's
+  acceptance criteria; more than five only where `## Screens` needs it. Each case has this shape, and
+  `## Screens` and `## For your check` follow the closing marker:
   ```
   ## Smoke
   ### AC-1 <screen> — <what the user sees>
@@ -925,6 +926,14 @@ semantic-conflict risk.
   - **Expected**:
     1. <result of step 1>
   <!-- /smoke -->
+
+  ## Screens
+  - SCREEN-1 · <screen title as the app shows it> · <device>, <device>
+
+  ## For your check
+  ### CHECK-1 <what to try>
+  Checks: <the spec criteria it covers, as `u1 AC 3`> — <what only a person or a real device can judge>
+  <steps, as a case writes them>
   ```
   In the body, drop this file's two-space indent: the `##` and `###` headings and the closing
   `<!-- /smoke -->` line start at column 0, because §3.8 finds the cases by them and stops at that
@@ -932,15 +941,36 @@ semantic-conflict risk.
   after it. The marker closes the whole section once, after the last case, never after each case;
   on a final PR it follows the last renumbered case, and a unit's own marker is dropped. Every acceptance criterion that only a look at the running
   app can check (it names a simulator, a device or a manual check, or says no gate covers it) has a
-  case. **A case whose rule holds on more
+  case or a CHECK. **A case whose rule holds on more
   than one screen ends with a step that repeats the check on each of them, by name**
   (`On <screen>, <screen>: repeat step 2; expect the same`): a screen that differs from its siblings
-  is the defect no gate sees. Preconditions name data, never "any record": §3.8's runner makes what
+  is the defect no gate sees. Name there only the screens that should match. A screen whose change
+  differs from its siblings gets its own step and its own `Expected`. Preconditions name data, never "any record": §3.8's runner makes what
   its fixture lacks (`repo-profile §21`'s Data row). The final PR's cases are its units' cases, in
-  unit order, renumbered `AC-1`, `AC-2`, … in one sequence, each with its `Checks` line. A unit
-  with nothing to see says `Smoke: none — <why>`. Gates were green on three fixes the owner then
+  unit order, renumbered `AC-1`, `AC-2`, … in one sequence, each with its `Checks` line. Its
+  `## Screens` joins its units' lists: one line per screen, with the devices of every unit that lists
+  it, renumbered `SCREEN-1`, `SCREEN-2`, …, and each case step that names a screen keeps naming it by
+  title. Its `## For your check` joins its units' CHECKs, renumbered the same way. A unit
+  with nothing to see says `Smoke: none — <why>`. A PR with cases that changes no screen writes
+  `Screens: none — <why>` in place of the list. Gates were green on three fixes the owner then
   found still broken on the device, and the owner asked six runs for this list by hand. Then a list
   that named the three broken screens shipped unwalked on AXCMedApp #580, which is why §3.8 walks it.
+- **`## Screens` lists every screen the change alters**, one line each: `SCREEN-<n>`, the screen's
+  title as the app shows it, and the `repo-profile §21` Devices tokens to see it on (with no §21, the
+  device a person would use). §3.8 keeps an image of each listed screen on each listed device, passed
+  or failed, and posts them on the PR. The walk captures a screen only where a case reaches it, so
+  each listed screen a case can reach appears in a case's steps. A changed screen no case can reach
+  (behind the camera, say) is still listed: it gets no image, and the PR waits for the owner. When `repo-profile §3` has a `UI paths` row, every
+  changed file under it renders on at least one listed screen; a changed UI file no listed screen
+  shows is a missing line, added before the PR opens.
+- **`## For your check` holds what a walk cannot do**: a camera capture, a push notification, a real
+  network, what a real AI answer looks like. Each is a `### CHECK-<n>` with its `Checks` line and its
+  steps. A CHECK is not a case: §3.8 never reads it, and the owner finds it on the PR after the merge.
+  **A CHECK does not excuse a changed screen:** the screen is still listed. A PR with nothing for the owner to check has no such section.
+- **Before the cases are final, read the code at the PR head** for every field, control and screen a
+  step names. A case that names what the code does not have is rewritten. Code that lacks what its
+  criterion asks for is a defect: fix it before the walk, back through §3.1. The walk never finds
+  this out on its own.
 - Every adw PR body carries one depth-conditional line, naming the spec/plan dirs
   (`repo-profile §2`) — D3:
   `<specs-dir>/<plans-dir> in this PR = the unit's contract, authored and critical-passed
@@ -970,7 +1000,11 @@ brief): the `ready|blocked` machine
 line with `verified <sha7>`, the review cycle count and tier, the per-gate table and mutation
 row from the re-pass, the §5 review-evidence count, the `/pr-ready` §5 open-findings lines
 (`closed:` / `open:`, or `open-findings: none` / `fetch failed` / `NOT RUN`), the §8 cleanup line,
-and on `blocked` the question with its default. **A `ready` return without the open-findings lines
+and on `blocked` the question with its default. The brief also asks the driver one question before
+`/pr-ready`: **does the PR body's `## Screens` list every screen that a changed file under
+`repo-profile §3`'s `UI paths` renders?** A screen it misses is a finding like any other: the driver
+adds its line to `## Screens` and a step that reaches it to a case (`gh pr edit <N> --body-file`), and
+returns `screens: +<n> <SCREEN ids>`, `screens: complete`, or `screens: no UI paths row`. **A `ready` return without the open-findings lines
 has not returned:** the PR is `blocked` with `default: run /pr-ready <N>` — not `/adw-build <slug>`,
 which halts at Phase 0 on the still-open PR. A `blocked` decided before `/pr-ready` §5 (a red gate,
 an escalation, a count of `0`) carries no lines and needs none. **`ready` needs `open-findings:
@@ -1420,7 +1454,8 @@ code — catching a real auto-merge defect on the way, with no escalation raised
 
 Otherwise the final PR (`adw/<slug>` → `<INTENT_BASE>`) runs the FULL Phase 3 loop on the
 composition — gates, 3.4 verify against `origin/<INTENT_BASE>`, **and 3.6's review** — and
-waits `ready` for the one human consent. After the carried blocks below are listed, it runs §3.8's
+waits `ready` for the one human consent. Its body's `## Screens` and `## For your check` join its
+units' lists (§3.5). After the carried blocks below are listed, it runs §3.8's
 app smoke on its verified head, with its smoke fix cycles: the one smoke of the chain. A smoke fix
 cycle's commits land on the integration branch from the close worktree, and its pushed head takes
 the rule below for an answer commit that changes code, once per cycle (§3.8 step 5).
