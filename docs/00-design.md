@@ -454,21 +454,24 @@ develop ──► adw/<intent-slug>            (integration branch)
 Each sub-PR runs the full per-PR loop (§4.2): implement → gates → verify → open sub-PR →
 `/code-review` → **merge into the integration branch**. The next unit branches off the
 updated integration branch. The final PR gets its own full pass — gates on the composition,
-§4.5 verification, `/code-review` — before it waits for the human.
+§4.5 verification, `/code-review` — before it waits for the human, or for `adw-build §3.7`'s
+merge gate when the intent says `merge: auto`.
 
 **Consent carve-out, stated explicitly.** The standing rule (recorded in
 `memory/feedback_no_auto_commit_push.md`) is: never merge a PR without explicit human
-consent. This design carves out exactly one case, authorised by the owner on 2026-07-20:
+consent. This design carves out one case, authorised by the owner on 2026-07-20, and widened twice
+since (below):
 **a sub-PR this pipeline opened for a unit of the current intent, whose base is that
 intent's integration branch, may be merged by the pipeline once its loop reaches
 `ready`.** Provenance is the authority, never the branch-name pattern — a PR that merely
 *targets* some `adw/*` branch does not qualify. Any PR targeting `develop` or `main`
-requires explicit human consent, always — the carve-out never widens past the integration
-branch, with one exception: an independent or final PR of an intent whose approved surface
-printed `merge   auto` merges into `develop` when `adw-build §3.7`'s merge gate passes, and the
-approved line is that consent (`adw-core §6`). `main`, the production branch, never. Widened once inside it, owner-authorised 2026-10-01: a `blocked` sub-PR is also merged,
+requires explicit human consent, always — the carve-out widens past the integration branch only
+as the second widening below says. Widened once inside it, owner-authorised 2026-10-01: a `blocked` sub-PR is also merged,
 as a *carried block*, and the final PR answers for it — a chain asks the owner once, at the
-final PR (`adw-core §6`, `adw-build §3.7`). (Operational note: `gh pr merge --auto`
+final PR (`adw-core §6`, `adw-build §3.7`). Widened past it once, in the auto-merge design the
+owner approved on 2026-10-30: an independent or final PR of an intent whose approved surface
+printed `merge   auto` merges into `develop` when `adw-build §3.7`'s merge gate passes, and the
+approved line is that consent (`adw-core §6`). `main`, the production branch, never. (Operational note: `gh pr merge --auto`
 merges immediately in this repo — checks are not a hard gate — which is the desired
 behaviour here since the loop's own gates are the gate.)
 
@@ -977,8 +980,8 @@ can see; the safe scope widens as stream A lands. That is a per-run decision, no
 milestone.
 
 **Not in v2:** automated Sentry/Trello intake (both blocked on a scheduler that does not
-exist), auto-merge only behind `adw-build §3.7`'s gate; never into the production branch,
-forking plugin skills. On the
+exist), forking plugin skills. Auto-merge is in, only behind `adw-build §3.7`'s gate, and never
+into the production branch. On the
 skills evidence: 21 symlinks in `.claude/skills/` point into `.agents/skills/`,
 `git ls-files .agents` returns **0**, and all share one mtime (`Jul 12 14:05`) — evidence
 of one copy operation, and deliberately *not* evidence that they have never run (reading a

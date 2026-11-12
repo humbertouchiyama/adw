@@ -10,6 +10,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -293,6 +294,16 @@ class TestGitHub(Gate):
         self.fx["checks"] = []
         self.assertPass()
 
+    def test_wait_budget_bounds_the_polls(self):
+        # the gate must print its line inside adw-build §3.7's 600000 ms Bash timeout, whatever the poll counts
+        self.env.update(ADW_GATE_POLL_SECONDS="0.2", ADW_GATE_BUDGET_SECONDS="0.5")
+        self.fx["mergeable_seq"] = ["UNKNOWN", "MERGEABLE"]
+        self.fx["checks"] = [{"name": "validate", "bucket": "pending"}]
+        t0 = time.monotonic()
+        out = self.assertHold(5)
+        self.assertLess(time.monotonic() - t0, 2.0)
+        self.assertIn("validate", out)
+
 
 class TestWalk(Gate):
     def result(self, first=None, rows="", lines=""):
@@ -317,6 +328,11 @@ class TestWalk(Gate):
     def test_audit_row_not_zero_holds(self):
         self.set_body(evidence=EVIDENCE.replace("audit 0", "audit 1"))
         self.assertHold(7)
+
+    def test_defect_text_saying_not_run_passes(self):
+        # only the status line says the walk did not run; a row's own words never do
+        self.result(rows="| D1 | polish | the banner did not run its fade | - | none |\n")
+        self.assertPass()
 
     def test_not_run_holds(self):
         self.set_body(result="## Smoke result\nsmoke not run — queued behind other\n")
@@ -507,6 +523,23 @@ class Trial(unittest.TestCase):
         self.assertEqual(rc, 0, out + err)
         self.assertNotIn(self.tree, self.registered())
         self.assertFalse(os.path.exists(self.tree))
+
+    def test_clean_leftover_tree_is_replaced(self):
+        # a run that died before Phase 5 left its trial tree: a clean one is removed and the trial runs again
+        tip = self.move_base({"c.txt": "c base\n"})
+        self.assertEqual(self.trial()[0], 0)
+        rc, out, err = self.trial()
+        self.assertEqual((rc, out), (0, "tree %s base %s" % (self.tree, tip)), err)
+
+    def test_dirty_leftover_tree_is_a_gate_error(self):
+        self.move_base({"c.txt": "c base\n"})
+        self.assertEqual(self.trial()[0], 0)
+        with open(os.path.join(self.tree, "a.txt"), "w") as f:
+            f.write("edited after the merge\n")
+        rc, out, err = self.trial()
+        self.assertEqual(rc, 2, out + err)
+        self.assertTrue(out.startswith("hold 0 gate error: "), out)
+        self.assertIn(self.tree, self.registered())
 
     def test_discard_keeps_a_tree_with_other_changes(self):
         self.move_base({"c.txt": "c base\n"})

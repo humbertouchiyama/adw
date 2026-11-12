@@ -21,6 +21,7 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 | `commands/adw-dispatch.md` | Hand an intent to a new herdr pane beside the caller, with a brief, a ledger row and an optional one-line reply. |
 | `scripts/adw-dispatch.py` | The mechanics of `adw-dispatch`: pane placement, the reply, the ledger. Run from the fetch cache. |
 | `scripts/adw-run-clean.py` | Removes what one `/adw-build` run left on disk (its worktrees, and the Xcode DerivedData they left) and nothing else. Run from the fetch cache at `adw-build` Phase 5. |
+| `scripts/adw-merge-gate.py` | The auto-merge gate: `check` reads every merge condition fresh from GitHub and the profile and prints `pass` or `hold <n> <reason>`; `trial` merges a moved base into the head in a throwaway worktree; `discard` removes it. Run from the fetch cache at `adw-build` §3.7. |
 | `scripts/adw-screens.py` | Pushes a walk's screen images to the app repo's `refs/adw-screens` and posts one PR comment with them. Run from the fetch cache at `adw-build` §3.8. |
 | `scripts/adw-analyze.py` | The run analysis: reads PR bodies, session transcripts and `predicts` lines, judges each line against its baseline, and writes a dated report to the owner's private reports repo. Code in `scripts/adw_analyze/`. |
 | `scripts/adw-analyze-weekly.sh` | Runs the analysis every Monday under launchd: critical pass, leak scan, commit, push, and an issue in the reports repo. |

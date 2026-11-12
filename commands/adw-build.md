@@ -1191,16 +1191,20 @@ the evidence block's `merge` row (§3.4) with one `gh pr edit`, and a `hold` end
 stays open, the run-report line ends `· held <n>: <reason>` (adw-core §7), and the run goes on to
 its next unit. No label is added for a hold.
 
-1. **Check**, in one Bash call with `timeout: 600000` (the script re-queries a pending check for up
-   to 8 minutes), naming every unit spec path of the intent as a repo path:
+1. **Check**, in one Bash call with `timeout: 600000` (the script stops polling after 7 minutes),
+   naming as a repo path the spec of every unit this PR carries: its title's unit field, and for a
+   final PR every unit of its chain. Phase 0 step 4 already refused a mixed `merge:` across the
+   intent. Every later call of this gate starts with this block's first line again: shell
+   variables do not survive between Bash calls.
    ```bash
    R="$(git rev-parse --show-toplevel)"; C="$R/.claude/adw/cache/scripts/adw-merge-gate.py"; test -f "$C" || C="$R/scripts/adw-merge-gate.py"
    python3 "$C" check --repo "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" --pr <N> --profile "$R/.claude/repo-profile.md" --spec-path <spec path> [--spec-path <spec path> …]
    ```
    One line comes back. `pass` → step 2. `hold <n> <reason>` → write `merge      hold <n> — <reason>
-   · at <head sha7>` and stop. `hold 0 gate error: …` (exit 2) is a hold like any other.
-2. **Trial against the base**, one Bash call: `python3 "$C" trial --checkout "$R" --pr <N> --slug
-   <slug> --base <INTENT_BASE> --head <the verified row's sha>`. `base unmoved` → step 4, and the
+   · at <head sha7>` and stop. `hold 0 gate error: …` (exit 2) is a hold like any other, and so is
+   no line at all (the call was cut off): `hold 0 gate error: no line`.
+2. **Trial against the base**, one Bash call: step 1's first line, then `python3 "$C" trial
+   --checkout "$R" --pr <N> --slug <slug> --base <INTENT_BASE> --head <the verified row's sha>`. `base unmoved` → step 4, and the
    row will end `· base unmoved`. `hold 6 …` → write the row and stop. `tree <path> base <sha>` →
    step 3 in that tree.
 3. **Gates in the trial tree.** On a repo whose §21 has a Lock row, take the lock first with the
@@ -1211,13 +1215,15 @@ its next unit. No label is added for a hold.
    the `repo-profile §5` gates the PR's diff obligates (`repo-profile §6`). It runs each gate in the
    tree, writes every output under a `mktemp -d` directory outside the tree, edits nothing, and
    returns one line per gate: `<gate> <exit code>`. Any non-zero exit, or a gate with no line →
-   `hold 6 gate <name> red`. Then, gates green or red, run `python3 "$C" discard --checkout "$R"
-   --tree <path>`. Exit 1 leaves the tree for `/cleanup`; print it on a `note` line, and it does not
-   change the result. Gates red → write the row and stop. Green → step 4, and the row will end
+   `hold 6 gate <name> red`. Then, gates green or red, run step 1's first line, then `python3 "$C"
+   discard --checkout "$R" --tree <path>`, in one Bash call. Exit 1 leaves the tree for `/cleanup`;
+   print it on a `note` line, and it does not change the result. A later trial of the same PR
+   removes a leftover tree that is clean, and holds `0` on one that is not. Gates red → write the row and stop. Green → step 4, and the row will end
    `· base trial ok at <base sha7>`.
 4. **The merge, two Bash calls.** First: `gh pr view <N> --json baseRefName,headRefOid,labels`
    must show the base equal to `<INTENT_BASE>`, the head equal to the `verified` row, and no
-   `adw:hold` label. Any mismatch → `hold 1 adw:hold` or `hold 3 head moved`, and stop. Second,
+   `adw:hold` label. Any mismatch → `hold 2 base changed`, `hold 3 head moved` or `hold 1
+   adw:hold`, and stop. Second,
    alone in its own Bash call, the sha written out as a literal: `gh pr merge <N> <flag>
    --match-head-commit <full sha>`, where `<flag>` is `repo-profile §3`'s merge convention
    (`squash` → `--squash`, `merge` → `--merge`, `rebase` → `--rebase`). No `--auto`, no

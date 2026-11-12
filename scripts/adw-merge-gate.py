@@ -21,7 +21,8 @@ or aborts, removes the tree and prints `hold 6 conflict: <files>` (exit 1). The 
 removes it, never with --force: a tree with any change past the merge stays, and discard exits 1.
 A gh call that fails, or a bad flag, prints `hold 0 gate error: <message>` and exits 2: the contract
 treats it as a hold. ADW_GATE_POLL_SECONDS (default 30) spaces the re-queries: 5 for an UNKNOWN
-mergeable state, 16 (8 min at the default) for a pending check.
+mergeable state, 16 (8 min at the default) for a pending check, and all polling stops after
+ADW_GATE_BUDGET_SECONDS (default 420), so the line prints inside a 600000 ms Bash call.
 """
 from __future__ import annotations
 
@@ -38,6 +39,14 @@ PROFILE_PATH = ".claude/repo-profile.md"
 POLL = float(os.environ.get("ADW_GATE_POLL_SECONDS", "30"))
 UNKNOWN_QUERIES = 5
 PENDING_QUERIES = 16
+# All polling stops once this many seconds have passed, so the line prints inside adw-build §3.7's
+# 600000 ms Bash timeout with room for the gh calls that follow.
+BUDGET = float(os.environ.get("ADW_GATE_BUDGET_SECONDS", "420"))
+START = time.monotonic()
+
+
+def over_budget() -> bool:
+    return time.monotonic() - START + POLL > BUDGET
 
 
 class Hold(Exception):
@@ -222,8 +231,8 @@ def github(a, pr) -> None:
             break
         if state != "UNKNOWN":
             raise Hold(5, "GitHub says the PR is %s" % state)
-        if n == UNKNOWN_QUERIES - 1:
-            raise Hold(5, "mergeable is still UNKNOWN after %d queries" % UNKNOWN_QUERIES)
+        if n == UNKNOWN_QUERIES - 1 or over_budget():
+            raise Hold(5, "mergeable is still UNKNOWN after %d queries" % (n + 1))
         time.sleep(POLL)
         state = json.loads(gh("pr", "view", str(a.pr), "--repo", a.repo, "--json", "mergeable,mergeStateStatus"))["mergeable"]
     for n in range(PENDING_QUERIES):
@@ -239,9 +248,9 @@ def github(a, pr) -> None:
         pending = [c["name"] for c in checks if c["bucket"] == "pending"]
         if not pending:
             return
-        if n < PENDING_QUERIES - 1:
-            time.sleep(POLL)
-    raise Hold(5, "check %s still pending after %d queries" % (", ".join(pending), PENDING_QUERIES))
+        if n == PENDING_QUERIES - 1 or over_budget():
+            raise Hold(5, "check %s still pending after %d queries" % (", ".join(pending), n + 1))
+        time.sleep(POLL)
 
 
 def walk(pr) -> None:
@@ -250,7 +259,7 @@ def walk(pr) -> None:
     if result is None or not result.strip():
         raise Hold(7, "the PR has cases and no ## Smoke result")
     first = next(l for l in result.splitlines() if l.strip())
-    if re.search(r"\bnot run(nable)?\b", result):
+    if re.search(r"^\W*(smoke )?not run(nable)?\b", result, re.M) or re.search(r"\bnot run(nable)?\b", first):
         raise Hold(7, "the walk did not run: %s" % first.strip()[:100])
     m = re.search(r"\bwalk (\d+) at ([0-9a-f]{7})\b", first)
     if not m:
@@ -381,7 +390,10 @@ def trial(a) -> int:
         return 1
     tree = os.path.join(co, ".claude", "worktrees", "adw-trial-%s-pr%d" % (a.slug, a.pr))
     if os.path.exists(tree):
-        raise GateError("%s exists from an earlier trial; discard it first" % tree)
+        # a run that died before Phase 5 left it: remove it when clean, never with --force
+        if git(tree, "status", "--porcelain").strip():
+            raise GateError("%s exists from an earlier trial with changes past the merge; /cleanup it" % tree)
+        git(co, "worktree", "remove", tree)
     git(co, "worktree", "add", "-q", "--detach", tree, a.head)
     m = subprocess.run(["git", "-C", tree, "merge", "--no-edit", "-q", tip], capture_output=True, text=True)
     if m.returncode != 0:
