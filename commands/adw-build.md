@@ -1377,9 +1377,10 @@ section and the evidence row before anything moves the head (smoke fix cycle ste
   `screens not posted` → `· smoke clean` after `review clean` (a `blocked` line has none:
   after its default).
   Otherwise one trailing flag, the first that applies: `· ⚠ smoke not runnable: <reason>`,
-  `· ⚠ smoke not run — <reason>`, `· ⚠ smoke unaudited — <failing check>`, `· ⚠ screens not posted —
-  <reason>`, or `· ⚠ smoke: <d>
-  defects (<b> blocking, <v> valid), <g> gaps, cases <passed>/<total>`. Either form ends
+  `· ⚠ smoke not run — <reason>`, `· ⚠ smoke unaudited — <failing check>`, or `· ⚠ smoke: <d>
+  defects (<b> blocking, <v> valid), <g> gaps, cases <passed>/<total>`. A screenshot relay line
+  `screens not posted — <reason>` adds `· ⚠ screens not posted — <reason>` after that flag, or alone
+  when no other flag applies. Either form ends
   `· fixed <f>` when smoke fix cycles fixed `<f>` rows, and `· fixed <f>, <u> unconfirmed` when `<u>`
   of those `fixed:` lines still end `, unconfirmed`.
 

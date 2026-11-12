@@ -440,7 +440,7 @@ skipped their own check. Say both in the PR body.
     `## Smoke result`'s `evidence:` line gains `· screens <comment url>`. This relay alone pushes
     to the screens ref. The smoke relay still posts nothing.
   - **Data:** a walk whose images leave the machine runs on a scratch DB. A §21 whose Data row
-    allows a template clone gets no screenshot relay: `screens none — data row allows real data`.
+    names no scratch database gets no screenshot relay: `screens none — §21 Data names no scratch database`.
 - [ ] **Step 3: Edit Phase 1 (287–297):** the ban on lock files and wait-for-lock loops does not
   reach a lock §21 names, which this session waits on only as §3.8 and §3.7 say.
 - [ ] **Step 4:** `adw-core.md` §8 row: "relay the app smoke and its screenshots (adw-build §3.8)".
