@@ -809,7 +809,7 @@ important the unit is:
 |---|---|
 | **Find** — refute, review, audit, scan, check against a doc, run a fixed checklist | `sonnet` |
 | **Clear a `Blocking`** — grade whether an earlier finding still holds at the head (`pr-ready.md` §5), the refutation step of `review-core.md` §9, the check of the app smoke's defect rows (adw-build §3.8) | `opus` — takes precedence over the Find row |
-| **Re-execute and relay** — run gates, report exit codes and output tails, verify, relay the app smoke (adw-build §3.8) | `sonnet` |
+| **Re-execute and relay** — run gates, report exit codes and output tails, verify, relay the app smoke and its screenshots (adw-build §3.8) | `sonnet` |
 | **Look up** — read a file or a history and answer a bounded question | `haiku` |
 | **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file; the app smoke's fix agent (adw-build §3.8) is one | `sonnet` |
 | **Author** — write a spec, a plan, or production code | **keyed on the unit's `depth:`** — `opus` at D3, `sonnet` at D0–D2 |
