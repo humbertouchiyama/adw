@@ -30,7 +30,7 @@ Maestro and `xcrun simctl` (native walk), Playwright Chromium and Node (web walk
   executor says "that needs a push to `<branch>`; say push" and waits. The owner merges every PR
   this plan opens. A task that opens a PR ends there, and the next task that depends on it waits
   for the merge.
-- **Order of PRs** (design §11 left it to the builder): image test → native PR N1 → web PR W1 →
+- **Order of PRs** (the auto-merge design's §11 left it to the builder): image test → native PR N1 → web PR W1 →
   native PR N2 → this repo PR A → PR B → PR C → PR D → web PR W2 → first live run. N2 lands before A
   because A makes the relay require the `Build floor` row. W1 lands before N2 because N2's Launch
   starts the web repo's test env with the AI stub.
@@ -398,7 +398,7 @@ skipped their own check. Say both in the PR body.
   - New rule: before the cases are final, check every field, control and screen a step names
     against the code at the PR head. A wrong case is rewritten. Code that lacks what the criterion
     asks for is a defect, fixed before the walk (back to §3.1).
-  - Completeness (design §11 left it to the builder): every changed file under the profile's
+  - Completeness (the auto-merge design's §11 left it to the builder): every changed file under the profile's
     `UI paths` renders on at least one listed screen. §3.6's review brief gains one question: "Does
     `## Screens` list every screen a changed UI file renders?" A miss is a finding like any other.
   - Phase 4: a final PR's `## Screens` joins its units' lists, one line per screen, devices merged.
