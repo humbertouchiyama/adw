@@ -147,6 +147,27 @@ class Scope(Base):
         self.assertNotIn("pr-ready-foo-u1-v2", self.registered(), out)
         self.assertNotIn("pr-ready-foo-close-v1", self.registered(), out)
 
+    def test_trial_worktree_is_cleaned(self):
+        # adw-merge-gate.py trial: a detached tree whose HEAD is a local merge commit of pushed parents
+        wt = self.worktree("adw-trial-foo-pr7", detach=True)
+        self.write(wt, "merged.txt", "m")
+        self.git("add", "-A", cwd=wt)
+        self.git("commit", "-qm", "trial merge", cwd=wt)
+        self.write(wt, "gate-output.log", "x")
+        self.worktree("adw-trial-foobar-pr7", detach=True)
+        rc, out = self.run_clean("--slug", "foo")
+        self.assertNotIn("adw-trial-foo-pr7", self.registered(), out)
+        self.assertIn("adw-trial-foobar-pr7", self.registered(), out)
+
+    def test_trial_worktree_with_an_unpushed_parent_is_kept(self):
+        wt = self.worktree("adw-trial-foo-pr7", detach=True)
+        for msg in ("unpushed work", "trial merge"):
+            self.write(wt, msg.replace(" ", "-") + ".txt", msg)
+            self.git("add", "-A", cwd=wt)
+            self.git("commit", "-qm", msg, cwd=wt)
+        rc, out = self.run_clean("--slug", "foo")
+        self.assertIn("adw-trial-foo-pr7", self.registered(), out)
+
     def test_verify_names_of_other_intents_are_not_matched(self):
         # slug foo must not reach intent foo-u2's or foo-close's verify worktrees, nor an improvised name
         names = ["pr-ready-foo-u2-close-v1", "pr-ready-foo-close-u1-v1", "pr-ready-foo-v1",

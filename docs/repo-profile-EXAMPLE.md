@@ -23,7 +23,7 @@ optional §19, §20 and §21 where a profile carries them. Do not renumber. Add 
 |---|---|---|
 | §1 | Identity and layout | orientation |
 | §2 | Paths | adw-core §1, adw-init Phase 4, adw-build §3.5, pr-ready §2/§5 |
-| §3 | Branches | adw-core §2/§6, adw-build Phase 0 |
+| §3 | Branches | adw-core §2/§6, adw-build Phase 0, adw-build §3.7 (merge gate), adw-init triage item 9 |
 | §4 | Worktree provisioning | adw-build Phase 2, review-core §1.2, pr-ready §4.3 |
 | §5 | Gates | adw-build §3.2, review-core §4, pr-ready §4.3 |
 | §6 | Layer map — which gates a diff obligates | review-core §4, adw-build §3.2 |
@@ -41,7 +41,7 @@ optional §19, §20 and §21 where a profile carries them. Do not renumber. Add 
 | §18 | Disposable state | cleanup Phase 3, 5; adw-build Phase 5 (`Provisioned files`) |
 | §19 | Review-lane map, layer to angle (optional; absent → derived) | code-review lane table |
 | §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2/§3.3/§3.4/§3.6 |
-| §21 | App smoke (optional; absent → no smoke) | adw-build §3.5/§3.8, adw-core §7 |
+| §21 | App smoke (optional; absent → no smoke) | adw-build §3.5/§3.7/§3.8, adw-core §7 |
 
 ---
 
@@ -102,9 +102,19 @@ Gitignored build output a path check must skip: `packages/shared/dist` and frien
 | **production branch** | `main` |
 | **long-lived integration branches** | `feat/**` |
 | **merge convention** | squash |
+| **auto-merge default** | `on` |
+| **merge-protected paths** | `.claude/**` `.github/workflows/**` `firebase.json` `.firebaserc` `api/drizzle.config.ts` |
+| **UI paths** | `src/**` `packages/shared/**` `index.html` `public/**` |
 
 `develop` is never merged into anything, so "the base branch is still unmerged" never expires for it
 (adw-core §1.1 liveness).
+
+The last three rows are read by `adw-build §3.7`'s merge gate, at merge time, so each cell holds the
+value alone: no note in the cell. **auto-merge default** is `on` or `off`; `off` is the kill switch
+and also stops runs already in flight, and a profile with no row reads as `off`. **merge-protected
+paths**: a PR whose diff touches one never merges without the owner. **UI paths**: a `Smoke: none`
+PR whose diff touches one waits for the owner; with no row, every `Smoke: none` PR waits. Both hold
+globs in backticks, space-separated: a double star crosses `/`, a single star does not.
 
 ## §4 — Worktree provisioning — before any gate
 

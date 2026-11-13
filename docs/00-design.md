@@ -56,7 +56,8 @@ One human brings intent. Two commands split the pipeline at the contract boundar
 
 **Human touches:** intake, unit-cut approval (§3.2 — `approve` buys the cut *and* the
 build), optionally reading the produced specs/plans, then per
-terminal PR: review, **`npm run preview` + visual verification**, merge consent. Plus deploy
+terminal PR: review, **`npm run preview` + visual verification**, merge consent (a `merge: auto`
+intent's PRs merge behind `adw-build §3.7`'s gate instead, never into the production branch). Plus deploy
 and exploratory testing. §6 is the authoritative list and this line must not drift from it.
 
 **Non-objectives:**
@@ -64,7 +65,8 @@ and exploratory testing. §6 is the authoritative list and this line must not dr
 - **Not faster.** METR's RCT (Jul 2025, 16 devs, 246 tasks) found developers **19% slower**
   with AI while estimating themselves 20% faster. Any speed claim here is unfounded.
 - **Not more PRs.** PR count is an output of the packaging rule (§3.5), never a goal.
-- Does not remove design authority. The human approves the cut and owns every merge.
+- Does not remove design authority. The human approves the cut and owns every merge, except
+  where an approved `merge   auto` line hands an intent's merges to `adw-build §3.7`'s gate.
 
 ---
 
@@ -339,7 +341,8 @@ and independently revertible** — no shared files, no ordering hazard, no consu
 another unit's output.
 
 **Separate develop-targeting PRs are earned by independence, never chosen by default.**
-Each costs, measurably: +1 review, +1 `npm run preview`, +1 merge consent. The owner's
+Each costs, measurably: +1 review, +1 `npm run preview`, +1 merge consent (for a `merge: hold`
+intent). The owner's
 recorded position (`memory/feedback_consolidate_prs.md`): *"each PR is a separate checkout,
 code review, and `npm run preview` run — N PRs = N× review+preview effort."* When a unit
 could go either way, group it. A chain already collapses N dependent units into **one**
@@ -445,25 +448,30 @@ develop ──► adw/<intent-slug>            (integration branch)
         sub-PR 1  sub-PR 2  sub-PR 3     (unit branches; base = integration branch)
               └────────┴────────┘
                        ▼
-        final PR: adw/<intent-slug> → develop     (the ONE human consent)
+        final PR: adw/<intent-slug> → develop     (the ONE human consent, or adw-build §3.7's gate)
 ```
 
 Each sub-PR runs the full per-PR loop (§4.2): implement → gates → verify → open sub-PR →
 `/code-review` → **merge into the integration branch**. The next unit branches off the
 updated integration branch. The final PR gets its own full pass — gates on the composition,
-§4.5 verification, `/code-review` — before it waits for the human.
+§4.5 verification, `/code-review` — before it waits for the human, or for `adw-build §3.7`'s
+merge gate when the intent says `merge: auto`.
 
 **Consent carve-out, stated explicitly.** The standing rule (recorded in
 `memory/feedback_no_auto_commit_push.md`) is: never merge a PR without explicit human
-consent. This design carves out exactly one case, authorised by the owner on 2026-07-20:
+consent. This design carves out one case, authorised by the owner on 2026-07-20, and widened twice
+since (below):
 **a sub-PR this pipeline opened for a unit of the current intent, whose base is that
 intent's integration branch, may be merged by the pipeline once its loop reaches
 `ready`.** Provenance is the authority, never the branch-name pattern — a PR that merely
 *targets* some `adw/*` branch does not qualify. Any PR targeting `develop` or `main`
-requires explicit human consent, always — the carve-out never widens past the integration
-branch. Widened once inside it, owner-authorised 2026-10-01: a `blocked` sub-PR is also merged,
+requires explicit human consent, always — the carve-out widens past the integration branch only
+as the second widening below says. Widened once inside it, owner-authorised 2026-10-01: a `blocked` sub-PR is also merged,
 as a *carried block*, and the final PR answers for it — a chain asks the owner once, at the
-final PR (`adw-core §6`, `adw-build §3.7`). (Operational note: `gh pr merge --auto`
+final PR (`adw-core §6`, `adw-build §3.7`). Widened past it once, in the auto-merge design the
+owner approved on 2026-10-30: an independent or final PR of an intent whose approved surface
+printed `merge   auto` merges into `develop` when `adw-build §3.7`'s merge gate passes, and the
+approved line is that consent (`adw-core §6`). `main`, the production branch, never. (Operational note: `gh pr merge --auto`
 merges immediately in this repo — checks are not a hard gate — which is the desired
 behaviour here since the loop's own gates are the gate.)
 
@@ -670,7 +678,7 @@ merge — that nothing checks.
 
 | State | Meaning | Result |
 |---|---|---|
-| **ready** | gates re-verified green in a clean checkout **after the review loop's last push** | independent/final PR: open, awaits human merge. Sub-PR: merged into the integration branch (§4.1 carve-out), chain continues |
+| **ready** | gates re-verified green in a clean checkout **after the review loop's last push** | independent/final PR: merged by `adw-build §3.7`'s gate when the intent says `merge: auto` and the gate passes; else open, awaits human merge. Sub-PR: merged into the integration branch (§4.1 carve-out), chain continues |
 | **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), the 16-boundary cap fired (condition 6 — gate-green but unconverged), or the app smoke left a defect its refuter confirmed and no smoke fix cycle fixed (adw-build §3.8) | PR open, labelled, body per §6.1 S4. A blocked sub-PR is merged as a carried block and the final PR lands `blocked` for it; it halts its chain only when it cannot be carried (`adw-build §3.7`) |
 | **failed** | a §4.8 progress condition fired — **fix**-cycle caps exhausted, repeated error signature, gate regression, diff oscillation, or stall — or an environment fault (including the 4h single-phase clock) | PR open **non-draft**, labelled, body per §6.1 S4 (last red output included). A failed sub-PR halts its chain |
 
@@ -864,12 +872,14 @@ assert that the thing which should go red still goes red.
 Intake, the §3.2 cut approval — where `approve` buys the cut *and* the build, so it is the
 only gate at which code consent is collected — reading the produced specs/plans (optional),
 then per PR targeting `develop`/`main`:
-review, `npm run preview` + visual verification, merge consent. Plus deploy and the
+review, `npm run preview` + visual verification, merge consent (for a `merge: hold` intent, or a
+PR the gate held). Plus deploy and the
 `develop → release → main` ritual, exploratory testing.
 
 **Removed from the human (now pipeline work):** diagnosis, design/spec/plan authoring and
 their critical passes, implementation, gate running, the fix cycle, review invocation,
-sub-PR merges inside a chain.
+sub-PR merges inside a chain, and the merge of a `merge: auto` intent's PRs into the default
+base behind `adw-build §3.7`'s gate.
 
 **Honest accounting.** Expect intake + cut approval + (per develop-targeting PR: review,
 preview, merge) + resolving `blocked`/`failed` exits. A single-PR intent is ~5 touchpoints
@@ -970,7 +980,8 @@ can see; the safe scope widens as stream A lands. That is a per-run decision, no
 milestone.
 
 **Not in v2:** automated Sentry/Trello intake (both blocked on a scheduler that does not
-exist), auto-merge of anything targeting `develop`/`main`, forking plugin skills. On the
+exist), forking plugin skills. Auto-merge is in, only behind `adw-build §3.7`'s gate, and never
+into the production branch. On the
 skills evidence: 21 symlinks in `.claude/skills/` point into `.agents/skills/`,
 `git ls-files .agents` returns **0**, and all share one mtime (`Jul 12 14:05`) — evidence
 of one copy operation, and deliberately *not* evidence that they have never run (reading a

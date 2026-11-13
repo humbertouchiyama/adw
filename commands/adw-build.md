@@ -63,14 +63,14 @@ plugin skills (`superpowers:*`), tracked commands
 (`.claude/skills/*` → `.agents/`) do not exist in worktrees — do not add such a
 reference in a future edit of this file.
 
-**Session-boundary provenance (adw-core §6 corollary):** the merge carve-out requires
-provenance THIS session established. After any session boundary — compaction that loses
-the run state, crash, or a fresh invocation — every already-open adw PR is human-owned:
-resume may build the next units, but it never merges a PR the current session did not
-itself open and carry to `ready` (or, for a carried block, to `blocked`: §3.7). **This binds
-hardest on a `ready` or `blocked` sub-PR still awaiting
-its §3.7 merge: if run state was lost, do not merge it — halt the chain and report it on
-the run report as human-owned.** Long runs compact (the 10-unit `subscription-locks` run did, 8 times);
+**The merge rests on durable facts (adw-core §6 corollary).** Never on what this session
+remembers: the spec's `merge:` flag (adw-core §2), the evidence block's `verified` row (§3.4), the
+`## Smoke result` walk line (§3.8) and the PR's labels. All four survive a compaction, a crash and
+a fresh invocation, so any run building this slug may merge one of its PRs when they allow it: an
+independent or final PR when §3.7's merge gate passes, a `ready` sub-PR, or a carried `blocked`
+one, when its head equals its `verified` row (§3.7). A head that moved off its `verified` row
+merges nowhere. A run never merges a PR of another slug. The owner who is testing a PR adds
+`adw:hold`, and no run merges it. Long runs compact (the 10-unit `subscription-locks` run did, 8 times);
 compaction is not schedulable from inside the loop, so the durable defences are the ones
 that survive it — §3.4's evidence block in the PR body, the `fix-attempt-N`/`fix(review):`
 prefixes step 7 recovers counts from, and re-deriving `$VSHA` and the base rather than
@@ -82,9 +82,8 @@ after a compaction, 15 of 45 had no evidence block (§3.4); before one, 6 of 160
 runs that compacted mid-run never read this file again (2026-09-20 to 10-01).
 
 **Never:** `git stash` (repo-global, shared across worktrees) · draft PRs (permanently
-review-ineligible) · merge anything targeting the default or production branch
-(`repo-profile §3`) · merge a PR whose
-provenance this session did not establish · resolve a sync conflict unattended · edit a
+review-ineligible) · merge into the production branch (`repo-profile §3`), or into the default
+base without §3.7's merge gate · resolve a sync conflict unattended · edit a
 gate file to get green · let a subagent create its own worktree.
 
 ## Phase 0 — resolve the contract
@@ -112,7 +111,7 @@ gate file to get green · let a subagent create its own worktree.
    shipped inside the file that might itself be stale. Two runs executed a superseded contract with
    it in place (design §10 v2.7, v2.12). Fetching before reading retires the whole class.
 
-2. Labels: run the two idempotent creates from adw-core §5.
+2. Labels: run the four idempotent creates from adw-core §5.
 3. Locate specs: `<specs-dir>/????-??-??-<slug>/` (multi-unit) or
    `<specs-dir>/????-??-??-<slug>.md` (single-unit flat) — **and the same two shapes under
    `<legacy-specs-dir>`** for an intent born before that repo's artifact-root cutover
@@ -127,7 +126,9 @@ gate file to get green · let a subagent create its own worktree.
    — parse both into one manifest.
 4. Parse every spec header (adw-core §2). Any missing required field, duplicate unit id,
    an `intent:` value that does not equal the slug, an `after` cycle, a `base:`
-   present on some units but not all (or with differing values), or a `shape: port` unit
+   present on some units but not all (or with differing values), a `merge:` present on some
+   units but not all (or with differing values, or a value other than `auto` or `hold`), a
+   `merge: auto` whose base is the production branch (`repo-profile §3`), or a `shape: port` unit
    whose depth is not D1, that shares a PR or sub-PR with another unit, or whose repo profile
    has no complete §20 (adw-core §2) → refuse the whole
    run, print what to fix, stop. No partial builds on a broken manifest.
@@ -140,7 +141,9 @@ gate file to get green · let a subagent create its own worktree.
    per-PR-type placeholder — a sub-PR still audits against `adw/<slug>`; do not conflate
    the two names. EXCEPT the consent boundary
    (adw-core §6: PRs targeting the default base, the production branch, OR the intent's base
-   branch all need the human), which always mean the literal branches. Non-default `INTENT_BASE`
+   branch all need the human), which always mean the literal branches: a PR into the intent's
+   base or the default base may merge only when the intent's specs say `merge: auto` and §3.7's
+   merge gate passes, and a PR into the production branch never. Non-default `INTENT_BASE`
    prints on the run report `note` row. Three straight runs needed a non-default base; run-5
    abandoned `/adw-build` for want of it — design v2.8.
 6. Reconstruct topology: independent PRs (respecting grouped packaging) + chains ordered
@@ -202,10 +205,12 @@ gate file to get green · let a subagent create its own worktree.
    closed-unmerged, across BOTH bases (`adw/<slug>` and `<INTENT_BASE>`; independent units
    target `<INTENT_BASE>` and are invisible to a chain-only listing); map head branch + title
    (`+`-separated unit field) → unit ids. Merged units are skipped. **A still-OPEN adw
-   PR for a unit of this intent (blocked/failed/ready from a prior session) is
-   human-owned** (see Session-boundary provenance): do not duplicate it, do not merge
-   it — its chain halts at that unit, the run-report line says `blocked #N — pre-existing PR
-   from a prior run; merge or close it, then re-run`. A CLOSED-unmerged adw PR is
+   PR for a unit of this intent (blocked/failed/ready from a prior session) goes through §3.7
+   like any other**, read from its labels and its evidence block (The merge rests on durable
+   facts, above): do not duplicate it. A `ready` one with a `verified` row equal to its head, or a
+   `blocked` one §3.7 can carry, merges by §3.7. Any other — no `verified` row equal to its head,
+   `failed`, a `blocked` one §3.7 cannot carry — halts its chain at that unit, and the run-report
+   line says `blocked #N — pre-existing PR from a prior run; merge or close it, then re-run`. A CLOSED-unmerged adw PR is
    owner-decided: do not rebuild — its chain halts `blocked` at that unit (run report: `closed
    by owner — reopen or re-cut, then re-run`) unless the unit's spec changed after the
    close. A pre-existing unit branch with no PR and NO registered worktree is stale
@@ -296,7 +301,7 @@ gate file to get green · let a subagent create its own worktree.
   its own: 581 lock commands across 9 sessions, four permission denials and 12 hours of owner time
   on one PR, and a three-hour stall on another when a verifier died holding the lock. The ban does
   not reach the lock `repo-profile §21`'s Lock row names: the repo's runner owns it, and a run waits
-  on it only where §3.8 says.
+  on it only where §3.7's merge gate and §3.8 say.
 
   **A sibling that merges first leaves its twin behind, and that is fine — do not rebase
   it.** Both branched from the same `origin/adw/<slug>`; when the first merges, the second is
@@ -825,6 +830,15 @@ pipeline knows:
   with a `fixed:` line still ending `, unconfirmed`, §3.8), and `<m>`,
   the minutes of every walk. No other PR carries the row.
 
+  Two more rows, each by one more `gh pr edit`, each replaced by the next write:
+  - `verified   <40-char sha>`: written at §3.7 when the PR reaches `ready`, or `blocked` with a
+    driver-returned `verified <sha7>`, from `$VSHA`, never from a fresh derivation. §3.7's merge
+    gate and its sub-PR procedure compare the head against it.
+  - `merge      merged <merge sha7> · base unmoved` or `· base trial ok at <base sha7>`, or
+    `merge      hold <n> — <reason> · at <head sha7>`: written by §3.7's merge gate on an
+    independent or final PR. `<n>` is the gate's condition number 1–9, or `call` for a denied or
+    failed merge call.
+
   `owner-wait` is the decisive one: it is the single bit that distinguishes a 21-hour
   owner gate from a 21-hour stalled pipeline. Git already exposes the *gap* via commit
   timestamps; only the attribution is missing, and three retros failed on exactly that
@@ -854,8 +868,9 @@ pipeline knows:
 
 Fork-point verification is the accepted bound: an independent/final PR is verified
 against its fork point, never re-synced to a base that moved afterwards (3.5
-declares that EXPECTED — design §4.8). The human merge gate owns the residual
-semantic-conflict risk.
+declares that EXPECTED — design §4.8). With `merge: hold`, the human merge gate owns the
+residual semantic-conflict risk. With `merge: auto`, the run owns it, through §3.7's trial
+against the base (step 2 and 3 of the merge gate).
 
 ### 3.5 Open the PR (always non-draft)
 
@@ -1101,9 +1116,8 @@ consent — and adds:
   /adw-build <slug> · ⏱ <N>m`. `failed` would libel a gate-green PR, and `blocked` is
   terminal, so Phase 3's not-terminal abort stops applying to it. (Run-2: an amendment
   pushed after review+verify closed the session as "reviewed clean · ready"; the PR then
-  collected two more review rounds.) Commits landing after the session ends are out of
-  reach by construction — Session-boundary provenance already makes such a PR
-  human-owned.
+  collected two more review rounds.) Commits landing after the session ends move the head
+  off its `verified` row, so no run merges that PR (§3.7).
 - **The `blocked` default line names adw**, not `/pr-ready`:
   `default: run /code-review <N> <tier> apply, then re-run /adw-build <slug>`. **One exception:**
   when `/pr-ready`'s reason is one of §5's open-findings reasons (`open:`, `fetch failed`,
@@ -1115,8 +1129,8 @@ consent — and adds:
 
 | State | Action |
 |---|---|
-| **ready** | independent/final PR: leave open, run report lists it — the human reviews, previews, merges. Sub-PR: merge it now, without asking (adw-core §6) — the merge procedure below, with `$VSHA` as the head |
-| **blocked** | label `adw:blocked`, PR body. Independent/final PR: leave open. Sub-PR → **carried**: merge it by the procedure below and build the next unit on its recommended default; the final PR answers for it (Phase 4). Sub-PR that cannot be carried (below) → chain halts; the halting PR's body lists every unbuilt unit of its chain |
+| **ready** | write the `verified` row (§3.4) from `$VSHA`. Independent/final PR: after §3.8 and its screenshot relay, the merge gate below; it merges on `pass`, else the PR stays open and the human reviews, previews, merges. Sub-PR: merge it now, without asking (adw-core §6) — the merge procedure below, with the `verified` row as the head |
+| **blocked** | label `adw:blocked`, PR body, and the `verified` row (§3.4) when the driver returned `verified <sha7>`. Independent/final PR: leave open. Sub-PR → **carried**: merge it by the procedure below and build the next unit on its recommended default; the final PR answers for it (Phase 4). Sub-PR that cannot be carried (below) → chain halts; the halting PR's body lists every unbuilt unit of its chain |
 | **failed** | label `adw:failed`, PR body with the last red gate output, non-draft. Sub-PR → chain halts, same bookkeeping |
 
 **A `blocked` or `failed` PR wears its label, checked.** After `gh pr edit <n> --add-label`,
@@ -1126,9 +1140,11 @@ that label alone.
 
 **Sub-PR merge procedure (adw-core §6 carve-out).** Two Bash calls, never one:
 
-1. Re-assert provenance: `gh pr view <n> --json baseRefName,headRefOid` must show base still
-   `adw/<slug>` and head equal to the expected sha. For a `ready` sub-PR that is `$VSHA`. For a
-   carried `blocked` sub-PR it is `$VSHA`, and the driver must have returned `verified <sha7>`
+1. Re-assert provenance: `gh pr view <n> --json baseRefName,headRefOid,body` must show base still
+   `adw/<slug>` and head equal to the expected sha: the evidence block's `verified` row (§3.4),
+   which a run wrote from `$VSHA`. The row survives a compaction and a new session, so a resumed
+   run merges a `ready` sub-PR, or carries a `blocked` one with a verified head, the same way. For a
+   carried `blocked` sub-PR the driver must have returned `verified <sha7>`
    (a port unit that is `port not converged` returns one too). A `blocked` sub-PR whose driver
    returned no `verified <sha7>` (a void such as `REVIEW NOT COMPLETE`, a driver that returned without its log, a stale-base abort) has no sha to compare: it is not carried, the chain
    halts `blocked`, never merge. Any mismatch → the chain halts `blocked`, never merge.
@@ -1166,6 +1182,64 @@ not print the block as a question and does not end its turn on it. Review cap wi
 left, an escalated finding, a gate-file diff, open findings `/pr-ready` §5 could not close: all
 carried. A carried gate-file diff is still in the final PR's diff, so §3.4's gate-file tripwire
 fires on the final PR and the owner signs it there.
+
+**The merge gate — independent and final PRs (adw-core §6).** It runs on a `ready` independent or
+final PR, after §3.8 and its screenshot relay, on every PR of the intent whatever its flag: the gate
+reads the flag itself (condition 1). Never on a sub-PR, never on a `blocked` or `failed` PR. The
+script is `scripts/adw-merge-gate.py` in the contract cache. Every step below writes the result as
+the evidence block's `merge` row (§3.4) with one `gh pr edit`, and a `hold` ends the gate: the PR
+stays open, the run-report line ends `· held <n>: <reason>` (adw-core §7), and the run goes on to
+its next unit. No label is added for a hold.
+
+1. **Check**, in one Bash call with `timeout: 600000` (the script stops polling after 7 minutes),
+   naming as a repo path the spec of every unit this PR carries: its title's unit field, and for a
+   final PR every unit of its chain. Phase 0 step 4 already refused a mixed `merge:` across the
+   intent. Every later call of this gate starts with this block's first line again: shell
+   variables do not survive between Bash calls.
+   ```bash
+   R="$(git rev-parse --show-toplevel)"; C="$R/.claude/adw/cache/scripts/adw-merge-gate.py"; test -f "$C" || C="$R/scripts/adw-merge-gate.py"
+   python3 "$C" check --repo "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" --pr <N> --profile "$R/.claude/repo-profile.md" --spec-path <spec path> [--spec-path <spec path> …]
+   ```
+   One line comes back. `pass` → step 2. `hold <n> <reason>` → write `merge      hold <n> — <reason>
+   · at <head sha7>` and stop. `hold 0 gate error: …` (exit 2) is a hold like any other, and so is
+   no line at all (the call was cut off): `hold 0 gate error: no line`.
+2. **Trial against the base**, one Bash call: step 1's first line, then `python3 "$C" trial
+   --checkout "$R" --pr <N> --slug <slug> --base <INTENT_BASE> --head <the verified row's sha>`. `base unmoved` → step 4, and the
+   row will end `· base unmoved`. `hold 6 …` → write the row and stop. `tree <path> base <sha>` →
+   step 3 in that tree.
+3. **Gates in the trial tree.** On a repo whose §21 has a Lock row, take the lock first with the
+   row's take command for `<slug>`, and release it with the row's release command when the gates
+   end; a lock another walk holds is waited on as §3.8 step 3's Queued step waits, and still held
+   at its deadline is `hold 6 lock held by <s>`. Provision the tree as `repo-profile §4` says, then
+   dispatch ONE agent, `model: sonnet`, with the tree path, `origin/<INTENT_BASE>` as the base and
+   the `repo-profile §5` gates the PR's diff obligates (`repo-profile §6`). It runs each gate in the
+   tree, writes every output under a `mktemp -d` directory outside the tree, edits nothing, and
+   returns one line per gate: `<gate> <exit code>`. Any non-zero exit, or a gate with no line →
+   `hold 6 gate <name> red`. Then, gates green or red, run step 1's first line, then `python3 "$C"
+   discard --checkout "$R" --tree <path>`, in one Bash call. Exit 1 leaves the tree for `/cleanup`;
+   print it on a `note` line, and it does not change the result. A later trial of the same PR
+   removes a leftover tree that is clean, and holds `0` on one that is not. Gates red → write the row and stop. Green → step 4, and the row will end
+   `· base trial ok at <base sha7>`.
+4. **The merge, two Bash calls.** First: `gh pr view <N> --json baseRefName,headRefOid,labels`
+   must show the base equal to `<INTENT_BASE>`, the head equal to the `verified` row, and no
+   `adw:hold` label. Any mismatch → `hold 2 base changed`, `hold 3 head moved` or `hold 1
+   adw:hold`, and stop. Second,
+   alone in its own Bash call, the sha written out as a literal: `gh pr merge <N> <flag>
+   --match-head-commit <full sha>`, where `<flag>` is `repo-profile §3`'s merge convention
+   (`squash` → `--squash`, `merge` → `--merge`, `rebase` → `--rebase`). No `--auto`, no
+   `--delete-branch`, no `cd`, `&&`, `;`, pipe or variable. Its `description` is `Merge #<N> into
+   <INTENT_BASE> (auto-merge gate passed)`.
+5. **Confirm**: `gh pr view <N> --json state,mergedAt` must print `MERGED` (`gh pr merge`'s exit
+   code is not reliable when a worktree holds the branch). Then `gh pr edit <N> --add-label
+   adw:auto-merged`, and write `merge      merged <merge sha7> · base unmoved` or `· base trial ok at
+   <base sha7>`. The run-report line is `merged` (adw-core §7).
+
+**A denied merge call** on an independent or final PR is a hold, not a block: write `merge      hold
+call — denied · at <head sha7>`, add no `adw:blocked` label, and the run-report line names the
+command for the owner to run: `held call: run ! gh pr merge <N> <flag> --match-head-commit <full
+sha>`. A `gh pr merge` that fails for another reason, or a confirm that does not print `MERGED`, is
+`hold call — <the gh error>`. Never re-shape a denied merge call. Sub-PR denial text is unchanged
+(above).
 
 ### 3.8 App smoke — independent and final PRs: walk, check, fix
 
@@ -1321,6 +1395,10 @@ check: it fixes nothing and changes no state. In a walk that passed:
 | `G<n>` | reported only: the runner could not walk that case, so no row says the app is wrong |
 | `S`, `P`, `I` | neither, as §21's Result row says |
 
+A row reported here and not fixed can still hold the merge: a `G<n>` that names an `AC-<n>` or a
+device a case needs, and any row the walk called `blocking`, whatever the check finds (§3.7's
+merge gate, condition 7).
+
 **Check each row before anyone fixes it: `review-core.md` §9's refutation pass.** The walk's
 verdict is a model reading a simulator screen, and no run has measured how often its `blocking` rows
 hold up. A second walk by the same runner is the same reading again. So when a walk has rows to
@@ -1382,7 +1460,8 @@ section and the evidence row before anything moves the head (smoke fix cycle ste
   `screens not posted — <reason>` adds `· ⚠ screens not posted — <reason>` after that flag, or alone
   when no other flag applies. Either form ends
   `· fixed <f>` when smoke fix cycles fixed `<f>` rows, and `· fixed <f>, <u> unconfirmed` when `<u>`
-  of those `fixed:` lines still end `, unconfirmed`.
+  of those `fixed:` lines still end `, unconfirmed`. A PR §3.7's merge gate then merges prints on
+  the `merged` row instead (adw-core §7), with `walk clean` in place of `smoke clean`.
 
 After each edit, check it, as §3.5 checks the evidence block:
 `gh pr view <N> --json body --jq .body | grep -c '^## Smoke result' || true` must print `1`.
@@ -1502,7 +1581,8 @@ code — catching a real auto-merge defect on the way, with no escalation raised
 
 Otherwise the final PR (`adw/<slug>` → `<INTENT_BASE>`) runs the FULL Phase 3 loop on the
 composition — gates, 3.4 verify against `origin/<INTENT_BASE>`, **and 3.6's review** — and
-waits `ready` for the one human consent. Its body's `## Screens` and `## For your check` join its
+lands `ready`. With `merge: auto`, §3.7's merge gate then merges it once §3.8 is done; with
+`merge: hold`, or a gate that holds, it waits for the one human consent. Its body's `## Screens` and `## For your check` join its
 units' lists (§3.5). After the carried blocks below are listed, it runs §3.8's
 app smoke on its verified head, with its smoke fix cycles: the one smoke of the chain. A smoke fix
 cycle's commits land on the integration branch from the close worktree, and its pushed head takes
@@ -1518,7 +1598,8 @@ A non-empty list → the final PR is `blocked`, never `ready`, whatever its own 
 Add `adw:blocked` to it, and put one line per carried sub-PR at the top of its body and on its
 run-report line: `carried #<n> <unit> — <the one-sentence reason>; default: <default>`. This is
 the chain's one stop: the owner answers every carried block and gives the merge consent in the
-same place. When the owner answers a carried block, apply the answer on the integration branch
+same place. A `blocked` final PR never meets §3.7's merge gate, whatever the flag: a carried block
+always waits for the owner. When the owner answers a carried block, apply the answer on the integration branch
 as its own commit (a default the owner accepts needs none), from the close worktree: Phase 5
 removed it when it was clean, so re-create it first, as Phase 5 says. An answer commit that changes
 code moves the head the final PR's `ready` was earned at, so the Phase 3 loop (3.4 verify
@@ -1647,5 +1728,6 @@ reported the PR's new state, run the cleanup call above again with the same flag
 last line and each `kept` line as `note` lines at the end of that report, not as a second run report: it removes the re-created worktree and the verify and review
 worktrees the fix made.
 
-Print the **run report exactly** (adw-core §7): one line per PR, ready → blocked → failed → unbuilt;
-`Next:` names the merge order. The report is the whole message — nothing else is printed, except that second cleanup's `note` lines.
+Print the **run report exactly** (adw-core §7): one line per PR, merged → ready → blocked → failed →
+unbuilt; `Next:` names the merge order, or, when every PR merged, `Next: when you test, gh pr list
+--state merged --label adw:auto-merged`. The report is the whole message — nothing else is printed, except that second cleanup's `note` lines.

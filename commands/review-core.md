@@ -281,7 +281,7 @@ included in a review's staged commit and never pushed as part of remediation.
 
 ## §8 — Local ship policy (commit / push / merge consent)
 
-An apply flag authorizes **editing the worktree**. Whether it also authorizes commit + push is the **local ship policy** (project config / CLAUDE.md / user memory / the invoking instructions / the skill's own declared policy). **Merge is never covered by any apply flag** — it always needs the explicit word.
+An apply flag authorizes **editing the worktree**. Whether it also authorizes commit + push is the **local ship policy** (project config / CLAUDE.md / user memory / the invoking instructions / the skill's own declared policy). **Merge is never covered by any apply flag** — it always needs the explicit word (or, for `adw-build` §3.7's merge gate only, an approved `merge   auto` line, below).
 
 - **Default: stage-only (fail-safe)** — binds any skill that does not declare its own policy. After apply + verify (§4), **stage the touched files and STOP.** The staged diff is the deliverable; the human ships. Surface commit / push / merge via the §5 surface (default: terminal gate; `interactive`: `AskUserQuestion`) and report `Action: applied + staged — awaiting your commit/push/merge consent`; never a fabricated "pushed"/"merged".
   - A generic affirmation ("do it", "go ahead", "yes") is **not** commit/push/merge consent — it authorizes only the single act just named.
@@ -289,7 +289,7 @@ An apply flag authorizes **editing the worktree**. Whether it also authorizes co
   - **Push-consent ≠ merge-consent.** Auto-ship ends at `push`. The §5 merge gate still runs.
   - **§7 still binds.** A blast-radius path or a failed gate falls back to comment-only — an auto-ship policy never overrides a safety stop.
   - **Re-runs push again.** A second `apply` on the same PR is a **new** commit + push (never amend, §1.3) — iterating is expected, not an anomaly.
-- **Merge needs explicit merge consent, always:** the word "merge" / "merge it" in the terminal gate, or selecting the Merge option under `interactive`. Nothing weaker counts — not `apply`, not "do it", not "go ahead".
+- **Merge needs explicit merge consent, always:** the word "merge" / "merge it" in the terminal gate, or selecting the Merge option under `interactive`. Nothing weaker counts — not `apply`, not "do it", not "go ahead". One more form, and only for `adw-build` §3.7's merge gate: the owner's `approve` on an `/adw-init` approval surface that printed `merge   auto` (adw-core §6, §7). It covers that intent's PRs once the gate passes, and nothing else.
 
 No apply flag ever implies merge. Every Phase-7 commit/push/merge step is read **through this section**.
 

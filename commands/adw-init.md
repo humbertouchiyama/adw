@@ -1,5 +1,5 @@
 ---
-description: "ADW entry point: intent → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init <intent>"
+description: "ADW entry point: intent → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init [--hold] <intent>"
 ---
 
 # /adw-init — from intent to contract, and on into the build
@@ -18,7 +18,10 @@ description: "ADW entry point: intent → triage → human-approved unit cut →
 > repo-agnostic: every value that could differ between repos is in `repo-profile.md`.
 
 **Input:** `$ARGUMENTS` — the intent: free text, a bug list, a report excerpt, a Trello
-ref. Empty → ask for the intent and stop.
+ref. Empty → ask for the intent and stop. A leading `--hold` is a flag, not intent text: strip
+it before anything reads the intent, and the intent gets `merge: hold` (adw-core §2) whatever
+triage proposes: the orchestrator applies it to triage's proposal before the first render, and
+the surface prints `merge   hold — --hold`.
 
 **Hard rules**
 - **Phases 0–5 are documents only.** No code edits, no branches, no worktrees — every
@@ -173,7 +176,9 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    propose `base: <branch>`
 >    (adw-core §2) after confirming it exists on origin; when the right base is itself
 >    doubtful (e.g. forking off another intent's still-open chain), return it as a
->    question, not a `⚠` or `fyi` line.
+>    question, not a `⚠` or `fyi` line. Beside it, propose `merge:` (adw-core §2):
+>    `merge: auto` when the base is the default base and `repo-profile §3`'s `auto-merge
+>    default` row says `on`, else `merge: hold` (no row is `hold`). One clause why.
 > Return the structured proposal, nothing else.
 
 **Extend mode appends this to the prompt** (Phase 0.5 matched a live intent) — without it
@@ -268,6 +273,11 @@ The orchestrator composes the pass's prompt from this text:
   and first chains the unit out of a shared PR or sub-PR; `none` leaves the depth at D1 until a
   `depth` verb moves it. Re-render the approval surface. `depth` never takes `port`, and refuses a
   `shape: port` unit: clear the shape first.
+- `merge auto` / `merge hold` → set the intent's `merge:` (adw-core §2) and re-render the approval
+  surface. `merge auto` refuses when the base is the production branch (`repo-profile §3`), and
+  overrides `--hold`. Every spec of the intent carries the value before the build starts: Phase
+  3's preamble writes it, and a D0 draft carries it in its header. `approve` on a surface that prints `merge   auto` is the owner's consent for that
+  intent's merges once the merge gate passes (adw-core §6, §7).
 - `new intent` (extend mode only) → drop the extension, cut a fresh slug, run the decide pass over
   its questions (first paragraph of this phase), re-render the approval surface.
 
@@ -309,7 +319,8 @@ with the most to discover), so blocking on it is a pure loss every time.
 > never code, never a branch. Spec path: `<exact path per adw-core §1>`. The spec MUST
 > open with the exact header block (adw-core §2):
 > `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`
-> when the unit was approved as `port`. Approved answers for this intent, one per line as
+> when the unit was approved as `port`, `base:` when the intent overrides it, and
+> `merge: <auto | hold>` as the gate printed it. Approved answers for this intent, one per line as
 > `QN — <question>: <answer>`: `<list>`. Follow each one that touches this unit and
 > record it in the spec under its `QN` id. The spec body
 > states: the problem, the change, acceptance criteria numbered `AC 1`, `AC 2`, … (adw-build §3.5's
@@ -455,6 +466,9 @@ Fix in place on any failure, except where a bullet says it only reports:
   existing units — prior units of the intent are legal targets — and is acyclic;
 - extend mode: exactly ONE dated spec folder for the slug (adw-core §1) and every new
   spec carries the intent's `base:`;
+- every spec of the intent carries the same `merge:` line, `auto` or `hold`, with the value the
+  gate printed; extend mode writes it into the prior units' specs too. `auto` with a base that
+  is the production branch is a failure: set `hold`;
 - every `verify:` is a non-empty command whose first token is on `repo-profile §5`'s allowlist;
   any other tool wraps in `bash -c '…'`;
 - **every D3 unit has a plan file; D0/D1/D2 units have none** — a plan file next to a D2
@@ -543,10 +557,10 @@ Three ordered steps, no discretion:
    bodies OUT of context:** do not re-read, quote or summarise them at the boundary, and
    drop the Phase 3 agents' returned text. Build's Phase 0 resolves every spec from disk
    itself, and the whole cost of collapsing the round-trip is that build no longer starts
-   on a fresh window — the `subscription-locks` run compacted 8 times, and adw-build's
-   session-boundary rule (§ "Session-boundary provenance") turns a mid-chain compaction
-   into a halt with a `ready` sub-PR left human-owned. Carrying init's spec text into build
-   buys nothing and pays that cost directly.
+   on a fresh window — the `subscription-locks` run compacted 8 times, and every compaction
+   drops the contract text the run needs next. A compaction no longer leaves a `ready` sub-PR
+   to the owner: its `verified` row lets the resumed run merge it (adw-build §3.7). Carrying
+   init's spec text into build buys nothing and pays that cost directly.
 
 Unanswered `needs you` items on the handoff ship with the recommended default, recorded in the
 spec — but note that an unanswered item is exactly what step 1 stops on, so this applies to a later

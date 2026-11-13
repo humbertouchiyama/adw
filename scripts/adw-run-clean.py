@@ -7,12 +7,15 @@ The run names everything it creates after its slug, so the slug is the whole sco
   adw-close-<slug>               chain close worktree    adw-build Phase 4
   pr-ready-<slug>-uNN|close-v<k> verify worktree         pr-ready §4.3, REF from adw-build §3.4
   pr-<N>                         review worktree         review-core §1.1, one per --pr
+  adw-trial-<slug>-pr<N>         base-trial worktree     adw-merge-gate.py trial, adw-build §3.7
   Xcode DerivedData whose WorkspacePath is inside one of those worktrees, once it is gone
 
 A worktree is removed only when every guard holds. Any doubt keeps it and prints why:
 no process names its path; its HEAD is on a remote ref (or is the head of a merged PR); and
 it has no change except a --provisioned file. A verify worktree is a throwaway checkout of a
-pushed sha, so its gate output is reset first, exactly as pr-ready §4.3 does. Never --force.
+pushed sha, so its gate output is reset first, exactly as pr-ready §4.3 does. A trial worktree's HEAD
+is a local merge commit, so it goes when every parent of that commit is on a remote ref, and its gate
+output is reset the same way. Never --force.
 
 Exit codes: 0 ran (kept items are not errors) · 1 --repo is not inside a git checkout · 2 bad flag.
 """
@@ -43,6 +46,7 @@ def scope(slug, prs):
         ("unit", re.compile(rf"^adw-{s}-{units}$"), lambda n: "adw/" + n[len("adw-"):]),
         ("close", re.compile(rf"^adw-close-{s}$"), lambda n: f"adw/{slug}"),
         ("verify", re.compile(rf"^pr-ready-{s}-(?:{units}|close)-v\d+$"), None),
+        ("trial", re.compile(rf"^adw-trial-{s}-pr\d+$"), None),
     ]
     for n in prs:
         out.append(("review", re.compile(rf"^pr-{n}$"), None))
@@ -117,6 +121,18 @@ def gb(kb):
 def on_remote(wt):
     rc, out, _ = git("for-each-ref", "--contains", "HEAD", "--format=%(refname)", "refs/remotes", cwd=wt)
     return rc == 0 and bool(out.strip())
+
+
+def parents_on_remote(wt):
+    rc, out, _ = git("rev-list", "--parents", "-n", "1", "HEAD", cwd=wt)
+    parents = out.split()[1:] if rc == 0 else []
+    if not parents:
+        return False
+    for sha in parents:
+        rc, refs, _ = git("for-each-ref", "--contains", sha, "--format=%(refname)", "refs/remotes", cwd=wt)
+        if rc != 0 or not refs.strip():
+            return False
+    return True
 
 
 def prs_for(branch, main):
@@ -214,6 +230,10 @@ def clean_worktrees(main, kinds, provisioned, dry, procs, here):
             if not on_remote(path) and not covered(path, prs):
                 keep("HEAD is on no remote ref and is no PR's head")
                 continue
+        elif kind == "trial":
+            if not parents_on_remote(path):
+                keep("a parent of its merge commit is on no remote ref")
+                continue
         elif not on_remote(path):
             # A review worktree pushes its apply fixes, so its PR's head can cover a pruned branch.
             prs = pr_by_number(name[len("pr-"):], main) if kind == "review" else None
@@ -226,7 +246,7 @@ def clean_worktrees(main, kinds, provisioned, dry, procs, here):
             continue
         dirty_prov = [p for st, p in items if st == " M" and p in provisioned]
         other = [p for st, p in items if not (st == " M" and p in provisioned)]
-        if other and kind != "verify":
+        if other and kind not in ("verify", "trial"):
             keep("uncommitted: " + ", ".join(other[:3]) + (" …" if len(other) > 3 else ""))
             continue
 
@@ -236,7 +256,7 @@ def clean_worktrees(main, kinds, provisioned, dry, procs, here):
             removed_kb += kb
             print(f"would remove  {name}  {gb(kb)}")
             continue
-        if kind == "verify":
+        if kind in ("verify", "trial"):
             steps = [("reset", "-q", "--hard", "HEAD"), ("clean", "-fdq")]
         else:
             steps = [("checkout", "--", *dirty_prov)] if dirty_prov else []

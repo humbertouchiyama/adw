@@ -21,7 +21,7 @@ the consuming repo's `.claude/repo-profile.md`, cited below as `repo-profile §N
 
 Examples: `/pr-ready 838` · `/pr-ready 838 apply` · `/pr-ready 839 apply interactive`.
 
-**This command never merges.** Merge needs the explicit word, every time (`review-core.md` §8).
+**This command never merges.** Merge needs the explicit word, every time, except behind `adw-build` §3.7's merge gate on an approved `merge   auto` line (`review-core.md` §8).
 
 ---
 
@@ -617,7 +617,8 @@ and the verdict, which is exactly when the line would be a lie, and it is the ch
 possible check: one `rev-parse` against a value already in hand.
 
 `ready` here means *the gates and the review agree at this SHA* — it is not merge
-approval. The human owns the merge, and is free to merge over a `blocked` verdict; the
+approval. The human owns the merge, except where an approved `merge   auto` line hands it to
+`adw-build` §3.7's merge gate (`review-core.md` §8), and is free to merge over a `blocked` verdict; the
 verdict's job is to stop **the runner** from claiming a clean state it did not verify.
 
 ### §8 Cleanup
