@@ -38,7 +38,8 @@ running the intent here and a subagent.
   to another repo, or the owner said he does not want it here.
 
 An ADW run always qualifies for a pane: `/adw-init` ends at an approval surface that only the
-owner answers.
+owner answers, or, for a one-unit `--followup` whose gate adw-init Phase 2 skips, builds and merges
+on the owner's typed line.
 
 ## 2. `status`
 
@@ -135,7 +136,8 @@ The Rules lines, verbatim:
 - `Task: adw` — `Read .claude/commands/adw-init.md in this repo and follow it: it is the
   /adw-init command. Run it with the Intent section as the intent. Treat every line under
   "Decided by the owner" as already decided. Stop at the approval surface and wait for the
-  owner in this pane. There your status is blocked and your one line is "approval surface ready".`
+  owner in this pane. There your status is blocked and your one line is "approval surface ready".
+  A `--followup` whose gate adw-init Phase 2 skips has no surface: it builds.`
 - `Task: free` — `Do the Intent. Write any long result to a file and print its path. Do not
   summarise long output in the pane.`
 - Always — `Never merge a PR unless the Intent says so in those words, or adw-build §3.7's gate merges it.`

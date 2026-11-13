@@ -750,7 +750,7 @@ per-PR `owner-wait` of adw-build §3.4's evidence block is not, and it defaults 
 by subtraction rather than by summing work intervals is deliberate: a halt nobody
 stamped inflates `machine`, which reads as the pipeline's own cost and gets
 investigated — the failure direction that self-corrects. `/adw-build` reached through
-`approve` continues the same T-series rather than restarting it — one invocation
+`approve`, or through a `--followup` whose gate adw-init Phase 2 skipped, continues the same T-series rather than restarting it — one invocation
 the owner experiences as one run reports as one run. A build reached by a fresh
 `/adw-build` starts its own series with `gate 0m`.
 

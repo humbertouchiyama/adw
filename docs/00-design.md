@@ -474,7 +474,9 @@ as a *carried block*, and the final PR answers for it — a chain asks the owner
 final PR (`adw-core §6`, `adw-build §3.7`). Widened past it once, in the auto-merge design the
 owner approved on 2026-10-30: an independent or final PR of an intent whose approved surface
 printed `merge   auto` merges into `develop` when `adw-build §3.7`'s merge gate passes, and the
-approved line is that consent (`adw-core §6`). `main`, the production branch, never. (Operational note: `gh pr merge --auto`
+approved line is that consent (`adw-core §6`). The same design lets a one-unit `--followup` with
+nothing to ask skip the surface: the typed line is that consent (`adw-init` Phase 2). `main`, the
+production branch, never. (Operational note: `gh pr merge --auto`
 merges immediately in this repo — checks are not a hard gate — which is the desired
 behaviour here since the loop's own gates are the gate.)
 

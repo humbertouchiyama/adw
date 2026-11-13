@@ -25,32 +25,44 @@ them before anything reads the intent.
   orchestrator applies it to triage's proposal before the first render, and the surface prints
   `merge   hold — --hold`.
 - `--followup <slug>` → a small follow-up to a merged intent (adw-core §1.1). `<slug>` must name a
-  merged intent: at least one adw PR of it merged into a base, and none open.
+  merged intent: a kebab-case slug, at least one adw PR of it merged into the default base
+  (`repo-profile §3`), none open, and no unbuilt spec of it in the main tree. The four counts must
+  read `1`, at least `1`, `0`, `0`:
 
   ```bash
-  # <slug> literal. First line: merged into a base (not into an adw/ branch), ≥1. Second: open, 0.
-  gh pr list --state merged --limit 1000 --json headRefName,baseRefName --jq '.[] | select(.baseRefName | startswith("adw/") | not) | .headRefName' | grep -cE '^adw/<slug>(-u[0-9][0-9+u]*)?$'
-  gh pr list --state open --limit 1000 --json headRefName --jq '.[].headRefName' | grep -cE '^adw/<slug>(-u[0-9][0-9+u]*)?$'
+  # <slug> literal; <default base> is repo-profile §3's value, <specs-dir> and <legacy-specs-dir> are §2's
+  git fetch -q origin
+  printf '%s\n' '<slug>' | grep -cE '^[a-z0-9]+(-[a-z0-9]+)*$'
+  gh pr list --state merged --base <default base> --limit 5000 --json headRefName --jq '.[].headRefName' | grep -cE '^adw/<slug>(-u[0-9][0-9+u]*)?$'
+  gh pr list --state open --limit 5000 --json headRefName --jq '.[].headRefName' | grep -cE '^adw/<slug>(-u[0-9][0-9+u]*)?$'
+  git status --porcelain <specs-dir> <legacy-specs-dir> | grep '^??' | grep -cE -- '[0-9]{4}-[0-9]{2}-[0-9]{2}-<slug>(/|\.md$)'
   ```
 
-  Either count wrong → drop the flag (`<slug>` is not intent text either), print `⚠ --followup
+  Any count wrong → drop the flag (`<slug>` is not intent text either), print `⚠ --followup
   <slug>: not a merged intent — the gate stays` on the approval surface, and run as a plain intent,
-  Phase 0.5 included. Otherwise the intent's slug is `<slug>-f<k>`: `<k>` is one more than the
-  highest `-f<k>` of `<slug>` among the repo's PR branches, remote branches and spec folders, and
-  `1` when this prints nothing:
+  Phase 0.5 included. An intent that merged into another base, or still has an open PR or an unbuilt
+  spec, is live: it is extended, not followed up. Otherwise mint the intent's slug with this block,
+  in one Bash call, and use the name it prints:
 
   ```bash
-  # <slug> literal; <specs-dir> and <legacy-specs-dir> are repo-profile §2's values
-  { { gh pr list --state all --limit 1000 --json headRefName --jq '.[].headRefName'
-      git ls-remote --heads origin 'adw/*' | sed 's|.*refs/heads/||'; } \
-      | sed -nE 's#^adw/<slug>-f([0-9]+)(-u[0-9][0-9+u]*)?$#\1#p'
-    ls <specs-dir> <legacy-specs-dir> 2>/dev/null \
-      | sed -nE 's#^[0-9]{4}-[0-9]{2}-[0-9]{2}-<slug>-f([0-9]+)(\.md)?$#\1#p'; } | sort -n | tail -1
+  # <slug> literal; <default base> is repo-profile §3's value, <specs-dir> and <legacy-specs-dir> are §2's
+  max=$( { { gh pr list --state all --limit 5000 --json headRefName --jq '.[].headRefName'
+             git ls-remote --heads origin 'adw/*' | sed 's|.*refs/heads/||'; } \
+             | sed -nE 's#^adw/<slug>-f([0-9]+)(-u[0-9][0-9+u]*)?$#\1#p'
+           { git ls-tree --name-only origin/<default base> -- <specs-dir>/ <legacy-specs-dir>/
+             ls <specs-dir> <legacy-specs-dir>; } 2>/dev/null | sed 's|.*/||' \
+             | sed -nE 's#^[0-9]{4}-[0-9]{2}-[0-9]{2}-<slug>-f([0-9]+)(\.md)?$#\1#p'; } | sort -n | tail -1 )
+  R="$(git rev-parse --path-format=absolute --git-common-dir)/adw-followups"; mkdir -p "$R"
+  k=$(( ${max:-0} + 1 )); until mkdir "$R/<slug>-f$k" 2>/dev/null; do k=$((k + 1)); done
+  echo "<slug>-f$k"
   ```
 
-  The weekly reader finds a merged PR that got a follow-up by that suffix, so a follow-up slug is
-  never minted any other way. Phase 0.5 skips its live-intent search, triage gets the follow-up
-  paragraph (Phase 1), and Phase 2 decides whether the gate is skipped.
+  `<k>` is one more than the highest `-f<k>` of `<slug>` among PR branches, remote branches and spec
+  names, on origin and in the main tree. The `mkdir` reserves the number, so two follow-ups started
+  at once never share one; a reserved number a run abandons is skipped, not reused. The weekly
+  reader finds a merged PR that got a follow-up by that suffix, so a follow-up slug is never minted
+  any other way. Phase 0.5 skips its live-intent search, triage gets the follow-up paragraph with
+  the merged specs (Phase 1), and Phase 2 decides whether the gate is skipped.
 
 **Hard rules**
 - **Phases 0–5 are documents only.** No code edits, no branches, no worktrees — every
@@ -233,11 +245,12 @@ the triage re-diagnoses shipped code and mints blind neighbours:
 > invisible to every gate and is the whole reason extension beats a fresh slug.
 
 **Follow-up mode appends this to the prompt** (a `--followup` that passed Input's checks), with the merged intent's
-spec paths from `git ls-tree -r --name-only origin/<base> -- <specs-dir> <legacy-specs-dir> | grep -E
--- '/[0-9]{4}-[0-9]{2}-[0-9]{2}-<slug>(/|\.md$)'`:
+spec paths from `git ls-tree -r --name-only origin/<default base> -- <specs-dir> <legacy-specs-dir> |
+grep -E -- '/[0-9]{4}-[0-9]{2}-[0-9]{2}-<slug>(/|\.md$)'` (`<default base>` is `repo-profile §3`'s;
+Input checked that the intent merged there):
 
 > This is a FOLLOW-UP to the merged intent `<slug>`, under the new slug `<slug>-f<k>`. Its specs:
-> `<paths>`, read with `git show origin/<base>:<path>`. Read them before proposing anything. Cut
+> `<paths>`, read with `git show origin/<default base>:<path>`. Read them before proposing anything. Cut
 > as for any intent. The owner asked for one small change: propose `express` (D0) when every D1
 > criterion holds, and never shrink or stretch the cut to reach it.
 
@@ -284,9 +297,14 @@ The orchestrator composes the pass's prompt from this text:
 > `<Q<N> — question — triage's default>`, one per line
 
 **`--followup` skip test — after the decide pass, before the first render.** It applies only to a
-`--followup` that passed Input's checks. The gate is skipped only when all three hold: triage cut exactly one unit and proposed it `express` (D0); no question is
-`ask`; and no `⚠` line would print on the approval surface. Then the surface does not print and
-nothing waits. The owner's typed `--followup` line is the consent to build that unit and to merge
+`--followup` that passed Input's checks. The gate is skipped only when all three hold:
+
+1. triage cut exactly one unit and proposed it `express` (D0);
+2. no question is `ask`;
+3. no `⚠` line would print on the approval surface, except adw-core §7's `⚠ spec criteria covered
+   by no unit: none`. An orchestrator above sonnet prints its tier `⚠` line, so it keeps the gate.
+
+Then the surface does not print and nothing waits. The owner's typed `--followup` line is the consent to build that unit and to merge
 it under adw-build §3.7's gate when the intent is `merge: auto` (adw-core §6): the owner asked for
 small follow-ups to skip this step. Freeze the proposal as `approve` does and go to Phase 3. The
 intent's `merge:` is triage's proposal, or `hold` under `--hold`, and the handoff prints it with
