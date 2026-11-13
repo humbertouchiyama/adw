@@ -190,7 +190,8 @@ decide pass and, since 2026-10-22, every later question of the run (§6.1 rule 4
 the unit cut, a **depth** per unit, and a **packaging** per unit (§3.5). Nothing expensive
 runs before approval — the per-unit front-end (§3.3) can cost more than the implementation,
 and burning it on a mis-cut is the failure this gate exists to prevent. The one exception is a
-`--followup` that triage cuts to one `express` unit with nothing to ask and no `⚠` line: the
+`--followup` that triage cuts to one `express` unit with nothing to ask and no `⚠` line other than
+`spec criteria covered by no unit: none`: the
 human's typed line is the approval, and there is no front-end to burn (adw-init Phase 2).
 
 **Depth ladder** — proposed per unit, overridable at the gate:

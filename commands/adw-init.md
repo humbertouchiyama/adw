@@ -302,7 +302,8 @@ The orchestrator composes the pass's prompt from this text:
 1. triage cut exactly one unit and proposed it `express` (D0);
 2. no question is `ask`;
 3. no `⚠` line would print on the approval surface, except adw-core §7's `⚠ spec criteria covered
-   by no unit: none`. An orchestrator above sonnet prints its tier `⚠` line, so it keeps the gate.
+   by no unit: none`. An orchestrator above sonnet, or of `unknown` tier, prints its tier `⚠` line
+   (adw-core §8), so it keeps the gate.
 
 Then the surface does not print and nothing waits. The owner's typed `--followup` line is the consent to build that unit and to merge
 it under adw-build §3.7's gate when the intent is `merge: auto` (adw-core §6): the owner asked for
