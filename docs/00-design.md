@@ -66,7 +66,8 @@ and exploratory testing. §6 is the authoritative list and this line must not dr
   with AI while estimating themselves 20% faster. Any speed claim here is unfounded.
 - **Not more PRs.** PR count is an output of the packaging rule (§3.5), never a goal.
 - Does not remove design authority. The human approves the cut and owns every merge, except
-  where an approved `merge   auto` line hands an intent's merges to `adw-build §3.7`'s gate.
+  where an approved `merge   auto` line hands an intent's merges to `adw-build §3.7`'s gate. A
+  one-unit `--followup` is approved by the line the human typed (adw-init Phase 2).
 
 ---
 
@@ -188,7 +189,10 @@ decide pass and, since 2026-10-22, every later question of the run (§6.1 rule 4
 `/adw-init` then runs **one cheap triage agent** over the intent and prints a proposal:
 the unit cut, a **depth** per unit, and a **packaging** per unit (§3.5). Nothing expensive
 runs before approval — the per-unit front-end (§3.3) can cost more than the implementation,
-and burning it on a mis-cut is the failure this gate exists to prevent.
+and burning it on a mis-cut is the failure this gate exists to prevent. The one exception is a
+`--followup` that triage cuts to one `express` unit with nothing to ask and no `⚠` line other than
+`spec criteria covered by no unit: none`: the
+human's typed line is the approval, and there is no front-end to burn (adw-init Phase 2).
 
 **Depth ladder** — proposed per unit, overridable at the gate:
 
@@ -471,7 +475,9 @@ as a *carried block*, and the final PR answers for it — a chain asks the owner
 final PR (`adw-core §6`, `adw-build §3.7`). Widened past it once, in the auto-merge design the
 owner approved on 2026-10-30: an independent or final PR of an intent whose approved surface
 printed `merge   auto` merges into `develop` when `adw-build §3.7`'s merge gate passes, and the
-approved line is that consent (`adw-core §6`). `main`, the production branch, never. (Operational note: `gh pr merge --auto`
+approved line is that consent (`adw-core §6`). The same design lets a one-unit `--followup` with
+nothing to ask skip the surface: the typed line is that consent (`adw-init` Phase 2). `main`, the
+production branch, never. (Operational note: `gh pr merge --auto`
 merges immediately in this repo — checks are not a hard gate — which is the desired
 behaviour here since the loop's own gates are the gate.)
 
@@ -870,7 +876,8 @@ assert that the thing which should go red still goes red.
 ## 6. What stays manual
 
 Intake, the §3.2 cut approval — where `approve` buys the cut *and* the build, so it is the
-only gate at which code consent is collected — reading the produced specs/plans (optional),
+only gate at which code consent is collected, except a one-unit `--followup`, whose typed line
+gives it — reading the produced specs/plans (optional),
 then per PR targeting `develop`/`main`:
 review, `npm run preview` + visual verification, merge consent (for a `merge: hold` intent, or a
 PR the gate held). Plus deploy and the
