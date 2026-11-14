@@ -560,6 +560,13 @@ than dropping the gate, and carry the narrowing as a flag (adw-build §3.2) — 
 practice, not a concession to a clock. Baseline-red is the one exception (§4.2's own
 `⚠ no trustworthy gate` flag, and `⚠ baseline red` for a red proved at `<BASE>`).
 
+**Slow gates run where they count (2026-11-14).** A profile can mark a gate `[slow]` (`repo-profile
+§5`). The implementer and `/code-review apply` skip a marked gate; the independent pass, the merge
+gate's trial, the base-red relay and a smoke fix agent run it. An implementer-side run of a slow
+gate duplicated the pass that followed it, and in one repo a single simulator suite added about ten
+minutes to every pass of a unit whose diff obligated it. In a fix cycle that a marked gate's red
+started, the implementer runs that gate to confirm its fix (adw-build §3.2).
+
 **App smoke (TRIAL, 2026-10-19).** No gate looks at the running app, and on a native client the
 gates cannot render native chrome at all. Where `repo-profile §21` declares a runner, every independent
 and final PR (never a sub-PR) gets one walk of the
@@ -652,6 +659,12 @@ head holds the weakened files, and only the final PR's restore from `origin/deve
 The verifier's value is that gates are re-executed in a process whose transcript the
 implementer never touched. It is not an agent judging whether another agent finished.
 
+**One pass per tree (2026-11-14).** The post-review re-pass reuses the pre-PR pass when the head
+still equals that pass's verified SHA (`/pr-ready` §4.0). The check is mechanical: a fetch, then the
+literal SHA against the remote head. Over 30 days of runs, re-running the gates on an unchanged
+tree found no real defect; the reds the re-runs did find came after the code changed. A head that
+moved by any commit still gets a full pass, and the void rule is unchanged.
+
 ### 4.6 Review runs after the PR opens
 
 `/code-review` is PR-keyed end to end — its input is a PR number, Phase 1 runs
@@ -689,7 +702,7 @@ merge — that nothing checks.
 
 | State | Meaning | Result |
 |---|---|---|
-| **ready** | gates re-verified green in a clean checkout **after the review loop's last push** | independent/final PR: merged by `adw-build §3.7`'s gate when the intent says `merge: auto` and the gate passes; else open, awaits human merge. Sub-PR: merged into the integration branch (§4.1 carve-out), chain continues |
+| **ready** | gates verified green in a clean checkout **at the exact head**: by a pass after the review loop's last push, or by an earlier pass with no commit after it (§4.5, `/pr-ready` §4.0) | independent/final PR: merged by `adw-build §3.7`'s gate when the intent says `merge: auto` and the gate passes; else open, awaits human merge. Sub-PR: merged into the integration branch (§4.1 carve-out), chain continues |
 | **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), the 16-boundary cap fired (condition 6 — gate-green but unconverged), or the app smoke left a defect its refuter confirmed and no smoke fix cycle fixed (adw-build §3.8) | PR open, labelled, body per §6.1 S4. A blocked sub-PR is merged as a carried block and the final PR lands `blocked` for it; it halts its chain only when it cannot be carried (`adw-build §3.7`) |
 | **failed** | a §4.8 progress condition fired — **fix**-cycle caps exhausted, repeated error signature, gate regression, diff oscillation, or stall — or an environment fault (including the 4h single-phase clock) | PR open **non-draft**, labelled, body per §6.1 S4 (last red output included). A failed sub-PR halts its chain |
 

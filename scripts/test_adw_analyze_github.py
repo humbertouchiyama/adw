@@ -32,6 +32,11 @@ class Block(unittest.TestCase):
         self.assertEqual(rows["gates"], "g1 0 · g2 0 · g4 0 (base red: SnapshotTest — pré-existente)")
         self.assertTrue(rows["contract"].startswith("abc1234def"))
 
+    def test_reused_reverify_phases_row_parses(self):
+        rows, n = github.parse_block("```\n%s\n```" % BLOCK.replace("reverify 6m", "reverify reused v1"))
+        self.assertEqual(n, 1)
+        self.assertEqual(rows["phases"], "implement 9m · gates 14m · verify 7m · review 21m · reverify reused v1")
+
     def test_two_blocks_counted(self):
         rows, n = github.parse_block(f"```\n{BLOCK}\n```\nold:\n```\ncontract   0000000\nowner-wait 9m\n```")
         self.assertEqual(n, 2)

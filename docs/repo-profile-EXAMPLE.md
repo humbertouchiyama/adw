@@ -174,6 +174,18 @@ Run in the worktree. `<BASE>` is the caller's diff anchor.
 
 **Gate commands with `cd` run as subshells** against the worktree path — never a bare persistent `cd`.
 
+### Slow gates — the `[slow]` marker
+
+Start a gate's Notes cell with `[slow]` to mark it slow. The `/adw-build` implementer and
+`/code-review apply` do not run a marked gate. The independent pass (`/pr-ready` §4) runs it on
+every pass, and so does every other gate runner (`review-core.md` §4). Mark a gate only
+when both hold:
+
+- its usual run takes several minutes, measured from your runs, not guessed;
+- a unit's `verify` command lets an implementer iterate without it.
+
+No gate in this example carries the marker: none runs several minutes per pass here.
+
 ### The audit gate
 
 Two invocations, one script, and the argument depends on who is calling:

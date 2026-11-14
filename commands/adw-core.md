@@ -118,6 +118,8 @@ Rules:
   whole-tree type check is a complete proof for a rename; `grep -rn <deleted-symbol>` expecting 0
   hits proves a deletion. Where a real test can express it, emit the test. The first token must be
   on `repo-profile §5`'s allowlist, and `repo-profile §12`'s single-test traps bind the form.
+  The implementer does not run a gate `repo-profile §5` marks `[slow]` (adw-build §3.2), so write
+  `verify` to check the unit's behaviour without that gate: it is what the implementer iterates on.
 - `after` names only units of the same intent; the graph must be acyclic.
 - **`base:` is optional** (so is `shape:`, below) — the branch the whole intent forks from and its
   PRs target. Omitted = `repo-profile §3`'s default base. Intent-wide: every spec of one intent
@@ -881,7 +883,7 @@ important the unit is:
 | **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file; the app smoke's fix agent (adw-build §3.8) is one | `sonnet` |
 | **Author** — write a spec, a plan, or production code | **keyed on the unit's `depth:`** — `opus` at D3, `sonnet` at D0–D2 |
 | **Decide** — settle each gate question or hand it to the owner (`adw-init.md` Phase 2) | `opus`; `sonnet` when every unit is D0–D1. A wrong `decided` builds unseen |
-| **Drive** — run `/pr-ready <N> apply` end to end for one PR (tier, review cycles, the post-review re-pass, evidence, verdict, cleanup) and return its machine line | `sonnet` |
+| **Drive** — run `/pr-ready <N> apply` end to end for one PR (tier, review cycles, the post-review re-pass or its reuse on an unchanged head, evidence, verdict, cleanup) and return its machine line | `sonnet` |
 | **Adjudicate** — triage a returned finding against `review-core.md` §3.1's bar (`code-review.md` Phase 6) | the tier of the session running `/code-review` — the §3.6 driver, `sonnet`. It is a check against a written bar, a Find job. A finding the bar does not dispose of clears the escalation gate and goes to the **human** as `blocked` with a default; no tier is dispatched to decide it, and no rule in `code-review.md` or `review-core.md` dispatches one |
 
 Write the tier out even where it equals the session's; **an omitted `model:` is a defect
