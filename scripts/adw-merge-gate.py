@@ -123,14 +123,16 @@ class Profile:
         s3 = self.sections.get("3", {})
         auto = s3.get("auto-merge default")
         self.auto = auto.replace("`", "").strip().lower() if auto is not None else None
-        self.has_protected = "merge-protected paths" in s3
+        # A row whose cell holds no glob in backticks protects nothing, so it counts as no row.
+        self.has_protected = bool(ticks(s3.get("merge-protected paths", "")))
         self.protected = [glob_re(g) for g in ticks(s3.get("merge-protected paths", ""))]
         ui = s3.get("ui paths")
-        self.ui = [glob_re(g) for g in ticks(ui)] if ui is not None else None
+        self.ui = [glob_re(g) for g in ticks(ui)] if ui is not None and ticks(ui) else None
         self.production = (ticks(s3.get("production branch", "")) or [None])[0]
         self.default_base = (ticks(s3.get("default base", "")) or [None])[0]
         self.excluded = [glob_re(g) for g in re.findall(r"':!([^']+)'", self.sections.get("2", {}).get("artifact exclusion pathspec", ""))]
         money = self.sections.get("11", {}).get("money", "")
+        self.money_unreadable = "money" in self.sections.get("11", {}) and not ticks(money)
         self.money_prefix = ticks(money)[0] if "path prefix" in money and ticks(money) else None
         pattern = ticks(money)[0].replace("\\|", "|") if ticks(money) and not self.money_prefix else None
         self.money = re.compile(pattern) if pattern else None
@@ -284,7 +286,9 @@ def paths(profiles: list[Profile], files: list[dict]) -> None:
     """Every safety row is read from both the local and the base copy of the profile, the stricter wins."""
     for prof in profiles:
         if not prof.has_protected:
-            raise Hold(4, "the profile has no merge-protected paths row")
+            raise Hold(4, "the profile has no merge-protected paths row with a glob in backticks")
+        if prof.money_unreadable:
+            raise Hold(4, "the profile's money row has no pattern in backticks")
     for f in files:
         for p in sorted(f["paths"]):
             if any(matches(prof.protected, p) for prof in profiles):
@@ -360,7 +364,7 @@ def walk(pr) -> None:
         raise Hold(7, "the smoke row's audit is %s" % (audit.group(1) if audit else "missing"))
     checked = {}
     for line in result.splitlines():
-        m = re.match(r"^[ \t]*(?:[-*][ \t]+)?(valid|unchecked|refuted|polish|fixed):[ \t]*(\S*)", line)
+        m = re.match(r"^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(valid|unchecked|refuted|polish|fixed):[ \t]*(\S*)", line)
         if not m:
             continue
         if m.group(1) in ("valid", "unchecked"):
@@ -368,10 +372,10 @@ def walk(pr) -> None:
         if m.group(1) == "fixed" and "unconfirmed" in line:
             raise Hold(7, "a fix is not confirmed by a walk: %s" % line.strip()[:80])
         checked.setdefault(m.group(2).rstrip(",:"), set()).add(m.group(1))
-    devices = re.search(r" · devices ([\w,.-]+)", first)
+    devices = re.search(r" · devices ([^·]+?)[ \t]*(?: · |$)", first)
     if not devices:
         raise Hold(7, "the walk line names no devices")
-    tokens = [t for t in devices.group(1).split(",") if t]
+    tokens = [t for t in re.split(r"[,\s]+", devices.group(1)) if t]
     for line in result.splitlines():
         r = re.match(r"^\s*(?:[-*+]\s+)?\|?\s*([DG])(\d+)\s*\|", line)
         if not r:

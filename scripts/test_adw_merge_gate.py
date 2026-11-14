@@ -310,6 +310,24 @@ class TestPaths(Gate):
                             "rename from api/x.ts\nrename to api/billing/x.ts\n")
         self.assertHold(4)
 
+    def test_a_protected_row_with_no_glob_holds(self):
+        self.local = self.local.replace("`.claude/**` `.github/workflows/**` `firebase.json`", ".claude/** .github/workflows/**")
+        self.fx["contents"][".claude/repo-profile.md?ref=develop"] = self.local
+        self.assertHold(4)
+
+    def test_a_money_row_with_no_pattern_holds(self):
+        self.local = self.local.replace("| money | `formatMoney\\|money\\.ts\\|cents` |", "| money | formatMoney or cents |")
+        self.fx["contents"][".claude/repo-profile.md?ref=develop"] = self.local
+        self.assertHold(4)
+
+    def test_a_file_moved_out_of_a_money_prefix_holds(self):
+        self.local = self.local.replace("| money | `formatMoney\\|money\\.ts\\|cents` |", "| money | path prefix `api/billing/` |")
+        self.fx["contents"][".claude/repo-profile.md?ref=develop"] = self.local
+        self.fx["diff"] += ("diff --git a/api/billing/charge.ts b/api/core/charge.ts\nsimilarity index 90%\n"
+                            "rename from api/billing/charge.ts\nrename to api/core/charge.ts\n"
+                            "--- a/api/billing/charge.ts\n+++ b/api/core/charge.ts\n@@ -1 +1 @@\n-return amount*100\n+return amount*10\n")
+        self.assertHold(4)
+
     def test_no_merge_protected_row_holds(self):
         self.local = self.local.replace("| **merge-protected paths** | `.claude/**` `.github/workflows/**` `firebase.json` |\n", "")
         self.assertHold(4)
@@ -458,6 +476,16 @@ class TestWalk(Gate):
         self.set_body(result=RESULT.replace("PASS — 1/1 cases", "smoke clean"), evidence=EVIDENCE.replace("audit 0", "audit 1"))
         self.assertHold(7)
 
+
+    def test_a_spaced_device_list_keeps_every_device(self):
+        self.result(first="PASS — 1/1 cases · walk 1 at 0123456 · devices iphone17, ipad · 12m",
+                    rows="| G1 | - | ipad not runnable | runner | none |\n")
+        self.assertHold(7)
+
+    def test_check_lines_with_other_list_markers_hold(self):
+        for marker in ("+ ", "1. "):
+            self.result(lines=marker + "fixed: D2 (walk 1) in abcdef1, unconfirmed\n")
+            self.assertHold(7)
 
     def test_no_smoke_evidence_row_holds(self):
         self.set_body(evidence=EVIDENCE.replace(
