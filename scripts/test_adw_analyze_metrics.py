@@ -19,7 +19,7 @@ START, END = "2026-10-01T00:00:00Z", "2026-10-29T00:00:00Z"
 
 
 def pr(number, title, created, merged=None, state="MERGED", block="", commits=(), labels_ever=(), labels_now=(),
-       files=(), repo="app", body=None):
+       files=(), repo="app", body=None, base="develop"):
     body = body if body is not None else (f"```\n{block}\n```" if block else "")
     b, n = parse_block(body)
     cs = [Commit(oid=str(i), headline=h, date=created, inherited=h.startswith("[adw ")) for i, h in enumerate(commits)]
@@ -27,7 +27,7 @@ def pr(number, title, created, merged=None, state="MERGED", block="", commits=()
     m = TITLE.match(title)
     return PR(repo=repo, number=number, title=title, slug=m.group(1) if m else None, unit=m.group(2) if m else None,
               adw=bool(m), state=state, created=created, merged=merged, closed=merged, last_edited=None,
-              base="develop", head="h", merge_sha=None, labels_now=set(labels_now),
+              base=base, head="h", merge_sha=None, labels_now=set(labels_now),
               labels_ever=set(labels_ever) | set(labels_now), commits=cs, files=list(files), body=body, block=b,
               block_count=n)
 
@@ -219,6 +219,113 @@ class Values(unittest.TestCase):
         for mid in REGISTRY:
             r = compute(mid, self.win)
             self.assertIn(r.status, ("ok", "no data", "below minimum"), mid)
+
+
+def merge_row(row):
+    return f"contract   aaaaaaa\nmerge      {row}"
+
+
+def gate_facts(prs):
+    return F.assemble([APP, ADW], {"app": []}, prs, [], until=END)
+
+
+class AutoMerge(unittest.TestCase):
+    def test_auto_merged_share(self):
+        prs = [pr(21, "[adw a] A", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", block=merge_row("merged 1111111 · base unmoved")),
+               pr(22, "[adw b u01] B", "2026-10-06T10:00:00Z", "2026-10-06T12:00:00Z",
+                  block=merge_row("merged 2222222 · base trial ok at 3333333")),
+               pr(23, "[adw c] C", "2026-10-07T10:00:00Z", state="OPEN", block=merge_row("hold 7 — walk failed · at 4444444")),
+               pr(24, "[adw d] D", "2026-10-08T10:00:00Z", "2026-10-09T12:00:00Z", block=merge_row("hold call — denied · at 5555555")),
+               pr(25, "[adw e u01] E", "2026-10-08T10:00:00Z", "2026-10-08T12:00:00Z", block="contract   aaaaaaa",
+                  base="adw/e"),                                                     # a sub-PR: the gate never runs on it
+               pr(26, "[adw f] F", "2026-10-09T10:00:00Z", state="OPEN", block="contract   aaaaaaa")]   # in flight
+        r = compute("outcome.auto_merged_share.v1", F.Slice(gate_facts(prs), START, END))
+        self.assertAlmostEqual(r.value, 0.5)
+        self.assertEqual(r.n, 4)
+
+    def test_share_counts_final_prs_that_ended_without_the_gate(self):
+        prs = [pr(21, "[adw a] A", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", block=merge_row("merged 1111111 · base unmoved")),
+               pr(22, "[adw b u02] B", "2026-10-06T10:00:00Z", state="OPEN", labels_now=["adw:blocked"], block="contract   aaaaaaa"),
+               pr(23, "[adw c] C", "2026-10-07T10:00:00Z", state="CLOSED", block="contract   aaaaaaa")]
+        r = compute("outcome.auto_merged_share.v1", F.Slice(gate_facts(prs), START, END))
+        self.assertAlmostEqual(r.value, 1 / 3)   # a blocked PR and a closed one were not auto-merged
+        self.assertEqual(r.n, 3)
+
+    def test_auto_merged_label_stands_for_a_lost_row(self):
+        prs = [pr(21, "[adw a] A", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", labels_ever=["adw:auto-merged"],
+                  block=merge_row("hold 5 — checks pending · at 1111111"))]
+        sl = F.Slice(gate_facts(prs), START, END)
+        self.assertAlmostEqual(compute("outcome.auto_merged_share.v1", sl).value, 1.0)
+        from adw_analyze.metrics import holds
+        self.assertEqual(holds(sl), {})
+
+    def test_a_revert_counts_only_against_the_pr_it_reverts(self):
+        auto = merge_row("merged 1111111 · base unmoved")
+        prs = [pr(21, "[adw a] A", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", block=auto),
+               pr(22, "[adw b] B", "2026-10-05T10:00:00Z", "2026-10-05T13:00:00Z", block=auto),
+               pr(41, 'Revert "[adw a] A"', "2026-10-06T10:00:00Z", "2026-10-06T11:00:00Z",
+                  body="Reverts o/app#21\n\nKeeps the fix from #22.")]
+        r = compute("outcome.auto_merge_false_pass.v1", F.Slice(gate_facts(prs), START, END))
+        self.assertAlmostEqual(r.value, 0.5)
+
+    def test_a_fix_pr_citing_the_merge_is_a_false_pass(self):
+        prs = [pr(21, "[adw a] A", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", block=merge_row("merged 1111111 · base unmoved")),
+               pr(43, "fix: crash after the ward change", "2026-10-07T10:00:00Z", "2026-10-07T11:00:00Z", body="Follow-up to #21.")]
+        r = compute("outcome.auto_merge_false_pass.v1", F.Slice(gate_facts(prs), START, END))
+        self.assertAlmostEqual(r.value, 1.0)
+
+    def test_a_fix_pr_citing_another_repo_is_not_a_false_pass(self):
+        prs = [pr(21, "[adw a] A", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", block=merge_row("merged 1111111 · base unmoved")),
+               pr(43, "fix: bump the lib", "2026-10-07T10:00:00Z", "2026-10-07T11:00:00Z", body="Needs o/lib#21 first.")]
+        r = compute("outcome.auto_merge_false_pass.v1", F.Slice(gate_facts(prs), START, END))
+        self.assertAlmostEqual(r.value, 0.0)
+
+    def test_one_followup_counts_once_against_the_latest_merge(self):
+        auto = merge_row("merged 1111111 · base unmoved")
+        prs = [pr(21, "[adw d u04] D4", "2026-10-05T10:00:00Z", "2026-10-07T10:00:00Z", block=auto),
+               pr(22, "[adw d] D", "2026-10-05T10:00:00Z", "2026-10-07T12:00:00Z", block=auto),
+               pr(31, "[adw d-f1] smaller", "2026-10-09T10:00:00Z", state="OPEN")]
+        r = compute("outcome.auto_merge_false_pass.v1", F.Slice(gate_facts(prs), START, END))
+        self.assertAlmostEqual(r.value, 0.5)
+        self.assertEqual(r.n, 2)
+
+    def test_auto_merge_false_pass(self):
+        auto = merge_row("merged 1111111 · base unmoved")
+        prs = [pr(21, "[adw alpha] A", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", block=auto),
+               pr(31, "[adw alpha-f1] logo bigger", "2026-10-08T10:00:00Z", "2026-10-08T12:00:00Z"),
+               pr(41, 'Revert "[adw alpha] A"', "2026-10-09T10:00:00Z", "2026-10-09T11:00:00Z", body="Reverts o/app#21"),
+               pr(22, "[adw beta] B", "2026-10-06T10:00:00Z", "2026-10-06T12:00:00Z", block=auto),
+               pr(32, "[adw beta-f1] late", "2026-10-14T13:00:00Z", state="OPEN"),
+               pr(23, "[adw gamma] G", "2026-10-07T10:00:00Z", "2026-10-07T12:00:00Z", block=auto),
+               pr(33, "[adw big-gamma-f1] other", "2026-10-08T10:00:00Z", state="OPEN"),
+               pr(24, "[adw delta] D", "2026-10-07T10:00:00Z", "2026-10-10T12:00:00Z", block=merge_row("hold 7 — walk failed · at 4444444")),
+               pr(34, "[adw delta-f1] fix", "2026-10-11T10:00:00Z", state="OPEN"),
+               pr(25, "[adw eps] E", "2026-10-24T10:00:00Z", "2026-10-25T12:00:00Z", block=auto),
+               pr(26, "[adw zeta u01] Z", "2026-10-10T10:00:00Z", "2026-10-11T12:00:00Z", block=auto),
+               pr(42, 'Revert "[adw zeta u01] Z"', "2026-10-12T10:00:00Z", "2026-10-12T11:00:00Z", body="")]
+        r = compute("outcome.auto_merge_false_pass.v1", F.Slice(gate_facts(prs), START, END))
+        self.assertAlmostEqual(r.value, 0.5)   # alpha once (follow-up and revert), zeta (revert); not beta, gamma
+        self.assertEqual(r.n, 4)               # delta was held, eps has not had its 7 days
+
+    def test_holds_by_condition_table(self):
+        from adw_analyze.report import Run, report_md, totals
+        prior = ("2026-09-03T00:00:00Z", START)
+        prs = [pr(21, "[adw a] A", "2026-10-05T10:00:00Z", state="OPEN", block=merge_row("hold 7 — walk failed · at 1111111")),
+               pr(22, "[adw b] B", "2026-10-06T10:00:00Z", state="OPEN", block=merge_row("hold 7 — 2 gaps · at 2222222")),
+               pr(23, "[adw c] C", "2026-10-07T10:00:00Z", state="OPEN", block=merge_row("hold 1 — merge: hold · at 3333333")),
+               pr(24, "[adw d] D", "2026-10-08T10:00:00Z", state="OPEN", block=merge_row("hold call — denied · at 4444444")),
+               pr(25, "[adw e] E", "2026-10-08T10:00:00Z", "2026-10-08T12:00:00Z", block=merge_row("merged 5555555 · base unmoved")),
+               pr(26, "[adw f] F", "2026-09-20T10:00:00Z", state="OPEN", block=merge_row("hold 7 — walk failed · at 6666666"))]
+        facts = gate_facts(prs)
+        run = Run(until=END, window=(START, END), prior=prior, facts=facts,
+                  win={m: compute(m, F.Slice(facts, START, END)) for m in REGISTRY},
+                  pri={m: compute(m, F.Slice(facts, *prior)) for m in REGISTRY})
+        report = report_md(run, {}, totals(facts))
+        self.assertIn("## Auto-merge holds", report)
+        self.assertIn("| 1 · flag | 1 | 0 |", report)
+        self.assertIn("| 7 · walk | 2 | 1 |", report)
+        self.assertIn("| call · merge call | 1 | 0 |", report)
+        self.assertNotIn("| 2 · base |", report)
 
 
 class Build(TmpCase):
