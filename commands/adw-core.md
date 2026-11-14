@@ -442,6 +442,7 @@ Five rules (owner feedback, structural after prose failed twice):
 
 ```
 Intent: <one line>
+card    <ref> — <status>, designs: <n>              ← only when the intent came from a card (§10 Intake)
 base    <branch> — <one clause why>        ← only when not the default base (§2 base:)
 merge   auto → <base>, after a clean walk  ← or: merge   hold — <why>; ALWAYS prints (§2 merge:)
 extends <slug> · u1–u6: merged u1 u2 u3 u5 · open u4 (#820) · unbuilt u6   ← extend mode (§1.1)
@@ -999,6 +1000,22 @@ stop: no retry, no question, the run goes on.
   the run prints ONE line, once per command (init Phase 0.5, build Phase 0 — build may start in a new
   session): `⚠ card <ref>: <trello|linear> MCP not connected — status will not be kept up to date`
   (or `card not found` in place of `MCP not connected`).
+- **Intake: the intent is the card.** When the WHOLE intent text is one ref (a Trello URL or shortlink,
+  a `linear.app` issue URL, `Linear <KEY>`), `/adw-init` builds the intent from the card; a ref inside
+  longer text keeps the rules above. This is the one place a tracker problem stops the run, because
+  there is no intent without the read: tracker off → `⚠ card <ref>: cannot read — paste the intent as
+  text`, and stop.
+  1. Read title, description, labels, status, comments and attachments. Intent text = title, description,
+     then the comments that decide something. Attachments and links are listed, never followed. The
+     approval surface prints this built text, so the owner sees what triage saw.
+  2. Card status is `repo-profile §22` `done`, or Canceled/Duplicate (Linear) or archived (Trello) →
+     `⚠ card <ref>: already <status> — nothing to build`, and stop. `--force-closed` overrides and the
+     surface prints `⚠ card <ref>: closed (<status>), run forced`.
+  3. A product question in the card is not a separate stop: the built intent goes to triage, which
+     raises it as a `needs you` row at the approval gate like any other intent.
+  4. `--design <path-or-url>` (repeatable) and image/Figma attachments become a `designs:` list in the
+     intent. Triage and the specs cite them; a port unit (§20) takes them as its visual reference.
+     `designs:` is not a header field; the header gets only `card:` (§2).
 - **Status names are `repo-profile §22`.** The run never guesses a column or status name. §22 absent,
   or a name it holds that the card's board or team does not have →
   `⚠ card <ref>: repo-profile §22 has no status "<name>" — status will not be kept up to date`, and

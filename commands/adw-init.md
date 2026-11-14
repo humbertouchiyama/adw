@@ -18,12 +18,14 @@ description: "ADW entry point: intent → triage → human-approved unit cut →
 > repo-agnostic: every value that could differ between repos is in `repo-profile.md`.
 
 **Input:** `$ARGUMENTS` — the intent: free text, a bug list, a report excerpt, a Trello
-ref. Empty → ask for the intent and stop. Leading flags, in any order, are not intent text: strip
+ref or Linear issue ref (alone, it is read and becomes the intent: adw-core §10 Intake). Empty → ask for the intent and stop. Leading flags, in any order, are not intent text: strip
 them before anything reads the intent.
 
 - `--hold` → the intent gets `merge: hold` (adw-core §2) whatever triage proposes: the
   orchestrator applies it to triage's proposal before the first render, and the surface prints
   `merge   hold — --hold`.
+- `--design <path-or-url>` (repeatable) → a design for the intent (adw-core §10 Intake, step 4).
+- `--force-closed` → run a card intent whose card is Done or Canceled (adw-core §10 Intake, step 2).
 - `--followup <slug>` → a small follow-up to a merged intent (adw-core §1.1). `<slug>` must name a
   merged intent: a kebab-case slug, at least one adw PR of it merged into the default base
   (`repo-profile §3`), none open, and no unbuilt spec of it in the main tree. The four counts must
@@ -144,7 +146,7 @@ prior state before triage:
   has no folder: create one at its BIRTH date, **under the root that intent already uses**, and
   leave the flat spec in place. NEVER mint a second dated folder for one slug.
 
-**Then the card (adw-core §10), only when the intent text names one.** Parse the ref here, and read nothing yet.
+**Then the card (adw-core §10), only when the intent text names one.** When the whole text is one ref, run §10's Intake first and use the text it builds as the intent for everything below. Otherwise parse the ref here, and read nothing yet.
 Phase 3 starts by settling which ref the headers carry: a new intent takes the ref it parsed, an
 extension takes the `card:` its existing specs carry (none if they carry none), and a different ref in
 the new text is ignored with §10's `⚠ card <ref>: the intent has its own card` line. Then run §10's
