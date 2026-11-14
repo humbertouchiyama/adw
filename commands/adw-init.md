@@ -1,5 +1,5 @@
 ---
-description: "ADW entry point: intent → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init [--hold] [--followup <slug>] <intent>"
+description: "ADW entry point: intent (or a Trello/Linear card ref) → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init [--hold] [--followup <slug>] <intent>"
 ---
 
 # /adw-init — from intent to contract, and on into the build
@@ -24,8 +24,8 @@ them before anything reads the intent.
 - `--hold` → the intent gets `merge: hold` (adw-core §2) whatever triage proposes: the
   orchestrator applies it to triage's proposal before the first render, and the surface prints
   `merge   hold — --hold`.
-- `--design <path-or-url>` (repeatable) → a design for the intent (adw-core §10 Intake, step 4).
-- `--force-closed` → run a card intent whose card is Done or Canceled (adw-core §10 Intake, step 2).
+- `--design <path-or-url>` (repeatable) → a design for the intent, card or free text (adw-core §10 Intake, step 4).
+- `--force-closed` → run a card intent whose card is Done or Canceled (adw-core §10 Intake, step 2). With no card intent, drop it and print `⚠ --force-closed: no card intent — ignored`.
 - `--followup <slug>` → a small follow-up to a merged intent (adw-core §1.1). `<slug>` must name a
   merged intent: a kebab-case slug, at least one adw PR of it merged into the default base
   (`repo-profile §3`), none open, and no unbuilt spec of it in the main tree. The four counts must
@@ -94,6 +94,12 @@ them before anything reads the intent.
 
 ## Phase 0.5 — new intent or extension? (before any dispatch)
 
+**Intake first (adw-core §10 Intake), only when the whole intent text is one card ref.** Run it before
+anything below. It reads the card once, builds the intent text, and keeps the ref it parsed. Every
+step below, the live-intent search included, uses the built text, and Phase 3 writes the kept ref
+as the `card:` (the built text need not hold it). Intake stops the run on its own refusals; a run
+it let through skips the connection read below, because Intake already made it.
+
 **Pin the contract first:** `CONTRACT_SHA=$(git -C <cache> log -1 --format=%h)` — the loader stub
 already fetched it (adw-core §9). Substitute the value as a literal; it goes on the handoff and,
 after `approve` or a skipped gate (Phase 2), is the value `/adw-build` carries. There is nothing to check: fetching before
@@ -146,11 +152,11 @@ prior state before triage:
   has no folder: create one at its BIRTH date, **under the root that intent already uses**, and
   leave the flat spec in place. NEVER mint a second dated folder for one slug.
 
-**Then the card (adw-core §10), only when the intent text names one.** When the whole text is one ref, run §10's Intake first and use the text it builds as the intent for everything below. Otherwise parse the ref here, and read nothing yet.
-Phase 3 starts by settling which ref the headers carry: a new intent takes the ref it parsed, an
+**Then the card (adw-core §10), only when the intent text names one.** Parse the ref here, and read nothing yet (Intake, above, already read it when the whole text was one ref).
+Phase 3 starts by settling which ref the headers carry: a new intent takes the ref it parsed (the one Intake kept, for a card intent), an
 extension takes the `card:` its existing specs carry (none if they carry none), and a different ref in
 the new text is ignored with §10's `⚠ card <ref>: the intent has its own card` line. Then run §10's
-connection read once on that ref and print its `⚠` line if it fails. The ref goes into every header
+connection read once on that ref and print its `⚠` line if it fails (skipped when Intake ran). The ref goes into every header
 whether or not the tracker is connected: the header is a fact about the intent, and build checks the
 connection again.
 
@@ -190,7 +196,7 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 
 > Read the design doc named in `.claude/repo-profile.md` §2, its §3.1–§3.2, and
 > `.claude/commands/adw-core.md` §2–§4. Read `.claude/repo-profile.md` itself first.
-> Intent: `<intent verbatim>`. Explore the repo read-only. Propose:
+> Intent: `<intent verbatim>` (plus `designs:` — the list, one path or URL per line — when the intent has one). Explore the repo read-only. Propose:
 > 1. the unit cut per §3.1 — vertical by behaviour; a layer cut only when one layer
 >    contains the entire behaviour; the rule is symmetric (merge freely — five copy fixes
 >    are one unit); sweep-shaped work may legitimately be ONE unit;
@@ -417,7 +423,7 @@ with the most to discover), so blocking on it is a pure loss every time.
 
 **Common preamble (every unit):**
 
-> You are producing the contract for unit `uNN` of intent `<slug>`. Write documents only —
+> You are producing the contract for unit `uNN` of intent `<slug>`. When the intent has `designs:`, cite the ones this unit covers in the spec; a port unit takes them as its visual reference. Write documents only —
 > never code, never a branch. Spec path: `<exact path per adw-core §1>`. The spec MUST
 > open with the exact header block (adw-core §2):
 > `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`

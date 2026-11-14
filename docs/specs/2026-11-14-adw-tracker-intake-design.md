@@ -43,8 +43,7 @@ keeps today's behaviour: the text is the intent, the ref is only tracked.
 | `commands/adw-core.md` §10 | Add the "Intake" bullet: T1–T3 and T6, one paragraph. |
 | `commands/adw-init.md` | Input: add `--design`, `--force-closed`; Phase 0.5: run intake before triage. |
 | `commands/adw-core.md` §7 approval | Print `card` line with status and the `designs` list. |
-| `docs/repo-profile-EXAMPLE.md` §22 | Add the Canceled status names the repo's tracker uses; no new section. |
-| `install/stubs/adw.md` | Usage line takes `<intent or card ref>`. |
+| `install/stubs/adw.md` | Usage line takes `<intent or card ref>`. Lands with the stub's own PR (`adw-alias-and-stub-sync`), not this one. |
 
 No new repo-profile section. Status names stay §22; tracker tool names stay §10.
 
