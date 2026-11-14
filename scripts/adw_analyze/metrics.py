@@ -245,15 +245,24 @@ def _(sl):
 # --- auto-merge: the merge row adw-build §3.7's gate writes on independent and final PRs -----------
 
 MERGE_ROW = re.compile(r"(merged)\b|hold (\d|call)\b")
+AUTO_LABEL = "adw:auto-merged"
 FALSE_PASS_DAYS = 7
 
 
 def gate_result(p) -> tuple[str, str | None] | None:
-    """("merged", None) or ("hold", <condition>) from the PR's merge row; None when it has none."""
+    """("merged", None) or ("hold", <condition>) from the PR's merge row; None when it has none.
+    §3.7 adds adw:auto-merged before it writes the merged row, so the label stands for a row write
+    that was lost or cut."""
+    if p.merged and AUTO_LABEL in p.labels_ever:
+        return ("merged", None)
     m = MERGE_ROW.match((p.block or {}).get("merge", ""))
     if not m:
         return None
     return ("merged", None) if m.group(1) else ("hold", m.group(2))
+
+
+def auto_merged(p) -> bool:
+    return bool(p.merged) and gate_result(p) == ("merged", None)
 
 
 def holds(sl) -> dict:
@@ -265,36 +274,70 @@ def holds(sl) -> dict:
     return out
 
 
+def reached_the_gate_or_ended(sl, p) -> bool:
+    """An independent or final PR the share counts: the gate ran on it (a merge row), or it ended
+    without the gate (blocked, failed or closed; §3.7 never runs on those). A sub-PR, whose base is
+    its intent branch, and a PR still in flight are left out."""
+    if gate_result(p):
+        return True
+    base = next((r.base for r in sl.facts.repos if r.name == p.repo), None)
+    if p.base != base:
+        return False
+    return p.state != "OPEN" or bool(p.labels_now & {"adw:blocked", "adw:failed"})
+
+
 @metric("outcome.auto_merged_share", "rate", 20, "ratio",
-        "opened ADW PRs whose merge row reads merged / opened ADW PRs with a merge row (the independent and final PRs the gate ran on)")
+        "opened independent and final ADW PRs that were auto-merged / those the gate ran on or that ended without it "
+        "(blocked, failed or closed); sub-PRs and PRs in flight are left out")
 def _(sl):
-    gated = [r for r in map(gate_result, sl.prs("created")) if r]
-    return ratio(sum(1 for r in gated if r[0] == "merged"), len(gated)), len(gated), {}
+    ps = [p for p in sl.prs("created") if reached_the_gate_or_ended(sl, p)]
+    return ratio(sum(1 for p in ps if auto_merged(p)), len(ps)), len(ps), {}
 
 
-def false_pass(p, prs) -> bool:
-    """A <slug>-f<k> ADW PR, or a revert PR of p, opened within FALSE_PASS_DAYS after p merged."""
-    lo = ts_seconds(p.merged)
-    hi = lo + FALSE_PASS_DAYS * 86400
-    follow = re.compile(re.escape(p.slug) + r"-f\d+")
-    cites = re.compile(rf"#{p.number}\b")
+FIX_TITLE = re.compile(r"(?i)\bfix")
+FOLLOWUP_SLUG = re.compile(r"(.+)-f\d+")
+
+
+def false_passes(prs: list) -> set:
+    """(repo, number) of auto-merged ADW PRs that got, within FALSE_PASS_DAYS after their merge: a revert
+    PR (GitHub's `Reverts <repo>#N` body, or titled `Revert "<title>"`), a non-ADW fix PR citing #N (the
+    signal outcome.followup_fix_rate reads), or a `<slug>-f<k>` follow-up. A follow-up counts once,
+    against the latest auto-merged PR of its slug merged before it opened."""
+    auto = [p for p in prs if p.adw and auto_merged(p)]
+    span = FALSE_PASS_DAYS * 86400
+
+    def within(p, q):
+        return p.repo == q.repo and ts_seconds(p.merged) < ts_seconds(q.created) <= ts_seconds(p.merged) + span
+
+    hit = set()
     for q in prs:
-        if q.repo != p.repo or not lo < ts_seconds(q.created) <= hi:
+        if q.adw:
+            m = FOLLOWUP_SLUG.fullmatch(q.slug or "")
+            got = [p for p in auto if m and p.slug == m.group(1) and within(p, q)]
+            if got:
+                p = max(got, key=lambda p: ts_seconds(p.merged))
+                hit.add((p.repo, p.number))
             continue
-        if q.adw and q.slug and follow.fullmatch(q.slug):
-            return True
-        if q.title.startswith('Revert "') and (q.title == f'Revert "{p.title}"' or cites.search(q.body)):
-            return True
-    return False
+        for p in auto:
+            if not within(p, q):
+                continue
+            if q.title.startswith('Revert "'):
+                if q.title == f'Revert "{p.title}"' or re.search(rf"(?m)^Reverts \S*#{p.number}\b", q.body):
+                    hit.add((p.repo, p.number))
+            elif FIX_TITLE.search(q.title) and re.search(rf"#{p.number}\b", q.title + "\n" + q.body):
+                hit.add((p.repo, p.number))
+    return hit
 
 
 @metric("outcome.auto_merge_false_pass", "rate", 20, "ratio",
-        f"auto-merged ADW PRs with a <slug>-f<k> follow-up PR or a revert PR within {FALSE_PASS_DAYS} days / "
-        f"auto-merged ADW PRs, merged in the window and at least {FALSE_PASS_DAYS} days before the run date")
+        f"auto-merged ADW PRs with a revert PR, a non-ADW fix PR citing #N, or a <slug>-f<k> follow-up (counted once, "
+        f"against the latest auto-merged PR of its slug) within {FALSE_PASS_DAYS} days / auto-merged ADW PRs, merged in "
+        f"the window and at least {FALSE_PASS_DAYS} days before the run date")
 def _(sl):
     limit = ts_seconds(sl.facts.until) - FALSE_PASS_DAYS * 86400
-    auto = [p for p in sl.prs("merged") if gate_result(p) == ("merged", None) and ts_seconds(p.merged) <= limit]
-    return ratio(sum(1 for p in auto if false_pass(p, sl.facts.prs)), len(auto)), len(auto), {}
+    auto = [p for p in sl.prs("merged") if auto_merged(p) and ts_seconds(p.merged) <= limit]
+    hit = false_passes(sl.facts.prs)
+    return ratio(sum(1 for p in auto if (p.repo, p.number) in hit), len(auto)), len(auto), {}
 
 
 # --- evidence block --------------------------------------------------------------------------------
