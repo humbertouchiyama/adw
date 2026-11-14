@@ -289,14 +289,21 @@ def paths(profiles: list[Profile], files: list[dict]) -> None:
         for p in sorted(f["paths"]):
             if any(matches(prof.protected, p) for prof in profiles):
                 raise Hold(4, "%s is a merge-protected path" % p)
+            if all(matches(prof.excluded, p) for prof in profiles):
+                continue
+            # Every path, either side of a rename, deletions and binary files included: the money row
+            # names files too (`money\.ts`), and a change there needs no money word in its lines.
+            for prof in profiles:
+                if prof.money_prefix and p.startswith(prof.money_prefix):
+                    raise Hold(4, "%s is under the money path %s" % (p, prof.money_prefix))
+                if prof.money and prof.money.search(p):
+                    raise Hold(4, "%s is a money file" % p)
     for f in files:
         path = f["path"]
         if path is not None and all(matches(prof.excluded, path) for prof in profiles):
             continue
         for line in f["added"]:
             for prof in profiles:
-                if prof.money_prefix and path is not None and path.startswith(prof.money_prefix):
-                    raise Hold(4, "%s is under the money path %s" % (path, prof.money_prefix))
                 if prof.money and prof.money.search(line):
                     raise Hold(4, "%s adds a money line: %s" % (path or "a file", line.strip()[:80]))
 
@@ -346,9 +353,11 @@ def walk(pr) -> None:
     if "unaudited" in first:
         raise Hold(7, "the walk is unaudited: %s" % first.split("unaudited", 1)[1].strip(" :")[:80])
     rows = re.findall(r"^[ \t]*smoke[ \t]+(walk \d+ .*)$", body, re.M)
-    audit = re.search(r"\baudit (\S+)", rows[-1]) if rows else None
-    if audit and audit.group(1) != "0":
-        raise Hold(7, "the smoke row's audit is %s" % audit.group(1))
+    if not rows:
+        raise Hold(7, "the evidence block has no smoke walk row")
+    audit = re.search(r"\baudit (\S+)", rows[-1])
+    if not audit or audit.group(1) != "0":
+        raise Hold(7, "the smoke row's audit is %s" % (audit.group(1) if audit else "missing"))
     checked = {}
     for line in result.splitlines():
         m = re.match(r"^[ \t]*(?:[-*][ \t]+)?(valid|unchecked|refuted|polish|fixed):[ \t]*(\S*)", line)
@@ -358,13 +367,13 @@ def walk(pr) -> None:
             raise Hold(7, "a defect is not cleared: %s" % line.strip()[:80])
         if m.group(1) == "fixed" and "unconfirmed" in line:
             raise Hold(7, "a fix is not confirmed by a walk: %s" % line.strip()[:80])
-        checked.setdefault(m.group(2).rstrip(",:"), m.group(1))
+        checked.setdefault(m.group(2).rstrip(",:"), set()).add(m.group(1))
     devices = re.search(r" · devices ([\w,.-]+)", first)
     if not devices:
         raise Hold(7, "the walk line names no devices")
     tokens = [t for t in devices.group(1).split(",") if t]
     for line in result.splitlines():
-        r = re.match(r"^\|\s*([DG])(\d+)\s*\|", line)
+        r = re.match(r"^\s*(?:[-*+]\s+)?\|?\s*([DG])(\d+)\s*\|", line)
         if not r:
             continue
         rid = r.group(1) + r.group(2)
@@ -372,7 +381,7 @@ def walk(pr) -> None:
             if re.search(r"\bblocking\b", line):
                 raise Hold(7, "%s was called blocking by the walk" % rid)
             # A defect passes only as polish, or with a refuted: or polish: line; anything else holds.
-            if not re.search(r"\|\s*polish\s*\|", line) and checked.get(rid) not in ("refuted", "polish"):
+            if not re.search(r"\|\s*polish\s*\|", line) and not checked.get(rid, set()) & {"refuted", "polish"}:
                 raise Hold(7, "%s has no check line that clears it" % rid)
         if r.group(1) == "G":
             ac = re.search(r"\bAC-\d+\b", line)

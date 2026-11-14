@@ -1400,8 +1400,8 @@ check: it fixes nothing and changes no state. In a walk that passed:
 | `S`, `P`, `I` | neither, as §21's Result row says |
 
 A row reported here and not fixed can still hold the merge: a `G<n>` that names an `AC-<n>` or a
-device a case needs, and any row the walk called `blocking`, whatever the check finds (§3.7's
-merge gate, condition 7).
+device a case needs, any row the walk called `blocking`, whatever the check finds, and a `D<n>` that
+is not `polish` with no `refuted:` or `polish:` line (§3.7's merge gate, condition 7).
 
 **Check each row before anyone fixes it: `review-core.md` §9's refutation pass.** The walk's
 verdict is a model reading a simulator screen, and no run has measured how often its `blocking` rows

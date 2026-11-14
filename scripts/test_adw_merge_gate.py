@@ -299,6 +299,17 @@ class TestPaths(Gate):
                                        "+++ a note\n+export const total = formatMoney(rows);")
         self.assertHold(4)
 
+    def test_a_diff_touching_a_money_file_holds_without_a_money_line(self):
+        self.fx["diff"] += diff_file("src/lib/money.ts", added="export const x = 1;")
+        self.assertHold(4)
+
+    def test_rename_into_a_money_path_prefix_holds(self):
+        self.local = self.local.replace("| money | `formatMoney\\|money\\.ts\\|cents` |", "| money | path prefix `api/billing/` |")
+        self.fx["contents"][".claude/repo-profile.md?ref=develop"] = self.local
+        self.fx["diff"] += ("diff --git a/api/x.ts b/api/billing/x.ts\nsimilarity index 100%\n"
+                            "rename from api/x.ts\nrename to api/billing/x.ts\n")
+        self.assertHold(4)
+
     def test_no_merge_protected_row_holds(self):
         self.local = self.local.replace("| **merge-protected paths** | `.claude/**` `.github/workflows/**` `firebase.json` |\n", "")
         self.assertHold(4)
@@ -447,6 +458,20 @@ class TestWalk(Gate):
         self.set_body(result=RESULT.replace("PASS — 1/1 cases", "smoke clean"), evidence=EVIDENCE.replace("audit 0", "audit 1"))
         self.assertHold(7)
 
+
+    def test_no_smoke_evidence_row_holds(self):
+        self.set_body(evidence=EVIDENCE.replace(
+            "smoke      walk 1 · 0 defects (0 blocking) · 0 gaps · valid 0 · refuted 0 · fixed 0 (0 unconfirmed) · cases 1/1 · audit 0 · 12m\n", ""))
+        self.assertHold(7)
+
+    def test_a_defect_row_without_a_leading_pipe_still_counts(self):
+        self.result(rows="D1 | blocking | the save button does nothing | code | fix |\n")
+        self.assertHold(7)
+
+    def test_a_kept_fixed_line_does_not_shadow_a_later_refuted_line(self):
+        self.result(rows="| D1 | worth-fixing | a label wraps | code | fix |\n",
+                    lines="fixed: D1 (walk 1) in abcdef1\nrefuted: D1 — the spec does not ask for one line\n")
+        self.assertPass()
 
 class TestScreens(Gate):
     def test_missing_image_holds(self):

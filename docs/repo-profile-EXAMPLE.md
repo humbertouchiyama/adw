@@ -112,7 +112,9 @@ Gitignored build output a path check must skip: `packages/shared/dist` and frien
 The last three rows are read by `adw-build §3.7`'s merge gate, at merge time, so each cell holds the
 value alone: no note in the cell. **auto-merge default** is `on` or `off`; `off` is the kill switch
 and also stops runs already in flight, and a profile with no row reads as `off`. **merge-protected
-paths**: a PR whose diff touches one never merges without the owner. **UI paths**: a `Smoke: none`
+paths**: a PR whose diff touches one never merges without the owner; with no row, no PR auto-merges.
+The gate reads these rows, and the `money` row, from the base's copy of the profile too, and the
+stricter wins. **UI paths**: a `Smoke: none`
 PR whose diff touches one waits for the owner; with no row, every `Smoke: none` PR waits. Both hold
 globs in backticks, space-separated: a double star crosses `/`, a single star does not.
 
