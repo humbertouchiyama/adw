@@ -1,7 +1,8 @@
 # adw
 
 An agentic development workflow. Intent goes in, reviewed pull requests come out, and a human
-approves exactly once — at the unit cut, before any code is written.
+approves exactly once — at the unit cut, before any code is written. When nothing on the cut needs
+the human, the intent they started is that approval, and the run does not wait.
 
 This repository holds **the contract**: the prompt files a coding agent reads to run the pipeline,
 and the design document that explains why each rule is there. It holds no product code and belongs
@@ -18,6 +19,14 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 | `commands/review-core.md` | Shared machinery for the two review skills. |
 | `commands/code-review.md` | Review a PR against the consuming repo's conventions. |
 | `commands/cleanup.md` | Clear stale worktrees, branches and disposable state. |
+| `commands/adw-dispatch.md` | Hand an intent to a new herdr pane beside the caller, with a brief, a ledger row and an optional one-line reply. |
+| `scripts/adw-dispatch.py` | The mechanics of `adw-dispatch`: pane placement, the reply, the ledger. Run from the fetch cache. |
+| `scripts/adw-run-clean.py` | Removes what one `/adw-build` run left on disk (its worktrees, and the Xcode DerivedData they left) and nothing else. Run from the fetch cache at `adw-build` Phase 5. |
+| `scripts/adw-merge-gate.py` | The auto-merge gate: `check` reads every merge condition fresh from GitHub and the profile and prints `pass` or `hold <n> <reason>`; `trial` merges a moved base into the head in a throwaway worktree; `discard` removes it. Run from the fetch cache at `adw-build` §3.7. |
+| `scripts/adw-screens.py` | Pushes a walk's screen images to the app repo's `refs/adw-screens` and posts one PR comment with them. Run from the fetch cache at `adw-build` §3.8. |
+| `scripts/adw-analyze.py` | The run analysis: reads PR bodies, session transcripts and `predicts` lines, judges each line against its baseline, and writes a dated report to the owner's private reports repo. Code in `scripts/adw_analyze/`. |
+| `scripts/adw-analyze-weekly.sh` | Runs the analysis every Monday under launchd: critical pass, leak scan, commit, push, and an issue in the reports repo. |
+| `.claude/skills/adw-analyze/` | Runs the weekly analysis by hand. Used in this repo only; it has no loader stub. |
 | `docs/00-design.md` | The design, and a frozen archive of every contract change up to the extraction. |
 | `docs/repo-profile-EXAMPLE.md` | A filled-in `repo-profile.md` from a real repository, to copy and edit. |
 | `install/` | The loader stubs and the fetch script a consuming repo drops in. |
@@ -28,7 +37,7 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 Nothing in `commands/` **reads** a repo-specific value. Every value that could differ between two
 repositories — paths, branch names, gate commands, trap domains, review emphasis — lives in a
 `repo-profile.md` **in the consuming repo**, cited from the contract as `repo-profile §N` against
-frozen anchors §1–§18 (plus optional §19, §20 and §21). The test for whether a value belongs here is simple: could this sentence be
+frozen anchors §1–§18 (plus optional §19, §20, §21 and §22). The test for whether a value belongs here is simple: could this sentence be
 true in a repo with a different stack? If not, it names a value, and the value belongs in the
 profile.
 
@@ -57,8 +66,8 @@ had to be rehomed into its `audit.sh` and `repo-profile §16` before the stub co
 Then write `.claude/repo-profile.md`. Start from `docs/repo-profile-EXAMPLE.md` and replace every
 value; the section numbers are anchors and must not be renumbered. A contract file that cites a
 section your profile does not answer will stop the run, which is the intended failure. The
-optional §19, §20 and §21 are the exception: a profile may omit them, and `code-review.md` (§19),
-`adw-core.md` §2 (§20) and `adw-core.md` §10 (§21) say what the absence does.
+optional §19, §20, §21 and §22 are the exception: a profile may omit them, and `code-review.md` (§19),
+`adw-core.md` §2 (§20), `adw-build.md` §3.8 (§21) and `adw-core.md` §10 (§22) say what the absence does.
 
 ### The loader is a copy, and copies drift
 
@@ -100,6 +109,20 @@ citations. What has actually caught defects is a fresh subagent, read-only, prom
 the change rather than approve it. Passes like this have found blocking defects. Run one:
 `/reviewing-contract-prs <PR number>` runs the whole procedure: an anchor check, three review
 lanes, and a refuter that attacks their findings. A later review of the same PR runs one delta lane.
+
+Every PR that changes `commands/` or `scripts/` says, in its body, what it should move and by when:
+
+```
+predicts  <metric-id> <down|up> <N%|N|to-zero> by <YYYY-MM-DD> for <path>[ §<section>] [repo <name>]
+predicts  none — <reason>
+```
+
+One line per fix the PR bundles. The amount is a change against the baseline before the merge, the
+deadline is at most 49 days after it, and the metric is a full id with its version suffix, as the
+report's Metrics table prints it (`friction.denials_per_1k_calls.v1`): a rate, ratio or median from
+`scripts/adw_analyze/metrics.py`. The weekly report judges each line after its deadline (worked,
+failed, confounded or no data), and a failed fix is listed for deletion. The reports go to the
+owner's private reports repo, never to this one.
 
 ## Provenance
 

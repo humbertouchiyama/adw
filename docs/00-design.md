@@ -55,8 +55,9 @@ One human brings intent. Two commands split the pipeline at the contract boundar
   independent verification → PRs → `/code-review` loop → `ready | blocked | failed`.
 
 **Human touches:** intake, unit-cut approval (§3.2 — `approve` buys the cut *and* the
-build), optionally reading the produced specs/plans, then per
-terminal PR: review, **`npm run preview` + visual verification**, merge consent. Plus deploy
+build; a cut with nothing for the owner skips the wait), optionally reading the produced specs/plans, then per
+terminal PR: review, **`npm run preview` + visual verification**, merge consent (a `merge: auto`
+intent's PRs merge behind `adw-build §3.7`'s gate instead, never into the production branch). Plus deploy
 and exploratory testing. §6 is the authoritative list and this line must not drift from it.
 
 **Non-objectives:**
@@ -64,7 +65,10 @@ and exploratory testing. §6 is the authoritative list and this line must not dr
 - **Not faster.** METR's RCT (Jul 2025, 16 devs, 246 tasks) found developers **19% slower**
   with AI while estimating themselves 20% faster. Any speed claim here is unfounded.
 - **Not more PRs.** PR count is an output of the packaging rule (§3.5), never a goal.
-- Does not remove design authority. The human approves the cut and owns every merge.
+- Does not remove design authority. The human approves the cut and owns every merge, except
+  where an approved `merge   auto` line hands an intent's merges to `adw-build §3.7`'s gate. A
+  cut that needs nothing from the human is approved by the intent the human started (adw-init Phase
+  2's skip test).
 
 ---
 
@@ -177,10 +181,21 @@ split of one is a legitimate outcome, which is why the command is `init`, not `s
 
 ### 3.2 The cut proposal and the human gate
 
-`/adw-init` first runs **one cheap triage agent** over the intent and prints a proposal:
+**One prompt, at the gate** (adw-init Phase 0.7). Triage lists only the questions the owner alone
+can answer and that a reasonable owner could reject against the default, plus anything that changes
+money, data or a public contract or is hard to reverse, each with its default and consequence. There is no question round before triage. The same ask rule governs the gate's
+decide pass and, since 2026-10-22, every later question of the run (§6.1 rule 4). The handoff's
+`asks` line measures it: over 96 gates, 42% came back as "critically decide" or "didn't understand" before this rule.
+
+`/adw-init` then runs **one cheap triage agent** over the intent and prints a proposal:
 the unit cut, a **depth** per unit, and a **packaging** per unit (§3.5). Nothing expensive
 runs before approval — the per-unit front-end (§3.3) can cost more than the implementation,
-and burning it on a mis-cut is the failure this gate exists to prevent.
+and burning it on a mis-cut is the failure this gate exists to prevent. The gate waits only when
+something on it needs the human: a question still `ask`, a `⚠` line other than `spec criteria
+covered by no unit: none`, a `base:` other than the default, or an extension of a live intent. Otherwise
+the surface prints, the intent the human started is the approval, and the run goes on (adw-init Phase 2).
+Over 58 intents with an approval surface in 30 days, 88% were built on the proposed cut unchanged, and the
+owner's wait was about two thirds of run time.
 
 **Depth ladder** — proposed per unit, overridable at the gate:
 
@@ -333,7 +348,8 @@ and independently revertible** — no shared files, no ordering hazard, no consu
 another unit's output.
 
 **Separate develop-targeting PRs are earned by independence, never chosen by default.**
-Each costs, measurably: +1 review, +1 `npm run preview`, +1 merge consent. The owner's
+Each costs, measurably: +1 review, +1 `npm run preview`, +1 merge consent (for a `merge: hold`
+intent). The owner's
 recorded position (`memory/feedback_consolidate_prs.md`): *"each PR is a separate checkout,
 code review, and `npm run preview` run — N PRs = N× review+preview effort."* When a unit
 could go either way, group it. A chain already collapses N dependent units into **one**
@@ -439,25 +455,32 @@ develop ──► adw/<intent-slug>            (integration branch)
         sub-PR 1  sub-PR 2  sub-PR 3     (unit branches; base = integration branch)
               └────────┴────────┘
                        ▼
-        final PR: adw/<intent-slug> → develop     (the ONE human consent)
+        final PR: adw/<intent-slug> → develop     (the ONE human consent, or adw-build §3.7's gate)
 ```
 
 Each sub-PR runs the full per-PR loop (§4.2): implement → gates → verify → open sub-PR →
 `/code-review` → **merge into the integration branch**. The next unit branches off the
 updated integration branch. The final PR gets its own full pass — gates on the composition,
-§4.5 verification, `/code-review` — before it waits for the human.
+§4.5 verification, `/code-review` — before it waits for the human, or for `adw-build §3.7`'s
+merge gate when the intent says `merge: auto`.
 
 **Consent carve-out, stated explicitly.** The standing rule (recorded in
 `memory/feedback_no_auto_commit_push.md`) is: never merge a PR without explicit human
-consent. This design carves out exactly one case, authorised by the owner on 2026-07-20:
+consent. This design carves out one case, authorised by the owner on 2026-07-20, and widened twice
+since (below):
 **a sub-PR this pipeline opened for a unit of the current intent, whose base is that
 intent's integration branch, may be merged by the pipeline once its loop reaches
 `ready`.** Provenance is the authority, never the branch-name pattern — a PR that merely
 *targets* some `adw/*` branch does not qualify. Any PR targeting `develop` or `main`
-requires explicit human consent, always — the carve-out never widens past the integration
-branch. Widened once inside it, owner-authorised 2026-10-01: a `blocked` sub-PR is also merged,
+requires explicit human consent, always — the carve-out widens past the integration branch only
+as the second widening below says. Widened once inside it, owner-authorised 2026-10-01: a `blocked` sub-PR is also merged,
 as a *carried block*, and the final PR answers for it — a chain asks the owner once, at the
-final PR (`adw-core §6`, `adw-build §3.7`). (Operational note: `gh pr merge --auto`
+final PR (`adw-core §6`, `adw-build §3.7`). Widened past it once, in the auto-merge design the
+owner approved on 2026-10-30: an independent or final PR of an intent whose approved surface
+printed `merge   auto` merges into `develop` when `adw-build §3.7`'s merge gate passes, and the
+approved line is that consent (`adw-core §6`). A cut that passes `adw-init` Phase 2's skip test does not
+wait at the surface: the intent the human started is that consent. `main`, the
+production branch, never. (Operational note: `gh pr merge --auto`
 merges immediately in this repo — checks are not a hard gate — which is the desired
 behaviour here since the loop's own gates are the gate.)
 
@@ -536,6 +559,23 @@ runs only for UI-touching units. Narrow the spec selection to the touched surfac
 than dropping the gate, and carry the narrowing as a flag (adw-build §3.2) — a standing
 practice, not a concession to a clock. Baseline-red is the one exception (§4.2's own
 `⚠ no trustworthy gate` flag, and `⚠ baseline red` for a red proved at `<BASE>`).
+
+**App smoke (TRIAL, 2026-10-19).** No gate looks at the running app, and on a native client the
+gates cannot render native chrome at all. Where `repo-profile §21` declares a runner, every independent
+and final PR (never a sub-PR) gets one walk of the
+`## Smoke` cases its body carries, on the verified head, after its state is decided (adw-build
+§3.8). Its verdict is a model reading a screen, and its false-positive rate is unmeasured, so no
+defect row is fixed on the walk's word: a `model: opus` refuter rebuilds each `blocking` and
+`worth-fixing` row from the evidence, the spec criterion and the code (`review-core.md` §9's pass),
+and only a row that holds up is fixed. A fix is at most two smoke fix cycles (on a final PR, per
+code-changing owner reply), each one gates, a 3.4 verify, a 3.6 review and another walk; a confirmed
+defect no cycle fixed (still there after the second, or its cycle could not start, went red, or was
+not allowed on a PR with a red gate) makes the PR `blocked`. `polish` and gap rows only report. The `refuted` count on each PR's `smoke` evidence row
+is the false-positive measure the step lacked. A device the driver can read but not tap would pass
+every case it cannot reach, so a tap probe runs first, and a failed probe ends the smoke as `smoke
+not runnable`, never as a pass. For the same reason a case passes only when its devices ran the code
+the PR changed: a case whose screen they draw from another implementation (an iOS SwiftUI twin of a
+changed Compose screen) is `blocked`, and its gap row holds the merge (adw-build §3.8).
 
 ### 4.3 Environment failures abort; they do not consume cycles
 
@@ -649,8 +689,8 @@ merge — that nothing checks.
 
 | State | Meaning | Result |
 |---|---|---|
-| **ready** | gates re-verified green in a clean checkout **after the review loop's last push** | independent/final PR: open, awaits human merge. Sub-PR: merged into the integration branch (§4.1 carve-out), chain continues |
-| **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), or the 16-boundary cap fired (condition 6 — gate-green but unconverged) | PR open, labelled, body per §6.1 S4. A blocked sub-PR is merged as a carried block and the final PR lands `blocked` for it; it halts its chain only when it cannot be carried (`adw-build §3.7`) |
+| **ready** | gates re-verified green in a clean checkout **after the review loop's last push** | independent/final PR: merged by `adw-build §3.7`'s gate when the intent says `merge: auto` and the gate passes; else open, awaits human merge. Sub-PR: merged into the integration branch (§4.1 carve-out), chain continues |
+| **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), the 16-boundary cap fired (condition 6 — gate-green but unconverged), or the app smoke left a defect its refuter confirmed and no smoke fix cycle fixed (adw-build §3.8) | PR open, labelled, body per §6.1 S4. A blocked sub-PR is merged as a carried block and the final PR lands `blocked` for it; it halts its chain only when it cannot be carried (`adw-build §3.7`) |
 | **failed** | a §4.8 progress condition fired — **fix**-cycle caps exhausted, repeated error signature, gate regression, diff oscillation, or stall — or an environment fault (including the 4h single-phase clock) | PR open **non-draft**, labelled, body per §6.1 S4 (last red output included). A failed sub-PR halts its chain |
 
 Nothing dies silently in a worktree (30 live today, 2026-07-20). A halted chain reports
@@ -667,11 +707,11 @@ its unbuilt units in the halting sub-PR's body (§4.1).
   `/code-review` already handles that case at its end.
 - **Per-PR stop rule: progress, not elapsed time** (v2.12 — the recalibration this bullet
   promised, performed at run 10). Six conditions, evaluated at every phase boundary and all
-  enforced in adw-build §3: cycle caps (no cycle past fix 3 / review 2) · repeated error
+  enforced in adw-build §3: cycle caps (no cycle past fix 3 / review 2 / smoke fix 2) · repeated error
   signature (normalised) · gate regression (green→red, twice, after §4.3 classification) ·
   diff oscillation · stall (HEAD + gate exit-vector + PR state unchanged across two
   boundaries, **evaluated only after a repeat cycle**) · boundary cap (16 crossings →
-  `blocked`). The first pass of a mandatory stage — 3.4 verify, the single 3.6 review,
+  `blocked`; a smoke fix cycle restarts the count, as Phase 4's answer commit does). The first pass of a mandatory stage — 3.4 verify, the single 3.6 review,
   Phase 4's composition review — is exempt from all six: it is a completion, not a loop.
   The stall condition's scoping is not a detail: unscoped, it fires on the *clean* run,
   where a green unit's HEAD and gate vector are supposed to sit still. The boundary cap is
@@ -757,8 +797,8 @@ its unbuilt units in the halting sub-PR's body (§4.1).
 | **Artifact ratio** — plan lines vs code-diff lines | `git diff --shortstat` excluding both artifact roots at PR open vs `wc -l` of spec+plan (adw-build §3.5); surfaced as `⚠ artifact-heavy` on the PR's S3 line | free |
 | ~~Token burn~~ | — | **dropped.** No source exists; the draft asserted a metric nothing produces |
 | **Progress-condition state** — cycle counts (and what they resumed from), gate exit-code vector, boundary count | orchestrator-held during the run; recovered on resume from the `fix-attempt-N` / `fix(review):` commit prefixes (adw-build Phase 0 step 7) | free |
-| **Per-PR evidence block** — contract sha, cycles, phase split, `owner-wait`, gate vector, mutation coverage ratio, artifact ratio | written into the **PR body** at adw-build §3.4, fetched forever by `gh pr view --json body` (adw-core §7.2) | free |
-| **The reader over all of the above** | `scripts/adw-metrics.sh` — scans every `[adw …]` PR body, emits the per-run table plus aggregates, and closes with an explicit `NOT MEASURED` block | free |
+| **Per-PR evidence block** — contract sha, cycles, phase split, `owner-wait`, gate vector, mutation coverage ratio, artifact ratio, `asks` (adw-core §7) | written into the **PR body** at adw-build §3.4, fetched forever by `gh pr view --json body` (adw-core §7.2) | free |
+| **The reader over all of the above** | `scripts/adw-analyze.py` — reads every `[adw …]` PR body, the session transcripts and the `predicts` lines of contract PRs; writes a dated report and `metrics.json` to the owner's private reports repo every week; closes with an explicit `NOT MEASURED` block (spec `docs/specs/2026-10-27-adw-self-improving-loop-design.md`) | free |
 
 Nothing else is stored. No run database, and no per-run artifacts — the prohibition is on
 run state, not on design docs; the specs and plans §3.4 produces are the latter. The two
@@ -774,19 +814,23 @@ the prohibition (§0). That distinction is load-bearing rather than convenient: 
 terminal-only, and a stop rule nothing preserves cannot be shown wrong. Adding a metric
 here without a durable home would repeat that.
 
-`scripts/adw-metrics.sh` is the **reader**, and it is inside the prohibition rather than an
-exception to it: it stores nothing, writes nothing, and computes on demand from `gh`. The
-PR body remains the only durable home. Delete the script and no measurement is lost — only
+`scripts/adw-analyze.py` is the **reader** (it replaced `scripts/adw-metrics.sh`, which read one
+evidence row and went stale). It computes on demand from `gh` and the session transcripts and
+keeps no state between runs. Dated analysis snapshots in the private reports repo are written by
+`scripts/adw-analyze.py` and never edited. They are the reader's output, not run state: nothing in
+them needs a person to keep it current, and a later run supersedes rather than updates them. The
+PR body remains the only durable home of run state. Delete the script and no measurement is lost — only
 the convenience of not re-deriving it by hand, which is precisely where it earns its place:
 hand-scanning these fields produced three separate mis-readings before the script existed,
 and two of them were **definition** errors rather than arithmetic, so a more careful human
-would have made them too. Both are now encoded in the script's header:
+would have made them too. Both are now encoded in the reader:
 
 - `review N/2` counts review cycles that **applied findings**. `0/2` is a review that ran
   and came back clean, *not* a review that was skipped — the opposite reading inverts the
   headline conclusion, since it turns the system's healthiest runs into its worst. The
-  script's `rv` / `rv+` columns are the independent check, fetched the way `/pr-ready` §5
-  fetches it rather than inferred from the counter.
+  reader's `evidence.review0_with_fixreview_rate.v1` is the independent check: it counts
+  `0/N` review rows on PRs that still carry `fix(review):` commits, read from the PR's
+  commits rather than inferred from the counter.
 - `progress-conditions` is **hyphenated**. A grep for the spaced form matches nothing and
   reports an empty result set, which reads identically to "no conditions fired".
 
@@ -806,6 +850,7 @@ aggregate cannot tell them apart, the script reports `no data`, never `0`.
 | **Fabricated `verify`** — `tsc`/`grep` forms | **Human.** The mutation check is diff-scoped and re-runs *the test files the unit touched*; a rename or deletion touches none, so there is nothing to re-run. These are exactly the forms §3.4 added to represent #731/#756 — the coverage extension and its verification mechanism are disjoint at the cases that motivated the extension |
 | Composition bugs across units in one sub-PR | System — gates run on the composition |
 | Composition bugs across sub-PRs in a chain | System — the final PR runs the full loop on the whole chain (§4.1) |
+| Wrong placement, a missing control, a screen unlike its siblings — the running app, which no gate renders | System: the app smoke (§4.2, adw-build §3.8) where `repo-profile §21` declares a runner — it fixes a defect its refuter confirms and blocks on one two fix cycles did not clear; else **Human** |
 | Hard unit silently omitted | **Human**, at the §3.2 gate, and only because the surface prints uncovered spec criteria |
 | Mis-cut units, wrong depth | **Human**, at the §3.2 gate — the reason the gate precedes the fan-out |
 | **Correlated blind spot** | **Nobody. Irreducible.** |
@@ -836,14 +881,17 @@ assert that the thing which should go red still goes red.
 ## 6. What stays manual
 
 Intake, the §3.2 cut approval — where `approve` buys the cut *and* the build, so it is the
-only gate at which code consent is collected — reading the produced specs/plans (optional),
+only gate at which code consent is collected, except a cut with nothing for the owner, whose
+started intent gives it — reading the produced specs/plans (optional),
 then per PR targeting `develop`/`main`:
-review, `npm run preview` + visual verification, merge consent. Plus deploy and the
+review, `npm run preview` + visual verification, merge consent (for a `merge: hold` intent, or a
+PR the gate held). Plus deploy and the
 `develop → release → main` ritual, exploratory testing.
 
 **Removed from the human (now pipeline work):** diagnosis, design/spec/plan authoring and
 their critical passes, implementation, gate running, the fix cycle, review invocation,
-sub-PR merges inside a chain.
+sub-PR merges inside a chain, and the merge of a `merge: auto` intent's PRs into the default
+base behind `adw-build §3.7`'s gate.
 
 **Honest accounting.** Expect intake + cut approval + (per develop-targeting PR: review,
 preview, merge) + resolving `blocked`/`failed` exits. A single-PR intent is ~5 touchpoints
@@ -856,19 +904,27 @@ of N.
 Every human touchpoint above arrives through one of four surfaces. Their shape is a
 contract, not a style preference — the owner's recorded feedback
 (`memory/feedback_review_output_structure.md`) is that report-shape rules enforced by
-prose failed twice and held only once made structural. Three rules:
+prose failed twice and held only once made structural. Five rules (adw-core §7 holds the
+current text):
 
 1. **Every surface has a directive slot** — the single action to take now. Asynchronous
    surfaces (run reports, PR bodies) open with a `Next:` first line; interactive prompts
    (the approval surface) end on the verb menu instead, which is the same slot at the
-   cursor.
+   cursor. A surface whose gate was skipped ends on its `gate skipped — …` line (adw-core §7).
 2. **The report is the whole message.** No narration before or after it.
 3. **Decisions read plainly.** Anything asked of the owner is one sentence a non-engineer
    can act on, recommended default stated first. Engineering detail lives one level down
    (the spec, a `<details>` fold), never in the decision line.
+4. **The ask rule binds every question**, mid-build and after the run report too (§3.2). A
+   question it would decide is decided and reported in one line. Merges, `base:` and the
+   `default:` after a stop still wait for the owner; a non-default `base:` keeps the approval
+   gate (adw-init Phase 2).
+5. **Depth renders as its word** (`express` / `spec` / `plan` / `design`, or `port`), never as
+   `D<N>`.
 
 **S1 — approval surface** (`/adw-init`, interactive): §3.2's format. The closing verb menu
-is the directive slot: `approve · re-cut "…" · regroup "…" · depth "…"`.
+is the directive slot: `approve · re-cut "…" · regroup "…" · depth "…"`. A skipped gate prints
+one `gate skipped — …` line in its place (adw-core §7).
 
 **S2 — init exit** (asynchronous):
 
@@ -938,7 +994,8 @@ can see; the safe scope widens as stream A lands. That is a per-run decision, no
 milestone.
 
 **Not in v2:** automated Sentry/Trello intake (both blocked on a scheduler that does not
-exist), auto-merge of anything targeting `develop`/`main`, forking plugin skills. On the
+exist), forking plugin skills. Auto-merge is in, only behind `adw-build §3.7`'s gate, and never
+into the production branch. On the
 skills evidence: 21 symlinks in `.claude/skills/` point into `.agents/skills/`,
 `git ls-files .agents` returns **0**, and all share one mtime (`Jul 12 14:05`) — evidence
 of one copy operation, and deliberately *not* evidence that they have never run (reading a
@@ -966,7 +1023,8 @@ Stop rather than tune if:
   inert until then and must not be cited as satisfied in the meantime.
 - **The six progress conditions (§4.8) never fire.** They replaced the 45-minute bound on
   the argument that a clock cannot distinguish a stuck run from a slow one — sound, and so
-  far untested: read the `progress-conditions` aggregate from `scripts/adw-metrics.sh`,
+  far untested: read the `progress-conditions` aggregate from `scripts/adw-analyze.py`
+  (`design.progress_fired.v1`, with `design.instrumented_units.v1` as the denominator),
   and read **only its `fired` bucket** — a body reading `… not consumed` records a
   condition that was evaluated and deliberately did *not* stop the loop, which is a
   non-firing. Pooling the two credits the conditions for work they did not do, and biases
@@ -993,7 +1051,8 @@ Do not let anyone — including a future revision of this document — fill thes
 plausible prose:
 
 - **Optimal retry caps.** No published study, and none is coming. What *is* now local and
-  readable (`scripts/adw-metrics.sh`) is that the two caps are **not symmetric in effect**:
+  readable (`scripts/adw-analyze.py`: `design.fix_cap_reached.v1`, `design.review_cap_reached.v1`)
+  is that the two caps are **not symmetric in effect**:
   the fix cap has never been reached, while the review cap has, and the review cap — not
   any progress condition — is where `blocked` verdicts have actually come from. So `max 3`
   is untested headroom and `max 2` is the live constraint. That is a description of where

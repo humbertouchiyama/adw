@@ -1,5 +1,5 @@
 ---
-description: "ADW entry point: intent → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init <intent>"
+description: "ADW entry point: intent → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init [--hold] [--followup <slug>] <intent>"
 ---
 
 # /adw-init — from intent to contract, and on into the build
@@ -18,7 +18,51 @@ description: "ADW entry point: intent → triage → human-approved unit cut →
 > repo-agnostic: every value that could differ between repos is in `repo-profile.md`.
 
 **Input:** `$ARGUMENTS` — the intent: free text, a bug list, a report excerpt, a Trello
-ref. Empty → ask for the intent and stop.
+ref. Empty → ask for the intent and stop. Leading flags, in any order, are not intent text: strip
+them before anything reads the intent.
+
+- `--hold` → the intent gets `merge: hold` (adw-core §2) whatever triage proposes: the
+  orchestrator applies it to triage's proposal before the first render, and the surface prints
+  `merge   hold — --hold`.
+- `--followup <slug>` → a small follow-up to a merged intent (adw-core §1.1). `<slug>` must name a
+  merged intent: a kebab-case slug, at least one adw PR of it merged into the default base
+  (`repo-profile §3`), none open, and no unbuilt spec of it in the main tree. The four counts must
+  read `1`, at least `1`, `0`, `0`:
+
+  ```bash
+  # <slug> literal; <default base> is repo-profile §3's value, <specs-dir> and <legacy-specs-dir> are §2's
+  git fetch -q origin
+  printf '%s\n' '<slug>' | grep -cE '^[a-z0-9]+(-[a-z0-9]+)*$'
+  gh pr list --state merged --base <default base> --limit 5000 --json headRefName --jq '.[].headRefName' | grep -cE '^adw/<slug>(-u[0-9][0-9+u]*)?$'
+  gh pr list --state open --limit 5000 --json headRefName --jq '.[].headRefName' | grep -cE '^adw/<slug>(-u[0-9][0-9+u]*)?$'
+  git status --porcelain <specs-dir> <legacy-specs-dir> | grep '^??' | grep -cE -- '[0-9]{4}-[0-9]{2}-[0-9]{2}-<slug>(/|\.md$)'
+  ```
+
+  Any count wrong → drop the flag (`<slug>` is not intent text either), print `⚠ --followup
+  <slug>: not a merged intent — the gate stays` on the approval surface, and run as a plain intent,
+  Phase 0.5 included. An intent that merged into another base, or still has an open PR or an unbuilt
+  spec, is live: it is extended, not followed up. Otherwise mint the intent's slug with this block,
+  in one Bash call, and use the name it prints:
+
+  ```bash
+  # <slug> literal; <default base> is repo-profile §3's value, <specs-dir> and <legacy-specs-dir> are §2's
+  max=$( { { gh pr list --state all --limit 5000 --json headRefName --jq '.[].headRefName'
+             git ls-remote --heads origin 'adw/*' | sed 's|.*refs/heads/||'; } \
+             | sed -nE 's#^adw/<slug>-f([0-9]+)(-u[0-9][0-9+u]*)?$#\1#p'
+           { git ls-tree --name-only origin/<default base> -- <specs-dir>/ <legacy-specs-dir>/
+             ls <specs-dir> <legacy-specs-dir>; } 2>/dev/null | sed 's|.*/||' \
+             | sed -nE 's#^[0-9]{4}-[0-9]{2}-[0-9]{2}-<slug>-f([0-9]+)(\.md)?$#\1#p'; } | sort -n | tail -1 )
+  R="$(git rev-parse --path-format=absolute --git-common-dir)/adw-followups"; mkdir -p "$R"
+  k=$(( ${max:-0} + 1 )); until mkdir "$R/<slug>-f$k" 2>/dev/null; do k=$((k + 1)); done
+  echo "<slug>-f$k"
+  ```
+
+  `<k>` is one more than the highest `-f<k>` of `<slug>` among PR branches, remote branches and spec
+  names, on origin and in the main tree. The `mkdir` reserves the number, so two follow-ups started
+  at once never share one; a reserved number a run abandons is skipped, not reused. The weekly
+  reader finds a merged PR that got a follow-up by that suffix, so a follow-up slug is never minted
+  any other way. Phase 0.5 skips its live-intent search, triage gets the follow-up paragraph with
+  the merged specs (Phase 1), and Phase 2 decides whether the gate is skipped.
 
 **Hard rules**
 - **Phases 0–5 are documents only.** No code edits, no branches, no worktrees — every
@@ -28,13 +72,16 @@ ref. Empty → ask for the intent and stop.
   the session — do not read this rule as a reason to stop there. (It is stated this way
   because the v2.15 contract said "documents only" at the top and "continue into build"
   at the bottom, and the top won every time.)
-- Nothing expensive runs before the human approves the cut (triage and the decide pass, one call
-  at the first render plus one per `re-cut` or `new intent`, are the only pre-gate dispatches) — the
+- Nothing expensive runs before the human approves the cut (triage and the decide
+  pass, one call at the first render plus one per `re-cut` or `new intent`, are the only pre-gate
+  dispatches) — the
   per-unit fan-out can
   cost more than the implementation it produces; burning it on a mis-cut is the failure
   the gate exists to prevent. Since v2.16 the same approval also releases the build, so
   the cut is the only gate in front of the whole run: everything the human might act on
-  is a `QN` or a `⚠` line, never `fyi` (adw-core §7).
+  is a `QN` or a `⚠` line, never `fyi` (adw-core §7). **So when nothing on the surface needs the owner,
+  nothing waits:** Phase 2's skip test skips the gate, the surface still prints, and the intent
+  the owner started is the approval.
 - Skill references allowed in produced artifacts and dispatched prompts: plugin skills
   (`superpowers:*`) and tracked commands only. Repo-local symlinked skills
   (`.claude/skills/*` → `.agents/`) are absent in worktrees — a spec or plan that
@@ -47,8 +94,11 @@ ref. Empty → ask for the intent and stop.
 
 **Pin the contract first:** `CONTRACT_SHA=$(git -C <cache> log -1 --format=%h)` — the loader stub
 already fetched it (adw-core §9). Substitute the value as a literal; it goes on the handoff and,
-after `approve`, is the value `/adw-build` carries. There is nothing to check: fetching before
+after `approve` or a skipped gate (Phase 2), is the value `/adw-build` carries. There is nothing to check: fetching before
 reading is what the old freshness check could only report on after the fact.
+
+**A `--followup` that passed Input's checks skips the rest of this phase:** the flag named the
+intent, and a merged intent is not live.
 
 **Then look for a live intent this belongs to** (adw-core §1.1) — the owner arrives with
 "three more bugs I found testing", not with a slug, so detection is the pipeline's job:
@@ -103,13 +153,31 @@ whether or not the tracker is connected: the header is a fact about the intent, 
 connection again.
 
 Extension is **proposed at the approval surface, never assumed** — the `extends` line states it and the verb
-menu still governs. A different `base:`, or a different subject, is a new intent: say so in
+menu still governs: Phase 2's skip test never skips the gate in extend mode. A
+different `base:`, or a different subject, is a new intent: say so in
 one `fyi` line and cut fresh. When nothing matches, this phase is silent.
+
+## Phase 0.7 — the ask rule (one prompt, at the approval surface)
+
+Stamp **T0** here (`date +%s`, adw-core §7.1) — before the dispatch, so triage and the decide pass
+count as machine time.
+
+**The ask rule** — triage (Phase 1) and every decide pass (Phase 2) use it. A question goes to the owner
+only when BOTH hold: (a) the answer needs knowledge only the owner has — goals, users, priorities,
+scope, what "done" means — and the repo cannot settle it; (b) a reasonable owner could reject the
+default. **Also `ask`, whatever (a) and (b) say:** the answer changes money, data or a public
+contract, is hard to reverse, or is the `base:` branch. Everything else is decided, with a reason.
+A question about how to build it is never `ask`: which approach, which file, which library, whether
+a refactor is in scope. Owner-reported, not measured: about 30% of gate questions went back because the run could
+decide them better, and about 12% because the default was obvious — (a) catches the first, (b) the second.
+
+There is no question round before triage. Triage lists the questions that pass this rule (Phase 1, item 6),
+the decide pass settles the ones the run can settle (Phase 2), and the owner sees the rest once, on the
+approval surface, with `approve`.
 
 ## Phase 1 — triage (one cheap agent)
 
-Stamp **T0** here (`date +%s`, adw-core §7.1) — before the dispatch, so triage counts as
-machine time. T1/T2 bracket the Phase 2 gate. **T3 is stamped at each `⏱ run` print, not
+**T0** was stamped in Phase 0.7. T1/T2 bracket the Phase 2 gate. **T3 is stamped at each `⏱ run` print, not
 once per run** — on a chained `approve` the handoff's `⏱ run` is a PARTIAL (init only) and
 the build's run report stamps its own T3 over the same continuing series (adw-core §7.1).
 Only `specs only` makes the handoff's T3 the run's last.
@@ -134,7 +202,9 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 > 5. spec criteria covered by no unit — mandatory, print `none` explicitly if none;
 > 6. **three separate lists, split by you, not by the renderer** — questions, hazards, fyi.
 >    A **question** is anything the owner must ANSWER (each becomes a numbered `QN` at the
->    approval surface, adw-core §7) and ships with a recommended default; a
+>    approval surface, adw-core §7) and ships with a recommended default and its consequence in one
+>    clause; check the repo before you list one — a question the code answers is not one, and
+>    a question about how to build it is never one. The ask rule: <Phase 0.7's ask rule, pasted>; a
 >    "confirm X before …" item is a question, never a hazard and never fyi. A **hazard**
 >    is anything the owner might act on without being asked: files shared between units,
 >    scope=future / fan-out hazards, gate-visibility gaps, uncharted territory — these
@@ -152,7 +222,7 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    and §20's port surface instead). A single-unit intent meeting every D1
 >    criterion is proposed `express` (D0) when D0 is active (adw-core §3 status line) —
 >    then include the draft
->    flat spec (header + body per adw-core §2) in the proposal itself; its code
+>    flat spec (header + body per adw-core §2, its acceptance criteria numbered `AC 1`, `AC 2`, …) in the proposal itself; its code
 >    snippets follow the repo comment rule (`repo-profile §2`): one terse line + spec ref,
 >    never a multi-line rationale comment (D0 skips the fan-out, so this is the
 >    draft's only exposure to that rule);
@@ -161,7 +231,9 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    propose `base: <branch>`
 >    (adw-core §2) after confirming it exists on origin; when the right base is itself
 >    doubtful (e.g. forking off another intent's still-open chain), return it as a
->    question, not a `⚠` or `fyi` line.
+>    question, not a `⚠` or `fyi` line. Beside it, propose `merge:` (adw-core §2):
+>    `merge: auto` when the base is the default base and `repo-profile §3`'s `auto-merge
+>    default` row says `on`, else `merge: hold` (no row is `hold`). One clause why.
 > Return the structured proposal, nothing else.
 
 **Extend mode appends this to the prompt** (Phase 0.5 matched a live intent) — without it
@@ -182,9 +254,20 @@ the triage re-diagnoses shipped code and mints blind neighbours:
 > shared file, shared query, one's design assuming the other's absence. That class is
 > invisible to every gate and is the whole reason extension beats a fresh slug.
 
-Run the **decide pass** (first paragraph of Phase 2) on the proposal's questions, THEN render the
-**approval surface exactly** (adw-core §7) from the proposal and end the turn on the verb menu.
-Do not proceed without an answer.
+**Follow-up mode appends this to the prompt** (a `--followup` that passed Input's checks), with the merged intent's
+spec paths from `git ls-tree -r --name-only origin/<default base> -- <specs-dir> <legacy-specs-dir> |
+grep -E -- '/[0-9]{4}-[0-9]{2}-[0-9]{2}-<slug>(/|\.md$)'` (`<default base>` is `repo-profile §3`'s;
+Input checked that the intent merged there):
+
+> This is a FOLLOW-UP to the merged intent `<slug>`, under the new slug `<slug>-f<k>`. Its specs:
+> `<paths>`, read with `git show origin/<default base>:<path>`. Read them before proposing anything. Cut
+> as for any intent. The owner asked for one small change: propose `express` (D0) when every D1
+> criterion holds, and never shrink or stretch the cut to reach it.
+
+Run the **decide pass** (first paragraph of Phase 2) on the proposal's questions, then Phase 2's
+**skip test**, THEN render the **approval surface exactly** (adw-core §7) from the proposal. When
+the skip test fails, end the turn on the verb menu and do not proceed without an answer. When it
+passes, the surface ends on the skipped-gate line instead and the run goes on (Phase 2 says how).
 
 ## Phase 2 — the human gate
 
@@ -195,19 +278,16 @@ from triage therefore goes through ONE read-only dispatch (it must not write) on
 (`model: sonnet` when every unit is D0–D1) that gets the question list, the proposal (with the D0
 draft spec when there is one) and the repo profile, and returns one line per question id:
 `decided: <answer>` or `ask`. An id it omits, or a reply it cannot parse, is `ask`.
-**A question is `ask` when ANY of these holds**, even if it has a default: the answer is a
-product or scope call the code cannot settle, changes money, data or a public contract, is hard to
-reverse, or is the `base:` branch. Only a question matching none of them is `decided` (UX taste,
-naming, which items or copy, a defensible default). **A question about how to build it is never
-`ask`:** which approach is correct, which file, which library, whether a refactor is in scope. The
-code settles those, and the owner sends them back: 12 of the 64 gates after this pass shipped were
-answered "critically decide". Every `ask` is rewritten in plain words: one
+**A question is `ask` only under Phase 0.7's ask rule**; every other question is `decided` (UX
+taste, naming, which items or copy, how to build it, a default no reasonable owner rejects). The
+code settles how-to-build questions, and the owner sends them back: 12 of the 64 gates after this
+pass shipped were answered "critically decide". Every `ask` is rewritten in plain words: one
 sentence, no identifiers the owner has to look up, the default and its consequence in a clause.
-Ids come from triage's list and are never renumbered, so `ask` rows can skip a number.
+Triage's questions take ids `Q1`, `Q2`, … in order, and no id is ever renumbered, so `ask` rows can skip a number.
 `decided` items print as ONE line under `needs you`
 (`decided  Q2 cap refunds: yes · Q3 export: pick-lists only — reopen by number`), a few words of the
-question then the answer. A `decided` answer goes to every unit author, who follows the ones that
-touch its unit. `reopen Q<N>` turns a `decided` question back into an `ask` with triage's default;
+question then the answer; a skipped gate drops `— reopen by number` (adw-core §7). A `decided` answer goes to every unit author, who follows the ones that
+touch its unit. `reopen Q<N>` turns a `decided` question back into an `ask` with its default;
 on any other question it does nothing. Only `re-cut` and `new intent` rerun the pass, and only over
 the questions triage marks `new` (none new, no dispatch): every other question keeps its id and its
 status (`ask`, `decided`, answered at the gate, reopened), and new questions take ids after the
@@ -223,8 +303,39 @@ The orchestrator composes the pass's prompt from this text:
 
 > Read-only: do not write. Intent `<slug>`. First read the proposal, the D0 draft spec if any, and
 > `.claude/repo-profile.md`. For each question below return one line: `Q<N> | decided: <answer>` or
-> `Q<N> | ask`. It is `ask` when <the `ask` criteria above, pasted>; a question you cannot judge is `ask`.
+> `Q<N> | ask`. It is `ask` only when <Phase 0.7's ask rule, pasted>; a question you cannot judge is `ask`.
 > `<Q<N> — question — triage's default>`, one per line
+
+**Skip test — after the decide pass, before the first render.** It applies to every intent, a
+`--followup` or not, at any unit count and any depth. The gate is skipped when all four hold:
+
+1. no question is `ask`;
+2. no `⚠` line would print on the approval surface, except adw-core §7's `⚠ spec criteria covered
+   by no unit: none`. An orchestrator above sonnet, or of `unknown` tier, prints its tier `⚠` line
+   (adw-core §8), so it keeps the gate;
+3. the intent's base is the default base (`repo-profile §3`): the surface prints no `base` line.
+   The `base:` branch waits for the owner (Phase 0.7, adw-core §7 rule 4);
+4. Phase 0.5 matched no live intent: the surface prints no `extends` line. Extension is the owner's
+   choice (adw-core §1.1), so extend mode keeps the gate, where `new intent` can drop it.
+
+When all four hold, the gate is skipped:
+
+- Render the approval surface exactly (adw-core §7) as for any intent, with the skipped-gate line in
+  place of the verb menu. Print it as the text of the message whose tool call starts Phase 3: the
+  first unit agent's dispatch, or, for a D0 unit, the write of its spec. A message that holds the
+  surface and no tool call ends the turn, and the run with it.
+- Nothing waits. Go on exactly as `approve` does: freeze the proposal, Phase 3, Phase 4, then
+  Phase 5, which builds in the same session.
+- The intent the owner started is the consent: a typed `/adw-init` line (`--followup` included), an
+  `/adw-build <unknown slug>` routed to init, or an `/adw-dispatch` brief. It consents to build
+  the proposed cut, to merge its sub-PRs into the integration branch, and to merge into `base:`
+  under adw-build §3.7's gate when the intent is `merge: auto` (adw-core §6). The intent's `merge:`
+  is triage's proposal, or `hold` under `--hold`, and the surface prints it, so the owner can still
+  add `adw:hold` before the merge.
+- There is no T1 or T2 stamp: the gate time is 0.
+
+Any other case renders the approval surface as usual, ends on the verb menu and waits, and every
+verb below works.
 
 - `approve` → freeze the proposal (units, depths, `shape`, packaging, `after`, `verify`, and every
   `QN` answer: `decided` ones, gate answers, `ask` defaults) → Phase 3,
@@ -246,7 +357,7 @@ The orchestrator composes the pass's prompt from this text:
   ends. This is the verb for reading the specs before any code exists.
 - `detail` → re-render the approval surface with its `detail` and `fyi` blocks appended
   (adw-core §7). Not an exit — the gate stays open.
-- `reopen Q<N>` → turn a `decided` question back into an `ask` with triage's default, re-render
+- `reopen Q<N>` → turn a `decided` question back into an `ask` with its default, re-render
   the approval surface.
 - `re-cut "<instruction>"` → send the instruction to the SAME triage agent
   (SendMessage — context intact), adding: "Keep every question your change does not touch
@@ -259,10 +370,17 @@ The orchestrator composes the pass's prompt from this text:
   and first chains the unit out of a shared PR or sub-PR; `none` leaves the depth at D1 until a
   `depth` verb moves it. Re-render the approval surface. `depth` never takes `port`, and refuses a
   `shape: port` unit: clear the shape first.
+- `merge auto` / `merge hold` → set the intent's `merge:` (adw-core §2) and re-render the approval
+  surface. `merge auto` refuses when the base is the production branch (`repo-profile §3`), and
+  overrides `--hold`. Every spec of the intent carries the value before the build starts: Phase
+  3's preamble writes it, and a D0 draft carries it in its header. `approve` on a surface that prints `merge   auto` is the owner's consent for that
+  intent's merges once the merge gate passes (adw-core §6, §7), and so is the intent the owner
+  started when the skip test skips the gate on such a surface.
 - `new intent` (extend mode only) → drop the extension, cut a fresh slug, run the decide pass over
   its questions (first paragraph of this phase), re-render the approval surface.
 
-Any number of rounds. Only `approve` / `decide` / `specs only` exits the gate.
+Any number of rounds. Only `approve` / `decide` / `specs only` exits the gate. A gate the skip test
+skipped never opens, so it has no rounds.
 
 **`approve` was the stopping verb until v2.16 and is now the building one.** The rename is
 deliberate: the round-trip existed so the human could read specs, and in practice they
@@ -271,7 +389,8 @@ told them to type — a step no one skipped on purpose. The consent that moved w
 real, so the approval surface names it (`approve → cut + build`) and every hazard is a
 `⚠` line the brief surface still prints. The merge carve-out (adw-core §6) does not move.
 
-Stamp **T1** immediately before each approval-surface print and **T2** on each answer (adw-core §7.1);
+Stamp **T1** immediately before each approval-surface print that waits and **T2** on each answer
+(adw-core §7.1); a surface printed under the skip test waits for nothing and gets neither;
 across re-cut rounds the gate total accumulates and the re-render itself is machine time.
 
 ## Phase 3 — fan-out (parallel, one subagent per unit)
@@ -300,11 +419,13 @@ with the most to discover), so blocking on it is a pure loss every time.
 > never code, never a branch. Spec path: `<exact path per adw-core §1>`. The spec MUST
 > open with the exact header block (adw-core §2):
 > `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`
-> when the unit was approved as `port`, plus `card: <ref>` when the intent names a card
-> (adw-core §10; `<ref>` is the ref Phase 3 settled). Approved answers for this intent, one per line as
+> when the unit was approved as `port`, `base:` when the intent overrides it, `merge: <auto | hold>` as
+> the gate printed it, and `card: <ref>` when the intent names a card (adw-core §10; `<ref>` is the ref
+> Phase 3 settled). Approved answers for this intent, one per line as
 > `QN — <question>: <answer>`: `<list>`. Follow each one that touches this unit and
 > record it in the spec under its `QN` id. The spec body
-> states: the problem, the change, acceptance criteria, and (bugs) root cause with
+> states: the problem, the change, acceptance criteria numbered `AC 1`, `AC 2`, … (adw-build §3.5's
+> `Checks` line cites them), and (bugs) root cause with
 > evidence. Reference only plugin skills (`superpowers:*`) or tracked commands.
 > Code snippets in the spec/plan MUST follow the repo comment rule (`repo-profile §2`): one
 > terse line + spec ref, never a multi-line rationale comment — the implementer copies
@@ -369,8 +490,8 @@ skill text asserts them and the skill text is what the agent has at the cursor:*
 
 **`brainstorming`'s `<HARD-GATE>` cannot be satisfied inside the fan-out** — it forbids
 implementation until "your human partner has approved", and a unit agent has no human. That
-approval already happened, at the approval surface (adw-core §7), which is why the fan-out
-runs at all. Say so in the prompt: "the human gate for this unit is already passed; produce
+approval already happened, at the approval surface (adw-core §7), or in the intent the owner
+started when Phase 2's skip test skipped the gate, which is why the fan-out runs at all. Say so in the prompt: "the human gate for this unit is already passed; produce
 the artifact and stop — do not ask for approval, and do not write code." Also pin the path:
 brainstorming classifies spike/bounded/architectural on its own, which is a second depth
 ladder that can disagree with §3's. **§3's depth wins; the unit's `depth:` is not
@@ -447,6 +568,9 @@ Fix in place on any failure, except where a bullet says it only reports:
   existing units — prior units of the intent are legal targets — and is acyclic;
 - extend mode: exactly ONE dated spec folder for the slug (adw-core §1) and every new
   spec carries the intent's `base:`;
+- every spec of the intent carries the same `merge:` line, `auto` or `hold`, with the value the
+  gate printed; extend mode writes it into the prior units' specs too. `auto` with a base that
+  is the production branch is a failure: set `hold`;
 - every `verify:` is a non-empty command whose first token is on `repo-profile §5`'s allowlist;
   any other tool wraps in `bash -c '…'`;
 - **every D3 unit has a plan file; D0/D1/D2 units have none** — a plan file next to a D2
@@ -519,12 +643,13 @@ Three ordered steps, no discretion:
    the handoff's `decided` line only after the spec is read back and shows the answer (when the
    resume fails, edit the spec here, or keep the question in `needs you`); only an `ask` stays in `needs you`. Of 12 handoff stops in twelve
    days, 8 were answered with the default. Then: build unless either holds:
-   the gate verb was `specs only`, **or** `needs you` is non-empty. Either → stopping exit.
+   the gate verb was `specs only`, **or** `needs you` is non-empty. Either → stopping exit. A gate
+   Phase 2's skip test skipped counts as `approve`.
 2. **Print the handoff exactly** (adw-core §7) in the variant step 1 chose — `Next: nothing
    — building <units>` for the building exit, `Next: /adw-build <slug>` for the stopping
    one. **On the building exit the handoff is not a message of its own:** print it as the text
    of the message whose tool call invokes `/adw-build <slug>` (step 3). A message that holds the
-   handoff and no tool call ends the turn, and the run with it. Rest of the surface is identical: specs line · plans line · `⏱ run` · `needs you`
+   handoff and no tool call ends the turn, and the run with it. Rest of the surface is identical: specs line · plans line · `⏱ run` · `asks` (adw-core §7) · `needs you`
    items aggregated from Phase 3 (or `none`). The report is the whole text of the message: **no text
    follows the last line — no summary of what the critical passes found, no explanation of
    a question already printed, no announcement of what you are about to do.** A run that
@@ -535,10 +660,10 @@ Three ordered steps, no discretion:
    bodies OUT of context:** do not re-read, quote or summarise them at the boundary, and
    drop the Phase 3 agents' returned text. Build's Phase 0 resolves every spec from disk
    itself, and the whole cost of collapsing the round-trip is that build no longer starts
-   on a fresh window — the `subscription-locks` run compacted 8 times, and adw-build's
-   session-boundary rule (§ "Session-boundary provenance") turns a mid-chain compaction
-   into a halt with a `ready` sub-PR left human-owned. Carrying init's spec text into build
-   buys nothing and pays that cost directly.
+   on a fresh window — the `subscription-locks` run compacted 8 times, and every compaction
+   drops the contract text the run needs next. A compaction no longer leaves a `ready` sub-PR
+   to the owner: its `verified` row lets the resumed run merge it (adw-build §3.7). Carrying
+   init's spec text into build buys nothing and pays that cost directly.
 
 Unanswered `needs you` items on the handoff ship with the recommended default, recorded in the
 spec — but note that an unanswered item is exactly what step 1 stops on, so this applies to a later

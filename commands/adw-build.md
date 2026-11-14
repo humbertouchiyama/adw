@@ -55,7 +55,8 @@ Then:
   `no spec for \`<argument>\` — starting /adw-init first` — and invoke `/adw-init
   <argument>` with the argument verbatim as the intent. Init runs its OWN Phase 0; this
   file's Phase 0 does not run first and its `CONTRACT_SHA` is not pinned here. Where init goes next is init's Phase 5 decision, and
-  a clean `approve` comes back through this file's Phase 0 by the normal route.
+  a clean `approve`, or a gate init's skip test skipped, comes back through this file's Phase 0 by
+  the normal route.
 
 **Skill tier (design §4.9):** this loop and every artifact it consumes may reference
 plugin skills (`superpowers:*`), tracked commands
@@ -63,28 +64,27 @@ plugin skills (`superpowers:*`), tracked commands
 (`.claude/skills/*` → `.agents/`) do not exist in worktrees — do not add such a
 reference in a future edit of this file.
 
-**Session-boundary provenance (adw-core §6 corollary):** the merge carve-out requires
-provenance THIS session established. After any session boundary — compaction that loses
-the run state, crash, or a fresh invocation — every already-open adw PR is human-owned:
-resume may build the next units, but it never merges a PR the current session did not
-itself open and carry to `ready` (or, for a carried block, to `blocked`: §3.7). **This binds
-hardest on a `ready` or `blocked` sub-PR still awaiting
-its §3.7 merge: if run state was lost, do not merge it — halt the chain and report it on
-the run report as human-owned.** Long runs compact (the 10-unit `subscription-locks` run did, 8 times);
+**The merge rests on durable facts (adw-core §6 corollary).** Never on what this session
+remembers: the spec's `merge:` flag (adw-core §2), the evidence block's `verified` row (§3.4), the
+`## Smoke result` walk line (§3.8) and the PR's labels. All four survive a compaction, a crash and
+a fresh invocation, so any run building this slug may merge one of its PRs when they allow it: an
+independent or final PR when §3.7's merge gate passes, a `ready` sub-PR, or a carried `blocked`
+one, when its head equals its `verified` row (§3.7). A head that moved off its `verified` row
+merges nowhere. A run never merges a PR of another slug. The owner who is testing a PR adds
+`adw:hold`, and no run merges it. Long runs compact (the 10-unit `subscription-locks` run did, 8 times);
 compaction is not schedulable from inside the loop, so the durable defences are the ones
 that survive it — §3.4's evidence block in the PR body, the `fix-attempt-N`/`fix(review):`
 prefixes step 7 recovers counts from, and re-deriving `$VSHA` and the base rather than
 trusting a remembered value.
 
-**After a compaction, re-read this file's Phase 3 (§3 to §3.7) before the next dispatch.** A
+**After a compaction, re-read this file's Phase 3 (§3 to §3.8) before the next dispatch.** A
 summary keeps what the run did and drops what the contract told it to do next. Of the PRs opened
 after a compaction, 15 of 45 had no evidence block (§3.4); before one, 6 of 160. Four of the seven
 runs that compacted mid-run never read this file again (2026-09-20 to 10-01).
 
 **Never:** `git stash` (repo-global, shared across worktrees) · draft PRs (permanently
-review-ineligible) · merge anything targeting the default or production branch
-(`repo-profile §3`) · merge a PR whose
-provenance this session did not establish · resolve a sync conflict unattended · edit a
+review-ineligible) · merge into the production branch (`repo-profile §3`), or into the default
+base without §3.7's merge gate · resolve a sync conflict unattended · edit a
 gate file to get green · let a subagent create its own worktree.
 
 ## Phase 0 — resolve the contract
@@ -112,7 +112,7 @@ gate file to get green · let a subagent create its own worktree.
    shipped inside the file that might itself be stale. Two runs executed a superseded contract with
    it in place (design §10 v2.7, v2.12). Fetching before reading retires the whole class.
 
-2. Labels: run the two idempotent creates from adw-core §5.
+2. Labels: run the four idempotent creates from adw-core §5.
 3. Locate specs: `<specs-dir>/????-??-??-<slug>/` (multi-unit) or
    `<specs-dir>/????-??-??-<slug>.md` (single-unit flat) — **and the same two shapes under
    `<legacy-specs-dir>`** for an intent born before that repo's artifact-root cutover
@@ -127,7 +127,9 @@ gate file to get green · let a subagent create its own worktree.
    — parse both into one manifest.
 4. Parse every spec header (adw-core §2). Any missing required field, duplicate unit id,
    an `intent:` value that does not equal the slug, an `after` cycle, a `base:`
-   present on some units but not all (or with differing values), or a `shape: port` unit
+   present on some units but not all (or with differing values), a `merge:` present on some
+   units but not all (or with differing values, or a value other than `auto` or `hold`), a
+   `merge: auto` whose base is the production branch (`repo-profile §3`), or a `shape: port` unit
    whose depth is not D1, that shares a PR or sub-PR with another unit, or whose repo profile
    has no complete §20 (adw-core §2), or a `card:` present on some units but not all (or with
    differing values) → refuse the whole
@@ -141,7 +143,9 @@ gate file to get green · let a subagent create its own worktree.
    per-PR-type placeholder — a sub-PR still audits against `adw/<slug>`; do not conflate
    the two names. EXCEPT the consent boundary
    (adw-core §6: PRs targeting the default base, the production branch, OR the intent's base
-   branch all need the human), which always mean the literal branches. Non-default `INTENT_BASE`
+   branch all need the human), which always mean the literal branches: a PR into the intent's
+   base or the default base may merge only when the intent's specs say `merge: auto` and §3.7's
+   merge gate passes, and a PR into the production branch never. Non-default `INTENT_BASE`
    prints on the run report `note` row. Three straight runs needed a non-default base; run-5
    abandoned `/adw-build` for want of it — design v2.8.
 6. Reconstruct topology: independent PRs (respecting grouped packaging) + chains ordered
@@ -203,10 +207,12 @@ gate file to get green · let a subagent create its own worktree.
    closed-unmerged, across BOTH bases (`adw/<slug>` and `<INTENT_BASE>`; independent units
    target `<INTENT_BASE>` and are invisible to a chain-only listing); map head branch + title
    (`+`-separated unit field) → unit ids. Merged units are skipped. **A still-OPEN adw
-   PR for a unit of this intent (blocked/failed/ready from a prior session) is
-   human-owned** (see Session-boundary provenance): do not duplicate it, do not merge
-   it — its chain halts at that unit, the run-report line says `blocked #N — pre-existing PR
-   from a prior run; merge or close it, then re-run`. A CLOSED-unmerged adw PR is
+   PR for a unit of this intent (blocked/failed/ready from a prior session) goes through §3.7
+   like any other**, read from its labels and its evidence block (The merge rests on durable
+   facts, above): do not duplicate it. A `ready` one with a `verified` row equal to its head, or a
+   `blocked` one §3.7 can carry, merges by §3.7. Any other — no `verified` row equal to its head,
+   `failed`, a `blocked` one §3.7 cannot carry — halts its chain at that unit, and the run-report
+   line says `blocked #N — pre-existing PR from a prior run; merge or close it, then re-run`. A CLOSED-unmerged adw PR is
    owner-decided: do not rebuild — its chain halts `blocked` at that unit (run report: `closed
    by owner — reopen or re-cut, then re-run`) unless the unit's spec changed after the
    close. A pre-existing unit branch with no PR and NO registered worktree is stale
@@ -223,13 +229,13 @@ gate file to get green · let a subagent create its own worktree.
    `· ⚠ no trustworthy gate sees this unit's correctness`.
 9. **Card (adw-core §10), last, after every refusal and halt above has passed.** When the headers carry
    `card:`, run §10's connection read, print its `⚠` line if it fails, and move the card to
-   `repo-profile §21` `started` with its comment. A card already in `started` or `review` is not moved
+   `repo-profile §22` `started` with its comment. A card already in `started` or `review` is not moved
    and gets no comment.
 
 ## Phase 1 — scheduling
 
-- **Timing series (adw-core §7.1):** reached via `approve` (adw-init
-  Phase 5 step 3), continue init's T-series — do NOT restart it. Invoked fresh, stamp T0 here and report `your gate 0m`.
+- **Timing series (adw-core §7.1):** reached via `approve`, or via a gate
+  adw-init Phase 2 skipped (both enter through adw-init Phase 5 step 3), continue init's T-series — do NOT restart it. Invoked fresh, stamp T0 here and report `your gate 0m`.
   Any mid-run halt for an owner answer stamps its own T1/T2 pair into the gate total.
 - **Halt only where §6 binds, and batch what you halt for.** The run stops for exactly two
   things: a merge outside adw-core §6's consent carve-out, and an escalation the owner alone
@@ -294,11 +300,14 @@ gate file to get green · let a subagent create its own worktree.
   dispatch. A level sibling's implementer brief says `implement, commit, then return before you
   run any gate`; the orchestrator then resumes one sibling at a time (SendMessage: `run the gates
   now`), and it does not dispatch a 3.4 verifier or a 3.6 driver while another unit's implementer,
-  verifier or driver is still running gates. Where §10 says the gates isolate themselves per
+  verifier or driver is still running gates. A §3.8 smoke relay counts as a gate-running agent here:
+  its runner builds the app. So does a §3.8 smoke fix agent: it runs the gates. Where §10 says the gates isolate themselves per
   worktree, nothing is serialised. **Never a lock file, a lock script, `flock` or a wait-for-lock
   loop**, in this session or in any brief. The rule above named no mechanism, so each run wrote
   its own: 581 lock commands across 9 sessions, four permission denials and 12 hours of owner time
-  on one PR, and a three-hour stall on another when a verifier died holding the lock.
+  on one PR, and a three-hour stall on another when a verifier died holding the lock. The ban does
+  not reach the lock `repo-profile §21`'s Lock row names: the repo's runner owns it, and a run waits
+  on it only where §3.7's merge gate and §3.8 say.
 
   **A sibling that merges first leaves its twin behind, and that is fine — do not rebase
   it.** Both branched from the same `origin/adw/<slug>`; when the first merges, the second is
@@ -360,6 +369,11 @@ implement ⟲ gates → verify → open PR → /code-review ⟲ → re-verify �
      max 3 cycles                          max 2 cycles
 ```
 
+An independent PR or a final PR then runs §3.8's app smoke on its verified head, after the state
+above is decided, and never on a sub-PR. A defect the smoke's check confirms starts a smoke fix
+cycle, at most two per PR (on a final PR, per code-changing owner reply: Phase 4), and each cycle
+comes back through gates → verify → review.
+
 **Progress, not elapsed time, terminates a loop** (v2.12; the 45-minute bound it replaces
 is design §4.8). Record `date +%s` at **PR start = this loop's first implementer dispatch
 (3.1)**, never `gh pr create` (3.5 runs after gates+verify — anchoring there would make
@@ -388,7 +402,8 @@ Any one fires → finish the phase in flight, then abort →
    exhaustion is `failed` (§3.2). Review cycle **3 never starts** — cycle 2 runs, and its
    verdict stands as `/pr-ready` §3 returns it: `ready` when its report-only closure check
    finds nothing to apply, otherwise **`blocked`**, not `failed` (§3.4 verdict routing). The
-   closure check is not a cycle — it cannot push, so it crosses no boundary. The caps permit the cycle they name; this condition stops the
+   closure check is not a cycle — it cannot push, so it crosses no boundary. Smoke fix cycle **3
+   never starts** (§3.8): a `valid` smoke row left after cycle 2 is `blocked`. The caps permit the cycle they name; this condition stops the
    one after it.
 2. **Repeated error signature.** The red at cycle N carries the same
    `(gate command, first failing test id or `TSxxxx`, NORMALISED assertion message)` as
@@ -440,7 +455,10 @@ Any one fires → finish the phase in flight, then abort →
    rises monotonically no matter what the implementer does. **16, not 12:** a fully-loaded
    legitimate run is 5 base boundaries + 3 fix-cycle gate passes + 2 review boundaries = 10,
    and a §3.6 void re-pass adds more — a cap of 12 would trip on a run that did everything
-   right. Size it above the legitimate maximum or it becomes the 45 again.
+   right. Size it above the legitimate maximum or it becomes the 45 again. A §3.8 smoke fix cycle
+   starts the count again, as Phase 4's answer commit does: its fix gates, 3.4 verify and 3.6 review
+   are boundaries counted from zero, and §3.8's walks and check are not boundaries. Condition 1's
+   smoke cap bounds how many times the count restarts.
 
 **The FIRST pass of a mandatory stage always runs, and no condition above suppresses it:**
 the 3.4 verify, the single 3.6 review, **and Phase 4's composition review**. Each is a
@@ -764,9 +782,11 @@ pipeline knows:
   why `/pr-ready` takes `BASE` as an override rather than always deriving it from
   `baseRefName`.
 - **`PASS`** — `v1`, `v2` for the post-review re-pass, `v3+` for a void re-pass (3.6).
-- **`REF`** — `<slug>-uNN` (grouped: `<slug>-uNN+uMM`). This pass runs BEFORE 3.5 opens the
+- **`REF`** — `<slug>-uNN` (grouped: `<slug>-uNN+uMM`); for a chain's final PR (Phase 4),
+  `<slug>-close`. This pass runs BEFORE 3.5 opens the
   PR, so `/pr-ready` §1's default `<N>` does not exist yet; §4.3 names the worktree and §8
-  sweeps it, both off `$REF`. Pass the same value to every `PASS` of the same unit.
+  sweeps it, both off `$REF`. Pass the same value to every `PASS` of the same unit. Phase 5's
+  cleanup finds a verify worktree, and its DerivedData, only by these two shapes.
 - **The mutation check.** The verifier's report must ALSO carry §3.2's red-then-restored
   pair, plus the per-file iteration where §3.2 makes it mandatory, and for a port unit the mode
   the check ran in (`fast` or `gate`; `gate` means the per-file sweep was skipped). It stays here rather
@@ -797,6 +817,7 @@ pipeline knows:
   cycles     fix 1/3 · review 1/2      progress-conditions none fired
   phases     implement 9m · gates 14m · verify 7m · review 21m · reverify 6m
   owner-wait 0m
+  asks       shown 3: owner 1 · default 1 · delegated 1 · auto-decided 4
   gates      <one field per repo-profile §5 gate the diff obligated: name + exit code>
   mutation   aggregate red · per-file 4/4
   artifact   plan 260L / diff 71L = 3.66x
@@ -807,6 +828,23 @@ pipeline knows:
   `mutation` row ends `· fast` or `· gate` (the mode that graded discrimination; `gate` means the per-file sweep was skipped), and its `gates`
   field adds `render gate-mode <exit code>`, so the TRIAL (adw-core §3) leaves a record.
 
+  A PR that §3.8 applies to gets one more row after each walk, written by one more `gh pr edit`
+  and replaced by the next walk's: `smoke      walk <k> · <d> defects (<b> blocking) · <g> gaps ·
+  valid <v> · refuted <r> · fixed <f> (<u> unconfirmed) · cases <passed>/<total> · audit <exit> · <m>m`, or
+  `smoke      not runnable: <reason> · fixed <f>`, or `smoke      not run — <reason> · fixed <f>`. The counts
+  are the last walk's, except `fixed`, which counts every row a smoke fix cycle fixed (`<u>` of them
+  with a `fixed:` line still ending `, unconfirmed`, §3.8), and `<m>`,
+  the minutes of every walk. No other PR carries the row.
+
+  Two more rows, each by one more `gh pr edit`, each replaced by the next write:
+  - `verified   <40-char sha>`: written at §3.7 when the PR reaches `ready`, or `blocked` with a
+    driver-returned `verified <sha7>`, from `$VSHA`, never from a fresh derivation. §3.7's merge
+    gate and its sub-PR procedure compare the head against it.
+  - `merge      merged <merge sha7> · base unmoved` or `· base trial ok at <base sha7>`, or
+    `merge      hold <n> — <reason> · at <head sha7>`: written by §3.7's merge gate on an
+    independent or final PR. `<n>` is the gate's condition number 1–9, or `call` for a denied or
+    failed merge call.
+
   `owner-wait` is the decisive one: it is the single bit that distinguishes a 21-hour
   owner gate from a 21-hour stalled pipeline. Git already exposes the *gap* via commit
   timestamps; only the attribution is missing, and three retros failed on exactly that
@@ -816,6 +854,8 @@ pipeline knows:
   `owner-wait = Σ(T2ᵢ − T1ᵢ)` over that PR's pairs; subtract it from the per-PR `⏱`. A field
   reported without being measured is the shape §4.8 just retired the clock over.
   `resumed-from` is the recovered cycle count, not `0` by default — see Phase 0 step 7.
+  `asks` is the init handoff's `asks` line (adw-core §7), copied verbatim, the same in every PR of the
+  intent; a build not reached through adw-init Phase 5 step 3 (`approve`, or a gate adw-init Phase 2 skipped) writes `asks n/a — fresh /adw-build`, and one whose handoff is no longer in context writes `asks n/a — handoff not in context`. Never rebuild the line.
   `open-findings` is `/pr-ready` §5's result: `none — read <n> comments`, or one
   `closed: <file:line> — <guard>` per graded finding, copied verbatim from the driver's return.
   `tier` records the session's own tier (`ORCH_TIER`, Phase 0 — the one cost term no dispatch
@@ -834,8 +874,9 @@ pipeline knows:
 
 Fork-point verification is the accepted bound: an independent/final PR is verified
 against its fork point, never re-synced to a base that moved afterwards (3.5
-declares that EXPECTED — design §4.8). The human merge gate owns the residual
-semantic-conflict risk.
+declares that EXPECTED — design §4.8). With `merge: hold`, the human merge gate owns the
+residual semantic-conflict risk. With `merge: auto`, the run owns it, through §3.7's trial
+against the base (step 2 and 3 of the merge gate).
 
 ### 3.5 Open the PR (always non-draft)
 
@@ -892,11 +933,85 @@ semantic-conflict risk.
   ```
   `0` → write the block now, before any other step. 13 of 28 final PRs had no block, and 36 blocks
   still read `review 0/2` on PRs that carry `fix(review):` commits (2026-09-20 to 10-01).
-- **Every adw PR body whose change a user can see or trigger carries a `Smoke` list:** one to five
-  steps a person performs to see the change work, written from the spec's acceptance criteria
-  (`open <screen> → do <action> → expect <result>`). The final PR's list is its units' lists, in
-  order. A unit with nothing to see says `Smoke: none — <why>`. Gates were green on three fixes the
-  owner then found still broken on the device, and the owner asked six runs for this list by hand.
+- **Every adw PR body whose change a user can see or trigger carries a `## Smoke` section:** at least
+  one case a person, or §3.8's runner, walks to see the change work, written from the spec's
+  acceptance criteria; more than five only where `## Screens` needs it. Each case has this shape, and
+  `## Screens` and `## For your check` follow the closing marker:
+  ```
+  ## Smoke
+  ### AC-1 <screen> — <what the user sees>
+  - **Checks**: <the spec criteria it covers, as `u1 AC 3`>
+  - **Device**: <a device class repo-profile §21 names, or `all`; with no §21, the device a person would use>
+  - **Entry point**: <the screen, and how a user reaches it>
+  - **Preconditions**: <this intent's own data, by name: which records, in which state, seen by which account>
+  - **Steps**:
+    1. <action>
+  - **Expected**:
+    1. <result of step 1>
+  <!-- /smoke -->
+
+  ## Screens
+  - SCREEN-1 · <screen title as the app shows it> · <§21 Devices token>, <§21 Devices token>
+
+  ## For your check
+  ### CHECK-1 <what to try>
+  Checks: <the spec criteria it covers, as `u1 AC 3`> — <what only a person or a real device can judge>
+  <steps, as a case writes them>
+  ```
+  In the body, drop this file's two-space indent: the `##` and `###` headings and the closing
+  `<!-- /smoke -->` line start at column 0, because §3.8 finds the cases by them and stops at that
+  line, so a section that is the last one in the body does not take the tables and the evidence block
+  after it. The marker closes the whole section once, after the last case, never after each case;
+  on a final PR it follows the last renumbered case, and a unit's own marker is dropped. Every acceptance criterion that only a look at the running
+  app can check (it names a simulator, a device or a manual check, or says no gate covers it) has a
+  case or a CHECK; a case, when no §21 device runs its change (below). **A case whose rule holds on more
+  than one screen ends with a step that repeats the check on each of them, by name**
+  (`On <screen>, <screen>: repeat step 2; expect the same`): a screen that differs from its siblings
+  is the defect no gate sees. Name there only the screens that should match. A screen whose change
+  differs from its siblings gets its own step and its own `Expected`. Preconditions name data, never "any record": §3.8's runner makes what
+  its fixture lacks (`repo-profile §21`'s Data row). The final PR's cases are its units' cases, in
+  unit order, renumbered `AC-1`, `AC-2`, … in one sequence, each with its `Checks` line. Its
+  `## Screens` joins its units' lists: one line per screen, with the device tokens of every unit that lists
+  it, renumbered `SCREEN-1`, `SCREEN-2`, …, and each case step that names a screen keeps naming it by
+  title. Its `## For your check` joins its units' CHECKs, renumbered the same way. A unit
+  with nothing to see says `Smoke: none — <why>`. A PR with cases that changes no screen writes
+  `Screens: none — <why>` in place of the list. Gates were green on three fixes the owner then
+  found still broken on the device, and the owner asked six runs for this list by hand. Then a list
+  that named the three broken screens shipped unwalked on AXCMedApp #580, which is why §3.8 walks it.
+- **`## Screens` lists every screen the change alters**, one line each: `SCREEN-<n>`, the screen's
+  title as the app shows it, and the devices to see it on, as `repo-profile §21` Devices tokens (with
+  no §21, the device a person would use). A token is the name §21's Devices row gives a runner device
+  (`iphone17`, `phone-width`). It is never the word a case's `Device` line uses (`iPhone`, `phone`):
+  §21 maps those words to tokens for the cases only, and the walk, its Audit and §3.7's gate read a
+  `## Screens` device as a token. List only tokens a case's `Device` line walks: the walk runs no
+  other device. §3.8 checks the list before each walk, and keeps an image of each
+  listed screen on each listed device, passed
+  or failed, and posts them on the PR. The walk captures a screen only where a case reaches it, so
+  each listed screen a case can reach appears in a case's steps. A changed screen no case can reach
+  (behind the camera, say) is still listed: it gets no image, and the PR waits for the owner. When `repo-profile §3` has a `UI paths` row, every
+  changed file under it renders on at least one listed screen; a changed UI file no listed screen
+  shows is a missing line, added before the PR opens.
+- **`## For your check` holds what a walk cannot do**: a camera capture, a push notification, a real
+  network, what a real AI answer looks like. Each is a `### CHECK-<n>` with its `Checks` line and its
+  steps. A CHECK is not a case: §3.8 never reads it, and the owner finds it on the PR after the merge.
+  **A CHECK does not excuse a changed screen:** the screen is still listed. A PR with nothing for the owner to check has no such section.
+- **Before the cases are final, read the code at the PR head** for every field, control and screen a
+  step names. A case that names what the code does not have is rewritten. Code that lacks what its
+  criterion asks for is a defect: fix it before the walk, back through §3.1. The walk never finds
+  this out on its own.
+- **A case checks code its devices run.** A walk sees only the code a §21 device runs. Some screens
+  have two implementations, and a device runs only one of them (a Compose screen that iOS draws with
+  a SwiftUI twin, say). When the PR changes only the other one, a walk sees the old screen and its
+  `pass` proves nothing. So when §21 has a Renders row, run its command on the diff before the cases
+  are final, in the form the row gives for a PR that is not open yet. It prints each changed file it
+  cannot show a §21 device runs. A non-zero exit means a step failed and clears no file: run it again,
+  or treat every changed file as printed. A criterion whose change is only in
+  printed files still gets its case, with a §21 `Device` that shows its screen, and its screen stays
+  on `## Screens`. The walk then marks that case `blocked`, with a gap row that names its `AC-<n>`, and
+  takes no image of that screen, so the PR waits for the owner (§3.7's gate, conditions 7 and 8).
+  Never give such a criterion only a CHECK, which holds nothing, and never write `Smoke: none` for it,
+  which is for a change with nothing to see. Add a CHECK for the device that runs the change as well.
+  With no Renders row, judge from the diff which device runs what.
 - Every adw PR body carries one depth-conditional line, naming the spec/plan dirs
   (`repo-profile §2`) — D3:
   `<specs-dir>/<plans-dir> in this PR = the unit's contract, authored and critical-passed
@@ -926,7 +1041,12 @@ brief): the `ready|blocked` machine
 line with `verified <sha7>`, the review cycle count and tier, the per-gate table and mutation
 row from the re-pass, the §5 review-evidence count, the `/pr-ready` §5 open-findings lines
 (`closed:` / `open:`, or `open-findings: none` / `fetch failed` / `NOT RUN`), the §8 cleanup line,
-and on `blocked` the question with its default. **A `ready` return without the open-findings lines
+and on `blocked` the question with its default. The brief also asks the driver one question before
+`/pr-ready`: **does the PR body's `## Screens` list every screen that a changed file under
+`repo-profile §3`'s `UI paths` renders?** A screen it misses is a finding like any other: the driver
+adds its line to `## Screens`, its devices as §21 Devices tokens (§3.5), and, when a case can reach it, a step that reaches it to that case
+(`gh pr edit <N> --body-file`), and
+returns `screens: +<n> <SCREEN ids>`, `screens: complete`, or `screens: no UI paths row`. **A `ready` return without the open-findings lines
 has not returned:** the PR is `blocked` with `default: run /pr-ready <N>` — not `/adw-build <slug>`,
 which halts at Phase 0 on the still-open PR. A `blocked` decided before `/pr-ready` §5 (a red gate,
 an escalation, a count of `0`) carries no lines and needs none. **`ready` needs `open-findings:
@@ -1020,9 +1140,8 @@ consent — and adds:
   /adw-build <slug> · ⏱ <N>m`. `failed` would libel a gate-green PR, and `blocked` is
   terminal, so Phase 3's not-terminal abort stops applying to it. (Run-2: an amendment
   pushed after review+verify closed the session as "reviewed clean · ready"; the PR then
-  collected two more review rounds.) Commits landing after the session ends are out of
-  reach by construction — Session-boundary provenance already makes such a PR
-  human-owned.
+  collected two more review rounds.) Commits landing after the session ends move the head
+  off its `verified` row, so no run merges that PR (§3.7).
 - **The `blocked` default line names adw**, not `/pr-ready`:
   `default: run /code-review <N> <tier> apply, then re-run /adw-build <slug>`. **One exception:**
   when `/pr-ready`'s reason is one of §5's open-findings reasons (`open:`, `fetch failed`,
@@ -1034,8 +1153,8 @@ consent — and adds:
 
 | State | Action |
 |---|---|
-| **ready** | independent/final PR: leave open, run report lists it — the human reviews, previews, merges. Sub-PR: merge it now, without asking (adw-core §6) — the merge procedure below, with `$VSHA` as the head |
-| **blocked** | label `adw:blocked`, PR body. Independent/final PR: leave open. Sub-PR → **carried**: merge it by the procedure below and build the next unit on its recommended default; the final PR answers for it (Phase 4). Sub-PR that cannot be carried (below) → chain halts; the halting PR's body lists every unbuilt unit of its chain |
+| **ready** | write the `verified` row (§3.4) from `$VSHA`. Independent/final PR: after §3.8 and its screenshot relay, the merge gate below; it merges on `pass`, else the PR stays open and the human reviews, previews, merges. Sub-PR: merge it now, without asking (adw-core §6) — the merge procedure below, with the `verified` row as the head |
+| **blocked** | label `adw:blocked`, PR body, and the `verified` row (§3.4) when the driver returned `verified <sha7>`. Independent/final PR: leave open. Sub-PR → **carried**: merge it by the procedure below and build the next unit on its recommended default; the final PR answers for it (Phase 4). Sub-PR that cannot be carried (below) → chain halts; the halting PR's body lists every unbuilt unit of its chain |
 | **failed** | label `adw:failed`, PR body with the last red gate output, non-draft. Sub-PR → chain halts, same bookkeeping |
 
 **A `blocked` or `failed` PR wears its label, checked.** After `gh pr edit <n> --add-label`,
@@ -1045,9 +1164,11 @@ that label alone.
 
 **Sub-PR merge procedure (adw-core §6 carve-out).** Two Bash calls, never one:
 
-1. Re-assert provenance: `gh pr view <n> --json baseRefName,headRefOid` must show base still
-   `adw/<slug>` and head equal to the expected sha. For a `ready` sub-PR that is `$VSHA`. For a
-   carried `blocked` sub-PR it is `$VSHA`, and the driver must have returned `verified <sha7>`
+1. Re-assert provenance: `gh pr view <n> --json baseRefName,headRefOid,body` must show base still
+   `adw/<slug>` and head equal to the expected sha: the evidence block's `verified` row (§3.4),
+   which a run wrote from `$VSHA`. The row survives a compaction and a new session, so a resumed
+   run merges a `ready` sub-PR, or carries a `blocked` one with a verified head, the same way. For a
+   carried `blocked` sub-PR the driver must have returned `verified <sha7>`
    (a port unit that is `port not converged` returns one too). A `blocked` sub-PR whose driver
    returned no `verified <sha7>` (a void such as `REVIEW NOT COMPLETE`, a driver that returned without its log, a stale-base abort) has no sha to compare: it is not carried, the chain
    halts `blocked`, never merge. Any mismatch → the chain halts `blocked`, never merge.
@@ -1085,6 +1206,390 @@ not print the block as a question and does not end its turn on it. Review cap wi
 left, an escalated finding, a gate-file diff, open findings `/pr-ready` §5 could not close: all
 carried. A carried gate-file diff is still in the final PR's diff, so §3.4's gate-file tripwire
 fires on the final PR and the owner signs it there.
+
+**The merge gate — independent and final PRs (adw-core §6).** It runs on a `ready` independent or
+final PR, after §3.8 and its screenshot relay, on every PR of the intent whatever its flag: the gate
+reads the flag itself (condition 1). Never on a sub-PR, never on a `blocked` or `failed` PR. The
+script is `scripts/adw-merge-gate.py` in the contract cache. Every step below writes the result as
+the evidence block's `merge` row (§3.4) with one `gh pr edit`, and a `hold` ends the gate: the PR
+stays open, the run-report line ends `· held <n>: <reason>` (adw-core §7), and the run goes on to
+its next unit. No label is added for a hold.
+
+1. **Check**, in one Bash call with `timeout: 600000` (the script stops polling after 7 minutes),
+   naming as a repo path the spec of every unit this PR carries: its title's unit field, and for a
+   final PR every unit of its chain. Phase 0 step 4 already refused a mixed `merge:` across the
+   intent. Every later call of this gate starts with this block's first line again: shell
+   variables do not survive between Bash calls.
+   ```bash
+   R="$(git rev-parse --show-toplevel)"; C="$R/.claude/adw/cache/scripts/adw-merge-gate.py"; test -f "$C" || C="$R/scripts/adw-merge-gate.py"
+   python3 "$C" check --repo "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" --pr <N> --profile "$R/.claude/repo-profile.md" --spec-path <spec path> [--spec-path <spec path> …]
+   ```
+   One line comes back. `pass` → step 2. `hold <n> <reason>` → write `merge      hold <n> — <reason>
+   · at <head sha7>` and stop. `hold 0 gate error: …` (exit 2) is a hold like any other, and so is
+   no line at all (the call was cut off): `hold 0 gate error: no line`.
+2. **Trial against the base**, one Bash call: step 1's first line, then `python3 "$C" trial
+   --checkout "$R" --pr <N> --slug <slug> --base <INTENT_BASE> --head <the verified row's sha>`. `base unmoved` → step 4, and the
+   row will end `· base unmoved`. `hold 6 …` → write the row and stop. `tree <path> base <sha>` →
+   step 3 in that tree.
+3. **Gates in the trial tree.** On a repo whose §21 has a Lock row, take the lock first with the
+   row's take command for `<slug>`, and release it with the row's release command when the gates
+   end; a lock another walk holds is waited on as §3.8 step 3's Queued step waits, and still held
+   at its deadline is `hold 6 lock held by <s>`. Provision the tree as `repo-profile §4` says, then
+   dispatch ONE agent, `model: sonnet`, with the tree path, `origin/<INTENT_BASE>` as the base and
+   the `repo-profile §5` gates the PR's diff obligates (`repo-profile §6`). It runs each gate in the
+   tree, writes every output under a `mktemp -d` directory outside the tree, edits nothing, and
+   returns one line per gate: `<gate> <exit code>`. Any non-zero exit, or a gate with no line →
+   `hold 6 gate <name> red`. Then, gates green or red, run step 1's first line, then `python3 "$C"
+   discard --checkout "$R" --tree <path>`, in one Bash call. Exit 1 leaves the tree for `/cleanup`;
+   print it on a `note` line, and it does not change the result. A later trial of the same PR
+   removes a leftover tree that is clean, and holds `0` on one that is not. Gates red → write the row and stop. Green → step 4, and the row will end
+   `· base trial ok at <base sha7>`.
+4. **The merge, three Bash calls.** First, run step 1's check again, exactly as step 1 writes it:
+   the trial can take long (a lock wait, a cold build, the gates), and the owner may have turned the
+   switch `off`, added `adw:hold` or changed the profile meanwhile (design §4.1: `off` also stops a
+   run already in flight). `pass` → go on. `hold <n> <reason>` → write the row as step 1 says and
+   stop. Second: `gh pr view <N> --json baseRefName,headRefOid,labels`
+   must show the base equal to `<INTENT_BASE>`, the head equal to the `verified` row, and no
+   `adw:hold` label. Any mismatch → `hold 2 base changed`, `hold 3 head moved` or `hold 1
+   adw:hold`, and stop. Third,
+   alone in its own Bash call, the sha written out as a literal: `gh pr merge <N> <flag>
+   --match-head-commit <full sha>`, where `<flag>` is `repo-profile §3`'s merge convention
+   (`squash` → `--squash`, `merge` → `--merge`, `rebase` → `--rebase`). No `--auto`, no
+   `--delete-branch`, no `cd`, `&&`, `;`, pipe or variable. Its `description` is `Merge #<N> into
+   <INTENT_BASE> (auto-merge gate passed)`.
+5. **Confirm**: `gh pr view <N> --json state,mergedAt` must print `MERGED` (`gh pr merge`'s exit
+   code is not reliable when a worktree holds the branch). Then `gh pr edit <N> --add-label
+   adw:auto-merged`, and write `merge      merged <merge sha7> · base unmoved` or `· base trial ok at
+   <base sha7>`. The run-report line is `merged` (adw-core §7).
+
+**A denied merge call** on an independent or final PR is a hold, not a block: write `merge      hold
+call — denied · at <head sha7>`, add no `adw:blocked` label, and the run-report line names the
+command for the owner to run: `held call: run ! gh pr merge <N> <flag> --match-head-commit <full
+sha>`. A `gh pr merge` that fails for another reason, or a confirm that does not print `MERGED`, is
+`hold call — <the gh error>`. Never re-shape a denied merge call. Sub-PR denial text is unchanged
+(above).
+
+### 3.8 App smoke — independent and final PRs: walk, check, fix
+
+**No gate looks at the running app.** On AXCMedApp #580 (units #577, #579) every gate, both
+verifier passes and a full review were green. A simulator walk the owner asked for afterwards found
+three defects: a button floating mid-screen on one tab, a control missing on a sibling tab, and a
+button on the wrong side of another screen. The PR body's own `Smoke` list named all three screens,
+and nobody walked it. This step walks it with `repo-profile §21`'s runner, checks each defect the
+walk reports, and fixes the ones that hold up. Rework that began at the owner's own device check
+cost about 52 agent hours in 2026-10-02..22, and each fix there was ordered by hand. **A TRIAL**
+(design §4.2): each PR's `smoke` evidence row records how many rows the check found `valid` and how
+many it `refuted`, the measure this step has not had.
+
+**It runs when all four hold, and only then:**
+
+- `repo-profile §21` exists. Absent → this section does not run, and nothing about it prints.
+- The PR is an independent PR or a final PR. **Never a sub-PR:** a sub-PR merges unseen, nothing acts
+  on its result before the final PR, and the final PR's cases include every unit's (§3.5). A chain of
+  N units pays for one smoke.
+- Its 3.7 state is `ready`, or `blocked` with a `verified <sha7>` from its driver. A `failed` PR, or a
+  `blocked` one with no verified head (Phase 4's unsynced final PR is one), is not smoked: its
+  run-report line carries `· ⚠ smoke not run — no verified head`.
+- Its body's `## Smoke` section has at least one `### AC-<n>` case. `Smoke: none — <why>` → no
+  smoke and no flag.
+
+**A walk costs tens of minutes, and past an hour on a long case list:** one app build, then every
+case on every device. `repo-profile §21`'s Max minutes is the ceiling of one walk. A PR walks at
+most three times (on a final PR, three per code-changing owner reply: Phase 4): once, then once
+after each of at most two smoke fix cycles, and each cycle also pays
+for a 3.4 verify and a 3.6 review. It is machine time: it counts in the PR's `⏱`, and the run report
+prints after the last walk returns.
+
+**A walk changes nothing by itself.** A smoke that could not run is a reported gap
+(`review-core.md` §4), never a pass. A defect row changes the PR only through the check and the fix
+cycle below: a row the check confirms is fixed, and one still there at the bound makes the PR
+`blocked`. A smoke is never `failed` and never §3.3's environment fault. The walk and the check run
+on a terminal PR, so §3's progress conditions do not count them; a smoke fix cycle re-enters the loop, and
+its own boundaries count from zero (step 5 below).
+
+**A device that reads but cannot act is the silent pass, so the runner proves a tap first.** On
+2026-10-19 one long-running iPadOS 27.0 simulator let the UI driver launch the app and read the
+screen, and refused every tap; fresh simulators of the same runtime and model, and of iOS 18.3 and
+26.5, tapped normally. A walk on that device asserts what it can read and fails nothing it cannot
+reach. So before the walk, §21's Driver probe runs on every device the smoke uses: one tap that must
+change the screen, then a read that proves it did. A read alone (an assert, a hierarchy dump) proves
+nothing about taps. A probe that fails, or a driver the runner reports lost mid-walk, ends the smoke
+as `smoke not runnable: <reason>`: a reported gap, never a pass and never a defect. §21's Devices row
+names the runtimes the runner is valid on.
+
+**Check the `## Screens` devices before each walk.** One listed device the walk does not run spends a
+whole walk: a case word (`iPhone` for `iphone17`), or a token no case walks. The runner names each
+image by its token and walks only the devices the cases name, the Audit finds no image for the rest,
+and §3.7's gate holds the walk as unaudited. Two Bash calls, with `<N>` written in. First, the walk's
+devices:
+```bash
+gh pr view <N> --json body --jq .body | tr -d '\r' | awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && (/^## / || /^<!-- \/smoke -->/) {exit} f && /^### AC-[0-9]+/ {if (id != "") print id ": " (d == "" ? "none" : d); id = $2; d = ""} f && /^- \*\*Device\*\*:/ {sub(/^- \*\*Device\*\*:[ \t]*/, ""); d = $0} END {if (id != "") print id ": " (d == "" ? "none" : d)}'
+```
+It prints `AC-<n>: <its Device line>` for each case, and `none` for a case with no `Device` line. The
+walk's devices are the tokens §21's Devices row maps those words to, each once; `none` takes the
+row's set for a case with no `Device` line. Second, with one `-e '<token>'` for each walk device:
+```bash
+gh pr view <N> --json body --jq .body | tr -d '\r' | awk '/^## Screens[[:space:]]*$/ {f=1; next} f && /^## / {exit} f && /^- SCREEN-[0-9]+ · /' | awk -F' · ' '{n = split($NF, d, ","); for (i = 1; i <= n; i++) {gsub(/^[ \t]+|[ \t]+$/, "", d[i]); if (d[i] != "") print d[i]}}' | grep -vxF -e '<token>' -e '<token>' | sort -u
+```
+It prints each listed device the walk does not run. Nothing printed → dispatch the relay. A printed
+word that §21's Devices row maps for a case's `Device` line → replace it on the `- SCREEN-` rows with
+the tokens it maps to that the walk runs (`all` takes every walk device), each token once per row, in
+one `gh pr edit <N> --body-file`, then run the second call again. Any other device (a word that maps
+to no walk device, a token no case walks, a word the row does not map), or one the second run still
+prints → dispatch no relay: the walk's return is `smoke not run — screens: '<device>' is not a device
+this walk runs`, recorded as below.
+
+**Dispatch one `model: sonnet` smoke relay** (adw-core §8's Re-execute and relay row,
+`subagent_type: general-purpose`), and never two smokes at once: a runner owns its devices. Its
+brief carries the PR number `<N>`, `$VSHA` written out in full, the walk's devices from the check
+above, `repo-profile §21` pasted whole,
+steps 1 to 5 below pasted, and `review-core.md` §11's brief floor. The relay and its runner edit no
+code, commit nothing, push nothing and post nothing on the PR. The relay:
+
+1. Checks the head: `gh pr view <N> --json headRefOid --jq .headRefOid` must print `$VSHA`. If it
+   does not, return `smoke not run — head moved` and stop.
+2. Extracts the cases, in one Bash call that prints the directory, and copies that path as a literal
+   into every later call:
+   ```bash
+   D="$(mktemp -d)"; gh pr view <N> --json body --jq .body | tr -d '\r' > "$D/body.md"; awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && (/^## / || /^<!-- \/smoke -->/) {exit} f' "$D/body.md" > "$D/cases.md"; awk '/^## Screens[[:space:]]*$/ {f=1; print; next} f && /^## / {exit} f' "$D/body.md" > "$D/screens.md"; [ -s "$D/screens.md" ] || grep -m1 '^Screens: none — ' "$D/body.md" > "$D/screens.md"; echo "$D"
+   ```
+   `<D>/screens.md` holds the PR's `## Screens` list (§3.5), or its `Screens: none` line, or nothing.
+   Before it runs anything from §21, it checks §21's Cases check, Devices, Launch, Driver probe, Wait
+   test, Result, Evidence, Audit, Max minutes, Abandon and Build floor rows (the Lock, Second
+   account and Renders rows are optional): a row that is missing or empty →
+   return `smoke not run — §21 <row> is empty` and stop; a Max minutes that is not a whole number →
+   return `smoke not run — §21 Max minutes is not a whole number` and stop. Nothing has launched, so
+   there is nothing to abandon. Then it compares the case counts:
+   `grep -c '^### AC-' "<D>/cases.md"` must equal the same `grep -c` on the whole body
+   (`gh pr view <N> --json body --jq .body`); unequal → return `smoke not run — cases: the section
+   is cut short` and stop. Then it runs §21's Cases check on `<D>/cases.md`. A non-zero exit →
+   return `smoke not run — cases: <the check's message>` and stop.
+3. Runs §21's Build floor, after `date +%s` printed once. Exit 0 → go on. Non-zero → wait as step 4
+   does, with Build floor as `<test>`, `sleep 60` in place of `sleep 5`, that epoch as `<start>`
+   and Max minutes as `<n>`. `DEADLINE` → run Build floor once more and return `smoke not run — build
+   floor: <what it printed>` and stop; nothing has launched. Two of six walks died of a host that could not
+   finish the build. Then it starts §21's Launch with `<N>`, `$VSHA`, `<D>/cases.md`,
+   `--screens <D>/screens.md` when that file is not empty, and the walk's devices its brief names (the
+   tokens §21's Devices row maps the cases' `Device` lines to), and keeps every value §21's Wait test, Result, Evidence, Audit and
+   Abandon rows name, as literals. **`<start>`** is the `<epoch>` of the runner's `adw-lock: taken
+   <epoch>` line, so a walk that waited for the lock does not spend its own Max minutes; a runner
+   that prints no lock line takes `date +%s`, printed once just before Launch. **Queued:** a runner
+   that prints `adw-lock: held by <s> since <e>` has not started its walk. Run §21's Abandon (it
+   releases what this launch took; a lock this walk does not hold stays). With a §21 Lock row, wait
+   as step 4 does, with `[ ! -e <the Lock row's file> ]` as `<test>`, `sleep 30`, `<e>` as `<start>`
+   and Max minutes as `<n>`; on `done`, Launch once more. Held again, or `DEADLINE` → return
+   `smoke not run — queued behind <s>` and stop. Without a Lock row → return `smoke not run — lock
+   held` and stop. Any other launch that stops before the runner runs (its stack will not come up,
+   the build fails, a Bash call of it is cut off at the 600000 ms limit) → run §21's Abandon, then
+   return `smoke not run — <the runner's own reason>`, with what Abandon printed, and stop. A
+   launch that stops leaves what it took (a lock, booted devices, a stack) held, and the next walk
+   would find them. §21's Driver probe
+   runs on each device at the point §21's Launch row names, before the walk; a non-zero exit →
+   run §21's Abandon, return `smoke not runnable: <device> — <the probe's failing line>` and stop.
+4. Waits, in one Bash call with `timeout: 600000`, re-issued only while it prints `running`. A call
+   that prints anything else but `done` or `DEADLINE` (nothing, an error, a cut at the 600000 ms
+   limit) is not re-issued: run §21's Abandon and return `smoke not run — the wait failed: <what it
+   printed>`.
+   `<test>` is §21's Wait test and `<n>` its Max minutes, both written in:
+   ```bash
+   lim=$(( <start> + <n> * 60 )); end=$(( $(date +%s) + 270 )); [ "$end" -gt "$lim" ] && end=$lim; until { <test>; } >/dev/null 2>&1 || [ "$(date +%s)" -ge "$end" ]; do sleep 5; done; if { <test>; } >/dev/null 2>&1; then echo done; elif [ "$(date +%s)" -ge "$lim" ]; then echo DEADLINE; else echo running; fi
+   ```
+   This is `review-core.md` §10's wait with §21's test in place of the file count, and the same
+   270 s per call. The braces keep a test that holds `&&` or `||` in one piece, and only its exit status counts: a test
+   that prints would otherwise turn `running` into another word and Abandon a healthy walk. Paste §21's test
+   unchanged, a lock clause included: it reads a lock the runner itself takes and releases, which
+   Phase 1's ban on lock files and wait-for-lock loops (locks a run writes to order its own agents)
+   does not reach. Without that clause the wait ends before the runner lets go of its devices. On `DEADLINE`, it
+   runs §21's Abandon and returns `smoke not run — exceeded <n> min`, with what Abandon printed.
+5. Runs §21's Audit, then returns this and nothing else: the Result file's path; the directory §21's Evidence row's
+   image paths are relative to; the `screens/` directory that row names for the listed screens, as an
+   absolute path, or `none`; `<D>`; the devices passed to Launch; its verdict line;
+   every row of its table, verbatim; the Audit's exit code and its failing lines; the case count as
+   `<passed>/<total>`, `<passed>` counted as §21's Result row says and `<total>` the number of ids
+   step 2's check printed; and the minutes from `<start>` to `done`. When §21's Result row says the
+   file shows the driver lost mid-walk, the first line of the return is `smoke not runnable: <what
+   the file says>`, and the rest follows it.
+
+**Then the screenshot relay posts the images**, after the smoke relay returns and before the record
+below is written. It runs when the walk ran (a Result exists), the return names a `screens/`
+directory, and `<D>/screens.md` holds a `- SCREEN-` row; otherwise its line is `screens none — <the
+condition that failed>`. **Images leave the machine only from a scratch database:** unless §21's
+Data row says the walk runs on a scratch database, never on a copy of real data, no screenshot relay
+runs, and its line is `screens none — §21 Data names no scratch database`. Otherwise dispatch one `model: sonnet` relay
+(adw-core §8's Re-execute and relay row, `subagent_type: general-purpose`). Its brief carries `<N>`,
+`$VSHA` in full, the walk number `<k>`, the command below with every value written in, and
+`review-core.md` §11's brief floor. It runs the command once, in one Bash call, and returns the line
+the command printed and its exit code. This relay alone pushes to the screens ref; the smoke relay
+still posts nothing.
+
+```bash
+R="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"   # the main checkout
+test -f "$R/.claude/adw/cache/scripts/adw-screens.py" || R="$(git rev-parse --show-toplevel)"
+python3 "$R/.claude/adw/cache/scripts/adw-screens.py" --repo "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" --checkout "$R" --pr <N> --head <VSHA> --walk <k> --screens "<D>/screens.md" --dir "<the screens/ directory>" --ref refs/adw-screens
+```
+
+It prints `screens <comment url> · <n> images` or `screens none — <why>`, and exits 0. Any other exit
+(1: the push or the comment failed after one retry) makes the line `screens not posted — <the last
+line it printed>`. The
+images go to `refs/adw-screens`, a ref a default `git fetch` does not download, and the comment
+links each one by its commit, so it never changes under the owner. A walk with no images is a
+reported gap, never a pass.
+
+**Which rows can lead to a fix.** Only rows of a walk that ran and passed its audit. A `smoke not
+run` or `smoke not runnable` return, or an Audit exit other than `0`, has no defect anyone can
+check: it fixes nothing and changes no state. In a walk that passed:
+
+| row | what happens |
+|---|---|
+| `D<n>`, severity `blocking` or `worth-fixing` | checked (below); a `valid` row is fixed |
+| `D<n>`, severity `polish` | reported only: no spec criterion asks for it, and a fix would re-open a verified head for taste |
+| `G<n>` | reported only: the runner could not walk that case, so no row says the app is wrong |
+| `S`, `P`, `I` | neither, as §21's Result row says |
+
+A row reported here and not fixed can still hold the merge: a `G<n>` that names an `AC-<n>` or a
+device a case needs, any row the walk called `blocking`, whatever the check finds, and a `D<n>` that
+is not `polish` with no `refuted:` or `polish:` line (§3.7's merge gate, condition 7).
+
+**A `pass` needs the changed code to run.** A case passes only when its walked devices ran the code
+the PR changed for it (§3.5). The runner runs the command of §21's Renders row before the walk: it
+prints each changed file it cannot show a walked device runs, and a run that fails clears no file.
+With no such row, the runner judges from the diff. A case whose change is only in such files is
+`blocked`, and its `G<n>` names its `AC-<n>`, so condition 7 holds the PR (design C20). A listed
+screen whose change is only in such files gets no image and a `G<n>` that names its `SCREEN-<n>`, so
+condition 8 holds. A `G` row is never checked or fixed, so neither row reaches the refuter below.
+
+**Check each row before anyone fixes it: `review-core.md` §9's refutation pass.** The walk's
+verdict is a model reading a simulator screen, and no run has measured how often its `blocking` rows
+hold up. A second walk by the same runner is the same reading again. So when a walk has rows to
+check, dispatch a refuter: `model: opus` (adw-core §8's Clear a `Blocking` row),
+`subagent_type: general-purpose`, one agent, or two with the rows split evenly when there are more
+than 4. Its brief is §9's quoted prompt block, not §9's dispatch rules, with four changes:
+
+- The sentence "Your cwd is the review worktree at the PR head" becomes: "Read-only: edit, push
+  and post nothing. Read code and specs at `<VSHA>` with `git show <VSHA>:<path>` and
+  `git grep <pattern> <VSHA>`. The cases are the `### AC-<n>` sections under `## Smoke` in
+  `gh pr view <N> --json body --jq .body`."
+- The claims are the rows to check, one per line, each as the relay returned it:
+  `POSITIVE | <row id> | <the row>`. Add `$VSHA` in full, `<N>`, the Result path, `repo-profile
+  §21`'s Evidence row pasted, the evidence directory the relay returned, and the spec path of every unit in the PR. Nothing else from the
+  relay's return.
+- The chain to rebuild for a row has three links. (1) The evidence §21's Evidence row locates for
+  it shows the state the row states: open each image with the Read tool and judge from it. A row
+  with no image is judged from the code alone. (2) The spec criterion its case's `Checks` line
+  names asks for a different state. (3) The code at `<VSHA>` that renders that state, as
+  `file:line`, or `cause not found`. A `REFUTED` names the link that breaks: the evidence does not
+  show it; the spec does not ask for the expected state (the case is wrong, not the app); or the
+  state is a run artefact, named (a keyboard over the control, an animation, missing data, the
+  driver).
+- The output: "One line per row id: `<id> | CONFIRMED, OVERSTATED or REFUTED | <the three links>`.
+  An `OVERSTATED` line also names the severity the row should have: `worth-fixing` or `polish`."
+
+Then its brief ends with `review-core.md` §11's brief floor. A row is **`valid`** when it is
+`CONFIRMED`, or `OVERSTATED` to `worth-fixing`. `OVERSTATED` to `polish` is reported only. A
+`REFUTED` row is not fixed and never dropped: the body prints it. A row with no verdict line goes to
+one more refuter dispatch with the other missing ids; with still none, it is `unchecked`: reported,
+never fixed.
+
+**The orchestrator records the walk and the check; it reads nothing else.** It writes the body
+section and the evidence row before anything moves the head (smoke fix cycle step 1).
+
+- **PR body:** a `## Smoke result` section. On a `ready` PR it goes right after the PR's opening
+  summary. On a `blocked` PR it goes right after the reason line, above the `<details>` fold: the
+  owner decides the merge on it. Its first line is `<verdict line> · walk <k> at <sha7> · devices
+  <token>,<token> · <m>m`, the devices passed to Launch, with `· unaudited: <failing check>` appended
+  when the Audit exit is not `0`. Then the returned
+  rows, as they came. Then one line per checked row: `valid: <id> — <the three links>`,
+  `refuted: <id> — <the link that breaks>`, `polish: <id> — overstated` (an `OVERSTATED` to
+  `polish`) or `unchecked: <id>`. Every `D` row that is not `polish` needs one of these lines: §3.7's
+  gate holds a `D` row with no `refuted:` or `polish:` line, so a lost line never reads as cleared. Then one `fixed: <id> (walk <k>)
+  in <sha7>, unconfirmed` line per row a smoke fix cycle fixed, `<sha7>` being the head that cycle
+  pushed; a later walk that passes its audit and leaves no `valid` row drops `, unconfirmed` from
+  every such line. Then `smoke fix cycle <c> running — the head moves past <sha7>` while a cycle
+  runs. Then `evidence: <Result path>, on the machine that ran the build · <the screenshot relay's
+  line>`. A
+  `smoke not run` or `smoke not runnable` return with no Result writes the section with that one
+  line, plus any `fixed:` lines; one with a Result puts that line first. A later walk of the same
+  PR replaces the section, never adds one, and keeps every `fixed:` line.
+- **Evidence block:** the `smoke` row (§3.4), counted from the rows by §21's Result row.
+- **Run-report PR line:** the last walk has no defect rows, no gap rows, Audit `0`, no `not
+  runnable` line, `<passed>` equal to `<total>`, and a screenshot relay line that does not start
+  `screens not posted` → `· smoke clean` after `review clean` (a `blocked` line has none:
+  after its default).
+  Otherwise one trailing flag, the first that applies: `· ⚠ smoke not runnable: <reason>`,
+  `· ⚠ smoke not run — <reason>`, `· ⚠ smoke unaudited — <failing check>`, or `· ⚠ smoke: <d>
+  defects (<b> blocking, <v> valid), <g> gaps, cases <passed>/<total>`. A screenshot relay line
+  `screens not posted — <reason>` adds `· ⚠ screens not posted — <reason>` after that flag, or alone
+  when no other flag applies. Either form ends
+  `· fixed <f>` when smoke fix cycles fixed `<f>` rows, and `· fixed <f>, <u> unconfirmed` when `<u>`
+  of those `fixed:` lines still end `, unconfirmed`. A PR §3.7's merge gate then merges prints on
+  the `merged` row instead (adw-core §7), with `walk clean` in place of `smoke clean`.
+
+After each edit, check it, as §3.5 checks the evidence block:
+`gh pr view <N> --json body --jq .body | grep -c '^## Smoke result' || true` must print `1`.
+
+**Fix the valid rows.** A smoke fix cycle `<c>` (1 or 2) runs when the walk has a `valid` row and
+the PR's state is `ready`, or `blocked` with no gate red on its pushed head (a §3.3 baseline red is
+not red). One cycle:
+
+1. The record above is written, with its `smoke fix cycle <c> running` line. A session that dies
+   inside the cycle leaves a body that says the head moved past what was verified.
+2. Bring the PR's worktree to `$VSHA`: Phase 2's worktree for an independent PR, Phase 4's close
+   worktree for a final PR (after Phase 5 removed it, re-create it first, as Phase 5 says). One
+   Bash call, the path and the full sha written out:
+   ```bash
+   git -C "<worktree>" fetch origin && git -C "<worktree>" merge --ff-only <VSHA> && [ "$(git -C "<worktree>" rev-parse HEAD)" = "<VSHA>" ]
+   ```
+   The last test is not redundant: a branch with a local commit on top of `<VSHA>` passes
+   `merge --ff-only` as "Already up to date". A non-zero exit → no cycle; the PR is `blocked` by
+   the bound below, with `smoke fix not run — <worktree> is not at <sha7>`.
+3. Dispatch one fix agent: `model: sonnet` (adw-core §8's Apply a diagnosed finding row),
+   `subagent_type: general-purpose`. Its brief carries the worktree path and the head branch,
+   written out; `<BASE>` (§3.2); each `valid` row with its three links; the gate list, order and
+   obligation rule §3.2 puts in an implementer's brief; every `known baseline red` line (§3.3); for
+   a port unit, §3.1's wait block and `repo-profile §20`'s Gate mode row; and `review-core.md` §11's
+   brief floor. The agent fixes the app, never the spec and never the case, and edits no gate file.
+   One commit per row: `smoke-fix-<c>: <row id> <what>`. Then it runs the gates §3.2 obligates for
+   `git diff --name-only <BASE>...HEAD` and returns the exit-code vector with each red's tail. Only
+   when every obligated gate is green does it push (`git -C "<worktree>" push origin <head branch>`)
+   and return the pushed sha.
+4. A red goes to §3.3's classifier. A genuine red goes back to the same agent once, by SendMessage;
+   its fix is one more `smoke-fix-<c>:` commit, then the gates again. A second red, or an
+   environment fault: nothing is pushed, and the PR is `blocked` by the bound below, with `smoke fix
+   red: <gate>; its commits are on smoke-red/<head branch>-<sha7>-<c>`. Move them off the head branch
+   first, in one Bash call, so that no later push from this worktree (Phase 4's answer commit is
+   one) carries them:
+   ```bash
+   git -C "<worktree>" branch "smoke-red/<head branch>-<sha7>-<c>" && git -C "<worktree>" reset --keep <VSHA> && [ "$(git -C "<worktree>" rev-parse HEAD)" = "<VSHA>" ]
+   ```
+   `<sha7>` is `$VSHA`'s first seven characters: a final PR restarts `<c>` at 1 on each code-changing
+   owner reply, and each reply's head is a new `$VSHA`, so the name is new each time.
+   `--keep`, not `--hard`: it refuses, rather than discards, an uncommitted edit. A non-zero exit
+   adds `; <worktree> is not back at <sha7>` to the reason.
+5. After the push, `ready` no longer holds: a code commit voids it (`/pr-ready` §6). So the
+   cycle's pushed head takes Phase 4's rule for an answer commit that changes code, once per cycle,
+   on an independent PR too: 3.4 verify at the new head with the next `PASS` id, then 3.6's review,
+   with fresh review-cycle and boundary counters. §3.7 then decides the state again, from that
+   re-pass, and `$VSHA` is the head that re-pass verified (§3.6's assertion). The re-pass's body edits keep the `## Smoke result` section. When the re-pass ends `failed` or with
+   no verified head, no walk follows and the bound may not fire: write the cycle's `fixed: …,
+   unconfirmed` lines and replace its `running` line then. A PR that was
+   `blocked` before the cycle stays `blocked`, with its earlier reason and label, whatever the
+   re-pass returns; a reason the re-pass adds goes below it. The cycle fixed a screen, not the
+   question that blocked the PR. Then the next walk, when this
+   section's four conditions still hold.
+
+**The bound.** Smoke fix cycle 3 never starts. A `valid` row that no smoke fix cycle fixed makes the PR
+`blocked`: one still in the walk after the second cycle, one whose cycle did not start (step 2) or
+went red (step 4), and one on a PR whose state allows no cycle. `blocked`, never `failed`: the code
+is gate-green and reviewed, and a person must look at the screen. The reason is `smoke: <v> valid
+defects — <the first row's id and claim>` (plus the step 2 or step 4 text when that applies), with
+`default: fix them on <head branch>, then re-run /pr-ready <N>`. A PR already `blocked` keeps its
+own reason and adds this one as a second line. The body write that records the bound replaces the
+`smoke fix cycle <c> running` line, since the head did not move, and writes the `fixed: …,
+unconfirmed` line of every row a pushed cycle fixed: when the re-pass ended `failed` or with no
+verified head, no walk follows to write it. A PR the bound turns from `ready`
+to `blocked` gets §3.7's label, checked as §3.7 checks it, and its body re-laid in the `blocked`
+layout (§3.4, §3.5): the reason line and its default first, `## Smoke result` right after it, and
+the per-gate table and evidence block inside the `<details>` fold.
 
 ## Phase 4 — chain close
 
@@ -1137,7 +1642,12 @@ code — catching a real auto-merge defect on the way, with no escalation raised
 
 Otherwise the final PR (`adw/<slug>` → `<INTENT_BASE>`) runs the FULL Phase 3 loop on the
 composition — gates, 3.4 verify against `origin/<INTENT_BASE>`, **and 3.6's review** — and
-waits `ready` for the one human consent.
+lands `ready`. With `merge: auto`, §3.7's merge gate then merges it once §3.8 is done; with
+`merge: hold`, or a gate that holds, it waits for the one human consent. Its body's `## Screens` and `## For your check` join its
+units' lists (§3.5). After the carried blocks below are listed, it runs §3.8's
+app smoke on its verified head, with its smoke fix cycles: the one smoke of the chain. A smoke fix
+cycle's commits land on the integration branch from the close worktree, and its pushed head takes
+the rule below for an answer commit that changes code, once per cycle (§3.8 step 5).
 
 **Carried blocks are answered here, and only here.** After the loop, list them:
 
@@ -1149,15 +1659,18 @@ A non-empty list → the final PR is `blocked`, never `ready`, whatever its own 
 Add `adw:blocked` to it, and put one line per carried sub-PR at the top of its body and on its
 run-report line: `carried #<n> <unit> — <the one-sentence reason>; default: <default>`. This is
 the chain's one stop: the owner answers every carried block and gives the merge consent in the
-same place. When the owner answers a carried block, apply the answer on the integration branch
-as its own commit (a default the owner accepts needs none). An answer commit that changes
+same place. A `blocked` final PR never meets §3.7's merge gate, whatever the flag: a carried block
+always waits for the owner. When the owner answers a carried block, apply the answer on the integration branch
+as its own commit (a default the owner accepts needs none), from the close worktree: Phase 5
+removed it when it was clean, so re-create it first, as Phase 5 says. An answer commit that changes
 code moves the head the final PR's `ready` was earned at, so the Phase 3 loop (3.4 verify
 against `origin/<INTENT_BASE>` and 3.6's review) runs again on the new head before the next
 step, once per answer commit, with fresh review-cycle and boundary counters. A docs-only answer
-commit needs the 3.4 verify alone, §4 and §5 at the new head with the next `PASS` id, and no review cycle (`/pr-ready` §6: any commit voids `ready`). If a re-pass ends `blocked`, the final PR stays `blocked` with that
+commit needs the 3.4 verify alone, §4 and §5 at the new head with the next `PASS` id, and no review cycle (`/pr-ready` §6: any commit voids `ready`). §3.8 runs again once per owner reply whose answer commits change code, after the last of them is verified, and that reply starts its smoke fix count again at cycle 1; a docs-only reply keeps the smoke result, whose `walk <k> at <sha7>` names the head it walked. If a re-pass ends `blocked`, the final PR stays `blocked` with that
 reason on its body and the owner decides; the carried lines stay. Then
 `gh pr edit <n> --remove-label adw:blocked` on that sub-PR; the final PR leaves `blocked` when
-the list is empty and its own loop, at the current head, is `ready`. The escalation rate
+the list is empty, its own loop, at the current head, is `ready`, and §3.8 left no `valid` row
+unfixed. The escalation rate
 (design §5.1) counts `carried #<n>` lines on final PRs, not labels still on. Of 13 owner stops
 for a sub-PR merge, 8 were a `blocked` sub-PR and the owner answered every one "merge"
 (adw-core §6).
@@ -1237,11 +1750,52 @@ run actually shows that shape**, else `note  CI red — verify before merge`. #8
 
 ## Phase 5 — run report
 
+**First, remove what this run left on disk, and nothing else.** A unit worktree holds 1 to 3 GB
+of build output, and an IDE build can leave a cache directory outside the worktree (Xcode does,
+one per worktree). No step of the run removed either, so they stayed until the owner ran `/cleanup`.
+One Bash call with `timeout` 600000 (it deletes several GB), with the slug, one `--pr` per PR this run opened (the final PR included), and one
+`--provisioned` per path on the `Provisioned files` line of `repo-profile §18` (no line, or
+`none`: no flag):
+
+```bash
+R="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"   # the main checkout, wherever the shell is
+test -f "$R/.claude/adw/cache/scripts/adw-run-clean.py" || R="$(git rev-parse --show-toplevel)"
+python3 "$R/.claude/adw/cache/scripts/adw-run-clean.py" --repo "$R" --slug <slug> --pr <N> --pr <M> --provisioned <path>
+```
+
+The script's scope is the names this run gives what it creates: `adw-<slug>-uNN` (Phase 2),
+`adw-close-<slug>` (Phase 4), `pr-ready-<slug>-uNN-v<k>` and `pr-ready-<slug>-close-v<k>`
+(§3.4's `REF`, `/pr-ready` §4.3) and `pr-<N>` for each `--pr` (review-core §1.1), plus the build
+cache each of them that is gone left outside itself (the script knows Xcode's DerivedData). It keeps a
+worktree, and prints `kept <name> <why>`, when a process works in it, when its HEAD is on no
+remote ref and is no PR's head, when it is a unit or close worktree whose branch has no PR, or
+when it holds any change but a provisioned file. A verify worktree is reset first, as
+`/pr-ready` §4.3 does. It never uses `--force` and never deletes a branch. Put its last line
+and each `kept` line on the run report as `note` lines, verbatim. Any non-zero exit (1: not a
+git checkout; 2: a bad flag, or `python3` found no script) → the one note is
+`run-clean failed — <the last line it printed>`.
+
+The cleanup runs here, before the owner tests, on purpose: the wait for the owner's test and merge
+is the longest idle time of a run, often a night, and other runs fill the disk during it. Work after
+the report that needs a worktree the script removed re-creates it first, then provisions it
+(`repo-profile §4`). That work is Phase 4's answer commit on a final PR, the §3.8 smoke fix cycle
+that follows it, and a fix the owner asks for after testing a PR. One Bash call:
+`git fetch origin && git branch -f <branch> origin/<branch> && git worktree add "<path>" <branch>`.
+If `git branch -f` refuses because another checkout holds the branch (the owner's, to test it), run
+`git worktree add --detach "<path>" origin/<branch>` instead and push with `git push origin HEAD:<branch>`.
+Take Phase 4's `$CW` and `adw/<slug>` for the close worktree, and Phase 2's `$WT` and unit branch
+for a unit. The cost is the provisioning and one cold build. When that work has pushed and
+reported the PR's new state, run the cleanup call above again with the same flags, and print its
+last line and each `kept` line as `note` lines at the end of that report, not as a second run report: it removes the re-created worktree and the verify and review
+worktrees the fix made.
+
 **Card first (adw-core §10).** When the headers carry `card:`, run §10's connection read again (do not
 rely on Phase 0's result: the context may have been compacted since). When the tracker is on, move the
-card to `repo-profile §21` `review` if at least one PR is `ready`, and post the comment whether or not
-the card moved. Blocked-only: comment, no move. Then print the report. A `note card` line goes on the
+card to `repo-profile §22` `done` when every PR of the run is `merged`, else to `review` if at least one
+PR is `ready`, and post the comment whether or not the card moved. Blocked-only or failed: comment,
+no move. Then print the report. A `note card` line goes on the
 report only for an off tracker or a failed call.
 
-Print the **run report exactly** (adw-core §7): one line per PR, ready → blocked → failed → unbuilt;
-`Next:` names the merge order. The report is the whole message — nothing else is printed.
+Print the **run report exactly** (adw-core §7): one line per PR, merged → ready → blocked → failed →
+unbuilt; `Next:` names the merge order, or, when every PR merged, `Next: when you test, gh pr list
+--state merged --label adw:auto-merged`. The report is the whole message — nothing else is printed, except that second cleanup's `note` lines.

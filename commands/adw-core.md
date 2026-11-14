@@ -7,7 +7,8 @@ description: "Shared ADW contract — spec headers, naming, depth ladder, packag
 **This file lives in the `adw` repository and is fetched, not copied** (§9). It is repo-agnostic:
 every command, path, branch and gate it needs is declared per-repo in the consuming repo's
 `.claude/repo-profile.md`, cited throughout as `repo-profile §N` against frozen anchors §1–§18,
-plus three optional ones a profile may omit: §19 (code-review lanes), §20 (visual port loop, §3) and §21 (card tracker, §10).
+plus four optional ones a profile may omit: §19 (code-review lanes), §20 (visual port loop, §3),
+§21 (app smoke, adw-build §3.8) and §22 (card tracker, §10).
 Both `/adw-init` and `/adw-build` read that file at their Phase 0 alongside this one — it is not
 auto-included.
 
@@ -84,9 +85,12 @@ new slug (adw-init Phase 0.5).
   two *folders* for one slug is the bug.
 - **Extend is proposed, never automatic** — a different `base:`, or a different subject,
   is a new intent (run-7's per-team-module-toggles feature was correctly split out).
-- The pipeline still never merges a PR it did not open this session (§6, adw-build
-  session-boundary provenance): extending across sessions builds new units, and the
-  earlier open PRs stay the owner's.
+- **A merged intent is not live.** A later issue in it is a new intent. The owner names it with
+  `/adw-init --followup <slug>`, which mints the slug `<slug>-f<k>` (adw-init Input). Its gate
+  follows adw-init Phase 2's skip test, like any intent's.
+- A merge rests on durable facts, never on the session (§6, adw-build §3.7): extending across
+  sessions builds new units, and an earlier open PR of the intent goes through adw-build §3.7
+  like any other. A PR whose head moved off its `verified` row stays the owner's.
 
 Mapa cirúrgico ran as three disconnected intents across three sessions; the second
 restarted ids at `u1` against a live `u1–u5` and had to reconstruct a cross-batch
@@ -106,6 +110,7 @@ verify: <a command per the rules below and repo-profile §5's allowlist>
 base: <a branch that exists on origin>   # OPTIONAL — omitted = repo-profile §3's default base
 shape: port                       # OPTIONAL — §3 Port shape; D1 only, needs a complete repo-profile §20 (below)
 card: trello:dQV3tHEq             # OPTIONAL — the card or issue this intent keeps up to date (§10): trello:<id> | linear:<KEY>
+merge: auto | hold                # OPTIONAL — omitted = hold
 ```
 
 Rules:
@@ -132,8 +137,16 @@ Rules:
   rule) — and the fail-closed `verify` template below the table.
 - **`card:` is optional and intent-wide** like `base:`: every spec of one intent carries the same
   value or none (`/adw-build` refuses a mixed set). Its rules are §10. An unreachable tracker never blocks a run; a mixed set is refused, like `base:`.
+- **`merge:` is optional, and `auto` or `hold` are its only values.** It says whether the intent's
+  PRs merge without the owner after a clean walk (adw-build §3.7). Intent-wide, like `base:`: every
+  spec of one intent carries the same value or none, and `/adw-build` refuses a mixed set.
+  **Missing means `hold`**, and so does a repo profile with no `auto-merge default` row
+  (`repo-profile §3`): no run infers `auto` from silence. `auto` is never valid when the base is
+  the production branch (`repo-profile §3`); `/adw-build` refuses it (Phase 0 step 4). `/adw-init`'s
+  triage proposes it (its item 9); the owner overrides it with `--hold` or at the approval gate
+  (§7), and the spec header carries the value the gate printed.
 - No spec, no build: `/adw-build` refuses a unit whose header is missing any of the six
-  required fields.
+  required fields. `base:`, `shape:` and `merge:` are optional and do not count among the six.
 
 ## 3. Depth ladder
 
@@ -219,7 +232,8 @@ For a single-unit intent meeting every D1 criterion: the triage agent itself dra
 flat spec in its one pass, the approval surface presents cut + spec together, and `approve` is the whole
 contract approval (no fan-out, no critical-pass subagent — the mutation gate carries
 the discriminating-verify property; AC completeness has no catcher but the approval glance —
-accepted at this tier). The do-side never thins at any depth.
+accepted at this tier). When adw-init Phase 2's skip test skips the gate, the intent the owner started is
+that approval, and the glance is at a surface that does not wait. The do-side never thins at any depth.
 
 **Port shape (`shape: port`) — status: TRIAL, the first run under it is the proof.**
 A unit whose acceptance is **pixel parity with a design reference**, graded by `repo-profile §20`'s
@@ -284,7 +298,8 @@ unit's output** (disjoint file lists do NOT prove independence).
 One exception: a port unit never shares a PR or sub-PR (§3 Port shape); it chains instead.
 
 Default when it could go either way: **group**. A separate base-targeting PR is earned,
-never chosen — each costs the owner +1 review, +1 local preview, +1 merge consent.
+never chosen — each costs the owner +1 review, +1 local preview, and, for a `merge: hold`
+intent, +1 merge consent (a `merge: auto` intent's PR merges behind adw-build §3.7's gate).
 
 ## 5. Chain conventions (contract, not style)
 
@@ -302,9 +317,11 @@ never chosen — each costs the owner +1 review, +1 local preview, +1 merge cons
   ```bash
   gh label create adw:blocked --color D93F0B --description "ADW: escalated finding or gate-file diff — needs the owner" || true
   gh label create adw:failed  --color B60205 --description "ADW: fix cycles exhausted or environment fault" || true
+  gh label create adw:hold    --color FBCA04 --description "ADW: the owner holds this PR — the run will not merge it" || true
+  gh label create adw:auto-merged --color 0E8A16 --description "ADW: merged by the run after its gate passed" || true
   ```
 
-  After the creates, `gh label list --search adw` MUST list both — the `|| true`
+  After the creates, `gh label list --search adw` MUST list all four — the `|| true`
   swallows a gh outage that otherwise resurfaces far from the cause as a failed
   `--add-label`.
 
@@ -322,16 +339,29 @@ never chosen — each costs the owner +1 review, +1 local preview, +1 merge cons
 
 ## 6. Consent carve-out (exact)
 
-The pipeline may merge ONLY: a sub-PR **it opened itself**, for a unit of the **current
-intent**, whose base is that intent's **integration branch**, whose loop reached
-**`ready`** or **`blocked`** (a blocked sub-PR merges as a *carried block*, below). Provenance
-is the authority — a PR that merely targets some `adw/*` branch
-does not qualify. Any PR targeting the default base, the production branch (`repo-profile §3`),
-or the intent's `base:` branch (§2) requires explicit human consent, always — a `base:` override
-does not open a consent side-door. The carve-out never widens past the integration branch.
+The pipeline may merge ONLY:
+
+- a sub-PR for a unit of the **current intent**, whose base is that intent's **integration
+  branch**, whose loop reached **`ready`** or **`blocked`** (a blocked sub-PR merges as a
+  *carried block*, below), and whose evidence block's `verified` row equals its head (adw-build
+  §3.4, §3.7). Provenance is the authority — a PR that merely targets some `adw/*` branch does not
+  qualify;
+- an independent or final PR of the **current intent**, into the intent's `base:` or the default
+  base, when the intent's specs say `merge: auto` (§2) and adw-build §3.7's merge gate passes.
+  The owner's `approve` on a surface that printed `merge   auto` is the consent (§7). When
+  adw-init Phase 2's skip test skipped the gate, the intent the owner started is: a typed
+  `/adw-init` line, an `/adw-build <unknown slug>` routed to init, or an `/adw-dispatch` brief.
+
+Provenance is durable, not the session's: the `merge:` flag, the `verified` row, the walk line
+and the labels survive a compaction and a new session, so any run building that slug may merge
+when they allow it. A run never merges a PR of another slug. The production branch
+(`repo-profile §3`) never: no flag opens it. Any other PR targeting the default base or the
+intent's `base:` branch (§2) requires explicit human consent, always — a `base:` override does not
+open a consent side-door.
 
 **A chain asks the owner once, at the final PR.** The consent for every sub-PR merge of a chain
-was given when the owner typed `approve` on a cut that shows the chain (§7). So:
+was given when the owner typed `approve` on a cut that shows the chain (§7), or started the intent
+whose gate adw-init Phase 2 skipped on such a cut. So:
 
 - **Never ask before a sub-PR merge.** "May I merge #N into `adw/<slug>`?" is not a question this
   contract has. Merge it (adw-build §3.7) and build the next unit.
@@ -340,7 +370,9 @@ was given when the owner typed `approve` on a cut that shows the chain (§7). So
   intent's base, the default base and the production branch: the one consent this section keeps
   for the owner. It stops a sub-PR merge only when it names sub-PRs or the integration branch
   ("do not merge sub-PRs", "stop after each unit"). A session that writes a brief for another
-  session never adds a no-merge line of its own.
+  session never adds a no-merge line of its own. An approved `merge   auto` line, or an intent
+  the owner started whose gate adw-init Phase 2 skipped for a `merge: auto` intent, is the owner's
+  word for that intent, given after any standing line; a standing line still binds an intent whose flag is `hold`.
 - **A `blocked` sub-PR does not stop the chain. It is carried.** The sub-PR keeps its
   `adw:blocked` label and its PR body, is merged into the integration branch, and the chain builds
   on its recommended default. The final PR then lands `blocked`, never `ready`, and lists every
@@ -348,9 +380,8 @@ was given when the owner typed `approve` on a cut that shows the chain (§7). So
 - **What still stops a chain:** a `failed` sub-PR; a `blocked` sub-PR the next unit cannot build
   on (adw-build §3.7 names three cases: a `depth escalation` or `shape escalation`, whose
   default replaces the unit, a red gate on the pushed head (but a port unit that is `port not converged` is carried), and a driver that returned no
-  `verified <sha7>`); a sub-PR whose provenance this
-  session did not establish (adw-build, Session-boundary provenance); and a merge-time assertion
-  mismatch (adw-build §3.7). Each of these is a line on the run report, not a question.
+  `verified <sha7>`); a sub-PR whose head is not its `verified` row (adw-build §3.7); and a
+  merge-time assertion mismatch (adw-build §3.7). Each of these is a line on the run report, not a question.
 
 Thirteen sub-PR merge questions reached the owner in twelve days of runs (2026-09-20 to 10-01):
 eight for a `blocked` sub-PR, two from a no-merge line a dispatching session wrote into a brief,
@@ -375,9 +406,10 @@ and appeared in three files' cross-references:
 | **run report** | `/adw-build` exit | S3 |
 | **PR body** | a `blocked`/`failed` sub-PR | S4 |
 
-Three rules (owner feedback, structural after prose failed twice):
+Five rules (owner feedback, structural after prose failed twice):
 1. Every surface has a **directive slot** — async surfaces open with a `Next:` first line;
-   interactive prompts end on the verb menu at the cursor.
+   interactive prompts end on the verb menu at the cursor (an approval surface whose gate was
+   skipped ends on its skipped-gate line instead).
 2. **The report is the whole message.** No narration before or after. Each fenced template below
    ends with a `← nothing follows this block` annotation for this reason: stated only here,
    the rule loses to whatever instruction sits at the cursor when the surface is printed.
@@ -389,7 +421,19 @@ Three rules (owner feedback, structural after prose failed twice):
    `Q13`, "the seat-now line": the same sentence says what it is. This binds every question a run
    asks, the ones outside these four surfaces included. 17 owner replies in twelve days were a
    form of "what is this?" (2026-09-20 to 10-01).
-4. **Depth renders as its §3 word** — `express` / `spec` / `plan` / `design` — on every
+4. **The ask rule binds every question as well** (adw-init Phase 0.7): mid-build, on the run report,
+   and in the chat after it. A question that fails the rule is not asked. Decide it, act on it, and
+   say what you decided in one line, so the owner can reverse it: a `note` row on the run report, or
+   one line in the chat after it. This includes "say `rerun` and I start" and "C1 or C2?" with a
+   recommendation a reasonable owner would not reject. Three things still wait for the owner: a merge
+   (§6), the `base:` branch (adw-init Phase 0.7; a base other than the default keeps adw-init
+   Phase 2's gate), and the `default:` printed after a stop: `blocked`,
+   `failed`, or an adw-build §3 progress condition or backstop. That default is the owner's to take.
+   A run that re-runs itself after its own backstop has defeated the backstop. In 2026-10-02..10-21,
+   where the outcome of such a choice was clear, the owner took the recommendation or delegated it 29
+   times of 34: "when you recommend to accept, just do it and tell me in the end … if you stop the
+   pipe is worse".
+5. **Depth renders as its §3 word** — `express` / `spec` / `plan` / `design` — on every
    surface and in every `note` line. A `shape: port` unit renders as `port` instead of `spec`.
    `D<N>` is the contract's code and the spec header's
    value; it is never printed to a human.
@@ -399,12 +443,14 @@ Three rules (owner feedback, structural after prose failed twice):
 ```
 Intent: <one line>
 base    <branch> — <one clause why>        ← only when not the default base (§2 base:)
+merge   auto → <base>, after a clean walk  ← or: merge   hold — <why>; ALWAYS prints (§2 merge:)
 extends <slug> · u1–u6: merged u1 u2 u3 u5 · open u4 (#820) · unbuilt u6   ← extend mode (§1.1)
+followup <slug> → <slug>-f<k>              ← `--followup` only (adw-init Input)
 
 needs you  2                               ← or: none — answer by number; blank = defaults
   Q1 (u4) — <one plain-language question>? default: <recommended default>
   Q2 — <question>? default: <recommended default>
-decided  Q3 <few words>: <answer> · Q4 <few words>: <answer> — reopen by number   ← only when the decide pass decided any (adw-init Phase 2)
+decided  Q3 <few words>: <answer> · Q4 <few words>: <answer> — reopen by number   ← only when the decide pass settled any (adw-init Phase 2); a skipped gate prints it without `— reopen by number`
 
 cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · u6
   u1  plan     <unit title>
@@ -420,9 +466,9 @@ cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · 
    uncharted territory>                    ← these print only when they exist
 
 approve → cut + build · decide → you settle the open questions, then build · specs only → stop after specs ·
-detail · re-cut "<instruction>" · regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port" · reopen Q3   ← `decide` only when `needs you` is not `none`; `shape` only when repo-profile has a complete §20 (§2); `reopen` only when a `decided` line prints
+detail · re-cut "<instruction>" · regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port" · merge auto · merge hold · reopen Q3   ← `merge auto` only when the base is not the production branch (§2 merge:); `decide` only when `needs you` is not `none`; `shape` only when repo-profile has a complete §20 (§2); `reopen` only when a `decided` line prints
 
-                        ← nothing follows this block: no summary, no narration
+                        ← nothing follows this block: no summary, no narration. A skipped gate ends otherwise: see the skipped-gate variant below
 ```
 
 The surface is **brief by default**: everything above is all that prints. `detail` and
@@ -485,8 +531,17 @@ surface must own:
   `approve → cut + build`, why every hazard is a `⚠` line the brief surface still prints,
   and why the `⚠` split above is not cosmetic. The merge carve-out (§6) does not move:
   sub-PRs still merge only into the intent's own integration branch, and the PR to
-  `base:` still needs explicit human consent. On a cut with a chain, `approve` is also the
-  consent for every sub-PR merge of that chain (§6): the run does not ask again per sub-PR.
+  `base:` still needs the owner's consent, which an approved `merge   auto` line gives: on
+  that surface, `approve` is the owner's explicit consent for the intent's merges into
+  `base:` once adw-build §3.7's merge gate passes (§6). On `merge   hold`, the owner merges
+  the PR to `base:`. On a cut with a chain, `approve` is also the consent for every sub-PR
+  merge of that chain (§6): the run does not ask again per sub-PR. When adw-init Phase 2's skip
+  test skips the gate, the intent the owner started gives the same consent as `approve` on the surface
+  it prints: nothing on that surface asked for the owner.
+- **The `merge` line always prints**, `auto` or `hold`, with the base it names. `merge auto` and
+  `merge hold` re-render the surface with the new value, and the run writes it to every spec of
+  the intent before the build starts. `merge auto` is refused when the base is the production
+  branch (§2 merge:).
 - **The collapse is gated on a clean exit.** A non-empty `needs you` on the handoff stops
   there exactly as `specs only` would — a pending critical-pass question is the whole
   reason the round-trip existed, and auto-defaulting it sight-unseen would bake the answer
@@ -494,29 +549,44 @@ surface must own:
 
 D0 (`express`) approval variant: the draft flat spec body renders as a fenced block
 between the `⚠` lines and the verb menu — cut + spec are one approval surface, and the
-prompt still ends on the verb menu (rule 1). The body renders in brief mode too; it is
+prompt still ends on the verb menu, or on the skipped-gate line (rule 1). The body renders in brief mode too; it is
 the artifact being approved, not detail.
+
+**Skipped-gate variant.** When adw-init Phase 2's skip test passes, the surface prints as it does
+at a gate that waits, with this one line in place of the verb menu:
+
+```
+gate skipped — no question needs you and no ⚠ line, so this runs as if you typed approve
+
+                        ← no TEXT follows this block, and the same message carries the tool call that starts adw-init Phase 3 (the first unit agent's dispatch, or a D0 spec's write)
+```
+
+That line is the directive slot (rule 1): it tells the owner that nothing waits. The run goes on in
+the same turn: a message that holds the surface and no tool call ends the run. No verb is read on
+this surface, so it offers none: the `decided` line drops `— reopen by number`.
 
 ### handoff — end of init (async; a run boundary, not always a stop)
 
 ```
-Next: nothing — building u1 · u3          ← `approve`, clean exit: build starts this turn
+Next: nothing — building u1 · u3          ← `approve` or a skipped gate, clean exit: build starts this turn
 specs      <specs-dir>/YYYY-MM-DD-<intent-slug>/   N units
 plans      u1 u3  ·  none: u2 u4 (below design — plan is in the spec)
 ⏱ run      machine 41m · your gate 3m                ← unconditional (§7.1)
+asks       shown 3: owner 1 · default 1 · delegated 1 · auto-decided 4   ← unconditional (below)
 needs you  none
 decided    Q1 <few words>: <answer> · Q4 <few words>: <answer>   ← only what the `decide` verb or Phase 5's decide pass settled
 
                         ← no TEXT follows this block, and the same message carries the tool call that starts the build (adw-init Phase 5 step 3)
 ```
 
-Stopping variant — `specs only`, or `approve` with a non-empty `needs you`:
+Stopping variant — `specs only`, or `approve` or a skipped gate with a non-empty `needs you`:
 
 ```
 Next: /adw-build <intent-slug>
 specs      <specs-dir>/YYYY-MM-DD-<intent-slug>/   N units
 plans      u1 u3  ·  none: u2 u4 (below design — plan is in the spec)
 ⏱ run      machine 41m · your gate 3m                ← unconditional (§7.1)
+asks       shown 3: owner 1 · default 1 · delegated 1 · auto-decided 4   ← unconditional (below)
 needs you  2                     ← ids CONTINUE the approval surface's sequence:
   Q3 (u3) — <one plain-language question>? default: <recommended default>
   Q4 (u3) — <question>? default: <recommended default>
@@ -534,7 +604,7 @@ building handoffs did exactly that (2026-09-20 to 10-01), and the owner came bac
 stop when you don't need my input on anything?".
 
 `needs you  none` when empty. **Items are numbered `Q1..QN` in ONE sequence across the
-whole run — the sequence starts at the approval surface and the handoff continues it, never restarting and never
+whole run — the sequence starts at the approval surface, and the handoff continues it, never restarting and never
 labelling by bare unit id** — the owner answers by number (`1- …`, `Q3: no`), and
 repeated unit labels give them nothing to reference (runs 3 and 6 both shipped
 `u1 · / u1 · / u2 ·` shapes; both times the answers came back by guessed position).
@@ -545,14 +615,23 @@ handoff's new questions continue after the highest id. `decided` ones print on t
 surface's `decided` line; the handoff's `decided` line carries only what was settled after that
 surface printed (the `decide` verb, Phase 5's decide pass). A `decided` line is never counted in
 `needs you N` or in the stopping test above.
+**The `asks` line counts every question this run put to the owner** — approval-surface
+`ask` rows — by how it settled: `owner` (answered by number), `default` (left blank), `delegated`
+(`decide`, "critically decide", "you decide"). `auto-decided` counts the questions a decide pass settled
+without showing them. When nothing was asked the line reads `shown 0: — · auto-decided <n>`. A question counts once, by how it last settled: a
+`reopen`ed one counts by its new answer, and an `ask` row a `re-cut` removed counts nowhere. Keep one `QN → how` row per question in context; if compaction dropped them, the line reads `asks n/a — not recoverable`. On a stopping handoff, rows still unanswered count as `pending`. It is the measure of the ask rule (adw-init
+Phase 0.7): **`delegated` above ~15% of `shown` means the rule lets through questions the run can
+settle**, and `default` above ~50% means it asks what no owner disputes. Before this line, the
+measurement took a 96-gate transcript sweep. It goes into the evidence block of every PR built in the same run (adw-build §3.4); a build started later writes `n/a`.
 Unanswered items ship with the recommended default, recorded in the spec. A single-unit
 (flat-file) intent prints its spec's flat path on the `specs` line instead of a folder.
 
 ### run report — build exit (async, end of `/adw-build`)
 
 ```
-Next: review + preview + merge PR #NNN (<which>)
-ready    #NNN  <desc> — <units> · gates green · review clean · ⏱ <N>m
+Next: review + preview + merge PR #NNN (<which>)   ← or, nothing left for the owner: Next: when you test, gh pr list --state merged --label adw:auto-merged
+merged   #NNN  <desc> — <units> · walk clean · screens <url> · polish <p> · refuted <r> · ⏱ <N>m   ← merged by adw-build §3.7's gate
+ready    #NNN  <desc> — <units> · gates green · review clean · ⏱ <N>m   ← a PR the gate held ends · held <n>: <reason>
 blocked  #NNN  <unit> — <one sentence>; default: <recommended default> · ⏱ <N>m
 failed   none
 unbuilt  none
@@ -564,6 +643,8 @@ note     tier <uNN> <word> author=<tier> impl=<tier>       ← only for units bu
 note     orchestrator <tier> — restart the next run with claude --model sonnet   ← only when the session ran above sonnet (§8)
 note     level <uNN>+<uNN> built concurrently              ← only when a DAG level ran >1 unit
 note     card <ref> — <what was not kept up to date, and why>   ← only when the tracker was off or a call failed (§10)
+note     run-clean: 3 worktrees, 2 DerivedData dirs, freed 7.9 GB; kept 1   ← unconditional (adw-build Phase 5)
+note     kept     adw-<slug>-u2  uncommitted: <paths>      ← one per item run-clean kept
 note     <further run-level caveats — one line each, only when present>
 
                         ← nothing follows this block: no summary, no narration
@@ -575,9 +656,14 @@ dated after the last production-code commit (NOT `$VSHA` — a docs-only amendme
 demand a re-review the void rule exempts). None → the line is `blocked`; so is any `[Blocking]` a
 review lists under `🔧 To fix` that `/pr-ready` §5's grader cannot close, and so is a grade that did
 not run (`fetch failed`, `NOT RUN`). One line per PR, ordered
-ready → blocked → failed → unbuilt. These four keywords are the
+merged → ready → blocked → failed → unbuilt. These five keywords are the
 only PR states — a PR whose `ready` was voided by a post-review amendment (adw-build
-§3.6) prints on the `blocked` row, never as a fifth state and never as `failed`.
+§3.6) prints on the `blocked` row, never as a sixth state and never as `failed`. `merged` is
+a PR adw-build §3.7's merge gate merged this run; `screens <url>` links its screenshots
+comment, and `polish <p>` and `refuted <r>` count the walk's rows that print but do not stop a
+merge. A `ready` PR the gate held ends `· held <n>: <reason>`, the evidence block's `merge`
+row: the owner merges it, or clears the reason and re-runs. When every PR line is `merged`,
+`Next:` is `Next: when you test, gh pr list --state merged --label adw:auto-merged`.
 Multiple `ready` PRs → the `Next:` line lists them in merge order. `· ⏱ <N>m` is
 unconditional on every PR line — **net of owner wait**, exactly as §7.1 computes it
 run-wide (`machine = (T3 − T0) − gate`): the per-PR number must not charge the human's
@@ -586,8 +672,12 @@ bound with adw-build §3's progress conditions — and it is durable only becaus
 §3.4 lands it in the PR body; the terminal line does not survive the session. A PR line may carry trailing `· ⚠ <flag>`
 annotations (e.g. `· ⚠ no trustworthy gate sees this unit`, `· ⚠ baseline red: <gate>`); a final PR
 landed `blocked` by a carry adds one line per carried sub-PR, `carried #<n> <unit> — <reason>;
-default: <default>` (adw-build Phase 4); every user-visible PR body carries a `Smoke` list
-(adw-build §3.5); the `note` row carries
+default: <default>` (adw-build Phase 4); every user-visible PR body carries a `## Smoke` section
+of cases (adw-build §3.5); an independent or final PR in a repo whose profile has a §21 adds
+`· smoke clean` after `review clean` (a `blocked` line has none: after its default), or one `· ⚠ smoke …` flag, plus `· ⚠ screens not posted — <reason>` when the screenshot relay failed, either one ending `· fixed <f>`
+(and `, <u> unconfirmed`) when smoke fix cycles fixed rows (adw-build §3.8): a smoke defect that its
+refuter confirms is fixed, and one no smoke fix cycle fixed puts the PR on the `blocked` row; a PR
+whose body says `Smoke: none — <why>` adds neither; the `note` row carries
 run-level caveats (non-default `base:`, extend-mode's prior-unit summary, a
 `· ⚠ mutation per-file <covered>/<total>` ratio). The first `note` line is
 unconditional: `note  contract <short-sha>` — the commit the loaded contract came from:
@@ -643,7 +733,14 @@ next run's analysis needs:
   visible in the bill and nowhere else. The evidence block carries it per PR; this line is the
   run-level copy the owner reads before starting the next run.
 
-Nothing else is printed.
+One more `note` line is unconditional: **`note run-clean: …`**, the last line of adw-build
+Phase 5's cleanup script, verbatim, and after it one `note kept …` line per item the script kept.
+A kept item is disk this run did not free, with the reason it would not. The owner frees it by
+hand: `/cleanup` skips a dirty or unpushed worktree too. A non-zero exit prints
+`note run-clean failed — <the script's last line>` instead.
+
+Nothing else is printed, except the `note` lines of the cleanup that adw-build Phase 5 runs again after
+post-report work.
 
 ### PR body — a `blocked`/`failed` sub-PR (async)
 
@@ -661,7 +758,8 @@ blocked on a human answer. Both surfaces carry the line unconditionally, `0m` in
 
 Take `date +%s` at these points: **T0** run start (before any dispatch) · a **T1/T2**
 pair around every halt that waits on the owner — the approval surface, a re-cut round, a mid-build
-question — T1 immediately before the print, T2 on the answer · **T3** at every `⏱ run`
+question — T1 immediately before the print, T2 on the answer (a surface printed under adw-init
+Phase 2's skip test waits for nothing and gets no pair) · **T3** at every `⏱ run`
 print, which on a chained run means twice: once for the handoff's partial, once for the
 run report's total, over one continuing series.
 **Tag every pair with the unit whose PR loop it interrupted** (`—` for a run-level halt
@@ -672,7 +770,7 @@ per-PR `owner-wait` of adw-build §3.4's evidence block is not, and it defaults 
 by subtraction rather than by summing work intervals is deliberate: a halt nobody
 stamped inflates `machine`, which reads as the pipeline's own cost and gets
 investigated — the failure direction that self-corrects. `/adw-build` reached through
-`approve` continues the same T-series rather than restarting it — one invocation
+`approve`, or through a gate adw-init Phase 2 skipped, continues the same T-series rather than restarting it — one invocation
 the owner experiences as one run reports as one run. A build reached by a fresh
 `/adw-build` starts its own series with `gate 0m`.
 
@@ -697,8 +795,8 @@ inverting the one distinction §7.1 exists to draw. A fresh `/adw-build` invocat
 this case (it starts its own series at `gate 0m`); mid-run compaction is. If the pair
 genuinely cannot be reconstructed, say so on a run-report `note` line rather than reporting a
 number the transcript cannot back. Recovery is scoped to the stamps: a readable transcript
-never re-establishes merge provenance, which §6 keys on the session, not on what is
-legible from disk.
+never re-establishes merge provenance, which §6 keys on the durable facts it names (the flag,
+the `verified` row, the walk line, the labels), not on what else is legible from disk.
 
 It exists because the two numbers were conflated in the only direction that matters:
 run-7 read as a 24-hour run and was 2h38m of work behind a 20-hour approval gate. Without
@@ -754,6 +852,11 @@ polling — `review-core.md` §10 is the procedure.** The `Agent` tool has no fo
 (measured in `review-core.md` §10). The top-level session is the exception: it may end its turn, and
 the notification wakes it.
 
+**A pane is not a subagent.** Use an `Agent` call when this session needs the result to
+continue. Use `/adw-dispatch` when the work has its own human gate, outlives this task, belongs
+to another repo, or the owner said he does not want it here: `adw-dispatch.md` §1. This table
+governs `Agent` calls only; a dispatched pane's tier is `adw-dispatch.md` §3.
+
 **Every brief ends with the brief floor: `review-core.md` §11, pasted.** It is about ten lines: no
 `git stash`, no printed credential, no lock script, the wait rule, the shell traps. An orchestrator
 that has not loaded `review-core.md` reads that one section once per run
@@ -772,10 +875,10 @@ important the unit is:
 | The agent's job | Tier |
 |---|---|
 | **Find** — refute, review, audit, scan, check against a doc, run a fixed checklist | `sonnet` |
-| **Clear a `Blocking`** — grade whether an earlier finding still holds at the head (`pr-ready.md` §5), the refutation step of `review-core.md` §9 | `opus` — takes precedence over the Find row |
-| **Re-execute and relay** — run gates, report exit codes and output tails, verify | `sonnet` |
+| **Clear a `Blocking`** — grade whether an earlier finding still holds at the head (`pr-ready.md` §5), the refutation step of `review-core.md` §9, the check of the app smoke's defect rows (adw-build §3.8) | `opus` — takes precedence over the Find row |
+| **Re-execute and relay** — run gates, report exit codes and output tails, verify, relay the app smoke and its screenshots (adw-build §3.8) | `sonnet` |
 | **Look up** — read a file or a history and answer a bounded question | `haiku` |
-| **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file | `sonnet` |
+| **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file; the app smoke's fix agent (adw-build §3.8) is one | `sonnet` |
 | **Author** — write a spec, a plan, or production code | **keyed on the unit's `depth:`** — `opus` at D3, `sonnet` at D0–D2 |
 | **Decide** — settle each gate question or hand it to the owner (`adw-init.md` Phase 2) | `opus`; `sonnet` when every unit is D0–D1. A wrong `decided` builds unseen |
 | **Drive** — run `/pr-ready <N> apply` end to end for one PR (tier, review cycles, the post-review re-pass, evidence, verdict, cleanup) and return its machine line | `sonnet` |
@@ -836,6 +939,7 @@ adw repo                     consuming repo
   commands/review-core.md      .claude/commands/review-core.md ← stub
   commands/code-review.md      .claude/commands/code-review.md ← stub
   commands/cleanup.md          .claude/commands/cleanup.md    ← stub
+  commands/adw-dispatch.md     .claude/commands/adw-dispatch.md ← stub
   docs/00-design.md            .claude/repo-profile.md        ← the per-repo half, authored here
                                .claude/adw/fetch.sh           ← the fetch, gitignored cache
                                docs/adw/{specs,plans}/        ← this repo's own artifacts
@@ -865,7 +969,7 @@ and it names an unverified contract rather than a stale one it cannot do anythin
 failure with no cache at all is **exit 1**, and the run stops.
 
 **What is still per-repo.** `repo-profile.md`, authored in the consuming repo and never fetched.
-Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19, §20 and §21 optional). A contract file that
+Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19, §20, §21 and §22 optional). A contract file that
 needs a value which could differ between two repos is wrong: the value belongs in the profile. The
 failing test is always the same — could this exact sentence be true in a repo with a different
 stack? If not, it names a value, and the value moves.
@@ -895,21 +999,23 @@ stop: no retry, no question, the run goes on.
   the run prints ONE line, once per command (init Phase 0.5, build Phase 0 — build may start in a new
   session): `⚠ card <ref>: <trello|linear> MCP not connected — status will not be kept up to date`
   (or `card not found` in place of `MCP not connected`).
-- **Status names are `repo-profile §21`.** The run never guesses a column or status name. §21 absent,
+- **Status names are `repo-profile §22`.** The run never guesses a column or status name. §22 absent,
   or a name it holds that the card's board or team does not have →
-  `⚠ card <ref>: repo-profile §21 has no status "<name>" — status will not be kept up to date`, and
+  `⚠ card <ref>: repo-profile §22 has no status "<name>" — status will not be kept up to date`, and
   the tracker is off for the run.
-- **Two moves, one comment each. A sub-PR never touches the card.**
+- **Up to three moves, one comment each. A sub-PR never touches the card.**
 
   | When | Move to | Comment |
   |---|---|---|
-  | `/adw-build` Phase 0 step 9, after every refusal and halt | `repo-profile §21` `started` | `adw <slug> started: <units>` |
-  | `/adw-build` Phase 5, before the run report prints | `repo-profile §21` `review`, only when at least one PR is `ready`; blocked-only gets the comment and no move | the final or independent PR numbers with their URLs and states |
+  | `/adw-build` Phase 0 step 9, after every refusal and halt | `repo-profile §22` `started` | `adw <slug> started: <units>` |
+  | `/adw-build` Phase 5, before the run report prints, when every PR of the run is `merged` (`merge: auto`, §2) | `repo-profile §22` `done` | the PR numbers with their URLs |
+  | the same point, when at least one PR is `ready` and not every PR is `merged` | `repo-profile §22` `review` | the PR numbers with their URLs and states |
 
-  There is no move to done. The owner merges the final PR (§6), and the run cannot see the merge.
-  `repo-profile §21` `done` exists only so the run can recognise a finished card.
+  Blocked-only, or `failed`: the comment, no move. A run whose final PR the owner merges by hand
+  (`merge: hold`) ends on `review`: the run cannot see that merge, and `done` is the owner's move.
 - **Skip the move when it would not advance the card:** the card already sits in the target, or in
-  `done`, or the target is `started` and the card sits in `review`. A skipped `started` move skips its
+  `done`, or the target is `started` or `review` and the card sits in `done`, or the target is
+  `started` and the card sits in `review`. A skipped `started` move skips its
   comment too; a skipped `review` move still posts its comment, because the PR list is new, unless the card sits in `done`. Move
   first, then comment; the two calls are independent.
 - **Comment text** is one or two lines in the language of the card's own title; the table's wording

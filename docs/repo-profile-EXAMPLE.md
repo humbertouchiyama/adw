@@ -4,24 +4,26 @@
 > repository ADW was built in: a full-stack TypeScript monorepo (React 19 + Vite, Hono + PostgreSQL
 > 16 + Drizzle, one shared npm workspace). Copy it to `.claude/repo-profile.md` in your repo and
 > replace **every** value. Keep the section numbers: the contract cites them as `repo-profile §N`
-> and the anchors §1–§18 are frozen. §19, §20 and §21 are optional; §20 and §21 are sketched at the end.
+> and the anchors §1–§18 are frozen. §19 to §22 are optional; §20, §21 and §22 are sketched at
+> the end.
 
 Every repo-specific value the shared agent contract needs. One of these lives in each repo that
 runs `/adw-init`, `/adw-build`, `/pr-ready` or `/code-review`; the contract files themselves
 (`adw-core.md`, `adw-init.md`, `adw-build.md`, `pr-ready.md`, `review-core.md`,
-`code-review.md`, `cleanup.md`) live in the `adw` repository and are fetched, never copied.
+`code-review.md`, `cleanup.md`, `adw-dispatch.md`) live in the `adw` repository and are fetched,
+never copied.
 
 The format is prose and tables, not a parsed config. The reader is an agent, so precision matters
 more than syntax.
 
 **Section anchors are frozen** — the contract files cite `repo-profile §1`…`§18` by number, and the
-optional §19, §20 and §21 where a profile carries them. Do not renumber. Add new sections at the end.
+optional §19 to §22 where a profile carries them. Do not renumber. Add new sections at the end.
 
 | § | Section | Read by |
 |---|---|---|
 | §1 | Identity and layout | orientation |
 | §2 | Paths | adw-core §1, adw-init Phase 4, adw-build §3.5, pr-ready §2/§5 |
-| §3 | Branches | adw-core §2/§6, adw-build Phase 0 |
+| §3 | Branches | adw-core §2/§6, adw-build Phase 0, adw-build §3.7 (merge gate), adw-init triage item 9 |
 | §4 | Worktree provisioning | adw-build Phase 2, review-core §1.2, pr-ready §4.3 |
 | §5 | Gates | adw-build §3.2, review-core §4, pr-ready §4.3 |
 | §6 | Layer map — which gates a diff obligates | review-core §4, adw-build §3.2 |
@@ -36,10 +38,11 @@ optional §19, §20 and §21 where a profile carries them. Do not renumber. Add 
 | §15 | Review emphasis + Blocking severity classes | code-review Phase 4, review-core §9 |
 | §16 | Project rule tables | code-review Phase 5.2, 5.3 |
 | §17 | Convention doc routing | code-review Phase 6.2 |
-| §18 | Disposable state | cleanup Phase 3, 5 |
+| §18 | Disposable state | cleanup Phase 3, 5; adw-build Phase 5 (`Provisioned files`) |
 | §19 | Review-lane map, layer to angle (optional; absent → derived) | code-review lane table |
 | §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2/§3.3/§3.4/§3.6 |
-| §21 | Card tracker status names (optional; absent → status is never moved) | adw-core §2/§10, adw-init Phase 0.5, adw-build Phase 0/5 |
+| §21 | App smoke (optional; absent → no smoke) | adw-build §3.5/§3.7/§3.8, adw-core §7 |
+| §22 | Card tracker status names (optional; absent → status is never moved) | adw-core §2/§10, adw-init Phase 0.5, adw-build Phase 0/5 |
 
 ---
 
@@ -100,9 +103,21 @@ Gitignored build output a path check must skip: `packages/shared/dist` and frien
 | **production branch** | `main` |
 | **long-lived integration branches** | `feat/**` |
 | **merge convention** | squash |
+| **auto-merge default** | `on` |
+| **merge-protected paths** | `.claude/**` `.github/workflows/**` `firebase.json` `.firebaserc` `api/drizzle.config.ts` |
+| **UI paths** | `src/**` `packages/shared/**` `index.html` `public/**` |
 
 `develop` is never merged into anything, so "the base branch is still unmerged" never expires for it
 (adw-core §1.1 liveness).
+
+The last three rows are read by `adw-build §3.7`'s merge gate, at merge time, so each cell holds the
+value alone: no note in the cell. **auto-merge default** is `on` or `off`; `off` is the kill switch
+and also stops runs already in flight, and a profile with no row reads as `off`. **merge-protected
+paths**: a PR whose diff touches one never merges without the owner; with no row, no PR auto-merges.
+The gate reads these rows, and the `money` row, from the base's copy of the profile too, and the
+stricter wins. **UI paths**: a `Smoke: none`
+PR whose diff touches one waits for the owner; with no row, every `Smoke: none` PR waits. Both hold
+globs in backticks, space-separated: a double star crosses `/`, a single star does not.
 
 ## §4 — Worktree provisioning — before any gate
 
@@ -556,10 +571,33 @@ Read by `/code-review` Phase 6.2 — where a convention `Insert` draft is target
 | analytics | `docs/analytics_standards.md` |
 | backend architecture | `docs/backend_standards.md` |
 
+### §17.1 — Enforcement
+
+Read by `/code-review` Phase 6.2 step 5. Optional: omit it and no enforcer is drafted. Lists each
+mechanism that turns a written rule into a red gate, and which written rules each one checks, so the
+review can see a rule with no check.
+
+| Mechanism | Shape of a new check | Rules it checks |
+|---|---|---|
+| `scripts/audit.sh` | one grep check: id, pattern, path glob, severity | `CLAUDE.md` forbidden-pattern table rows 1–6 |
+| `api/test/architecture.test.ts` | one `it()` per rule, path allowlist with a reason per entry | `api/CONVENTIONS.md` §13, §37 |
+
+Rules with no check, and why (a new rule lands here or in the table, never in neither):
+
+| Rule | Why no check |
+|---|---|
+| `CLAUDE.md` "no PII in analytics events" | needs the event payload at runtime |
+
 ## §18 — Disposable state
 
 Read by `/cleanup` Phase 3. Everything a session can leave behind **besides** worktrees and
-branches, which `/cleanup` handles on its own.
+branches, which `/cleanup` handles on its own. adw-build Phase 5 reads the one line below.
+
+**Provisioned files:** none. Read by adw-build Phase 5, which passes each path to its cleanup
+script as `--provisioned`. A tracked file that §4's provisioning rewrites in every worktree (a
+lockfile an install step re-stamps) goes here; the script restores it before it removes the
+worktree. Any other change keeps the worktree. Here §4's provisioning leaves `git status` clean
+(it writes only ignored paths), so the line is `none`.
 
 ### 18.1 — Inside the worktree — reclaimed for free
 
@@ -628,7 +666,33 @@ them all in one build, then `&&`-chain one score per screen, each exiting 1 on a
 that names a screen (its score, and any per-screen delete or filter) is a per-row part that
 `/adw-init` repeats for each row. Its first token must be on §5's allowlist (adw-init Phase 4); wrap it in `bash -c '…'` otherwise.
 
-## §21 — Card tracker (optional)
+## §21 — App smoke (optional)
+
+A profile that keeps this section declares a runner that drives the built app through a case file,
+and `/adw-build` §3.8 then walks the `## Smoke` cases of every independent and final PR, checks each defect the walk reports, and fixes the ones that hold up.
+**Delete the whole section unless the repo has one**:
+absent → no smoke runs and nothing about it prints. Fill every row with a value, not with the
+description:
+
+| | |
+|---|---|
+| **Launch** | how to start one smoke, unattended: a command, or a tracked skill and its arguments, taking the PR number, the head sha, a case file, a device list and, when the PR lists screens, a screens file (adw-build §3.8 passes `--screens <file>`; the runner keeps one image per listed screen and device in the Evidence row's `screens/`). It refuses a build that talks to production, edits no code, commits, pushes and posts nothing, and never reports by typing into the caller's terminal or chat: the caller is an agent, and that text would reach it as if the owner wrote it. Say where it prints every value the rows below need (a run directory, a slot, a run name), and at which point of it the Driver probe runs: after the devices boot and the app installs, before the walk. When the runner holds a lock, it prints `adw-lock: taken <epoch>` when it takes it, and `adw-lock: held by <holder> since <epoch>` before it exits when another walk holds it (adw-build §3.8) |
+| **Cases check** | a command that reads a case file in adw-build §3.5's shape and exits 0 when the runner can walk it, non-zero with the reason when it cannot |
+| **Devices** | the device classes the runner offers, each by its token (the name the runner gives it, such as `iphone17` or `phone-width`), the simulator or emulator runtimes it is valid on (tested, with the date and the driver version), how a case's `Device` line maps onto them, and the set used when no case names one. A `## Screens` row names only tokens a case walks, never a case's `Device` word (adw-build §3.5, checked at §3.8) |
+| **Driver probe** | a command, run once per device before the walk, that taps one control, then reads back the screen that tap must open, and exits non-zero when it did not open. A read alone is not a probe: a driver can read a screen and still refuse every tap (adw-build §3.8) |
+| **Data** | what data exists when the runner starts (accounts, a seeded fixture), and how a case gets the data its Preconditions name that the fixture lacks. A scratch DB; a template clone of real data is never allowed for a walk whose images leave the machine (adw-build §3.8 posts them on the PR). Never production data, never a person's own account |
+| **Wait test** | a shell test, judged by its exit status alone (its output is discarded), that is true once THIS walk has finished and released what it holds (devices, its lock), so the next smoke can start. Another walk's lock does not make it false |
+| **Result** | the file the run writes; its verdict line; which of its table rows are defects and with what severity, which are gaps, and which are neither; how to count the cases that passed; and which line in it shows the driver was lost mid-walk. A `blocked` case is a gap row that names its `AC-<n>`: one whose data or driver could not be made, and one whose change no walked device runs (the Renders row). Such a case never reads `pass` |
+| **Evidence** | for a defect row, where the files that show it are: the image a row cites, or the entry it cites and the image that entry names, with the directory each path is relative to, and which line of an entry holds the path. The §3.8 refuter opens those images and judges from them, not from the walk's own words. Also where the files showing a defect row are, and `screens/`: one image per `## Screens` pair (adw-build §3.5), named `SCREEN-<n>-<device>.png`, passed or failed |
+| **Audit** | a command that checks the result's evidence (the screenshots it cites exist, the build is the one asked for), and its exit codes |
+| **Max minutes** | a whole number: the longest one walk may run, counted from the runner's `adw-lock: taken` line, or from before Launch when there is no lock; `/adw-build`'s relay runs Abandon at its first wait check past it, and on any Launch that stops before the walk |
+| **Abandon** | what to run at that deadline: stop the run, release what it holds, and print the last state it reached |
+| **Build floor** | a command that exits 0 when the host can finish a build now (enough free memory, no other build running) and non-zero with the reason when it cannot. The relay runs it before Launch and waits on it up to Max minutes |
+| **Second account** | optional: the roles the walk can sign in as (the default first) and the command that switches a device to another, so a case that needs two users switches in its steps |
+| **Lock** | optional: the command that takes the runner's lock, the one that releases it, and the lock file, whose existence means a walk or a build holds the host. The relay waits on the file while a walk is queued (adw-build §3.8) |
+| **Renders** | optional: which code each device runs, and a command that prints, one per line, each file of a PR's diff that it cannot show a device above runs: code for another platform, or one implementation of a screen that the devices draw with another (a Compose screen that iOS draws with a SwiftUI twin). It fails closed: a file it cannot place prints, a deleted file it would need to read prints, and a step that fails (the diff, the sha) exits non-zero, which clears no file. State both forms of its input: the open PR's (`gh pr diff <N> --name-only`), and the one adw-build §3.5 uses before the PR exists (`git diff --name-only <base>...<sha>`). A file it prints by mistake only holds a PR. adw-build §3.5 runs it before the cases are final, and the runner before the walk: a case whose change is only in printed files is `blocked`, and a listed screen whose change is only there gets no image and a gap row that names its `SCREEN-<n>` |
+
+## §22 — Card tracker (optional)
 
 A repo whose intents name a Trello card or a Linear issue (adw-core §10) lists the status names the run
 moves it between. **Delete the whole section unless the repo uses a tracker**: absent → the run warns
@@ -640,6 +704,6 @@ or team shows it; the run does not guess. Fill only the tracker rows the repo us
 | Trello | `Doing` | `Review` | `Done` |
 | Linear | `In Progress` | `In Review` | `Done` |
 
-`started` is where the card goes when `/adw-build` begins. `review` is where it goes when the PR the
-owner must merge is open. `done` is never a target: the owner merges, and the run only uses it to
-recognise a card that is already finished.
+`started` is where the card goes when `/adw-build` begins. `review` is where it goes when a PR the
+owner must merge is open. `done` is where it goes when the run merged every PR itself (`merge: auto`);
+after a merge by hand the owner moves it.

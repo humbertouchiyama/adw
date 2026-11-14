@@ -87,13 +87,14 @@ Two properties hold in every repo, whatever `repo-profile §4` declares:
 
 ```bash
 if [ -z "$(git -C "$WT" status --porcelain)" ]; then
-  git worktree remove "$WT" --force
+  git worktree remove "$WT"
 else
   echo "WARN: $WT has uncommitted changes; not removing. Inspect manually."
 fi
 ```
 
-Removal failure → warn in terminal, don't block. **File mode: nothing to clean up.**
+Removal failure → warn in terminal, don't block. Never add `--force`: a clean tree does not need it,
+and the owner's settings deny it. **File mode: nothing to clean up.**
 
 ---
 
@@ -119,7 +120,7 @@ The one cognitive move both skills make on every finding. Named once here; every
 
 **Most findings that first look like "your call" resolve to *apply* once assessed** — only true decisions survive as escalations. Lead every report with what you decided; then list the (usually few) genuine escalations. Do not hand the user a raw list to adjudicate — the judgment is made *here*. **Neither skill presents findings as a chooser/menu** — an `AskUserQuestion` "which should I fix?" or a numbered "pick one" list IS a raw list; adjudicate each finding yourself and surface only genuine escalations via §5.
 
-The bucket names each skill uses (code-review `toFix`/`escalate`/`reject`; spec-review `mechanicalFix`/`proseRewrite` + `escalate`; convention verdicts `Insert`/`Reject`) are routing labels under this principle. The phrases **"decide-or-escalate pass"**, **"self-assessed 6.2"**, and **"the lesson bar"** all resolve to this single principle by reference.
+The bucket names each skill uses (code-review `toFix`/`escalate`/`reject`; spec-review `mechanicalFix`/`proseRewrite` + `escalate`; convention verdicts `Insert`/`Enforce`/`Reject`) are routing labels under this principle. The phrases **"decide-or-escalate pass"**, **"self-assessed 6.2"**, and **"the lesson bar"** all resolve to this single principle by reference.
 
 **This principle does NOT flatten spec-review's apply tiers.** In spec-review, **apply** stays two-tier: *mechanical* fixes land under `apply`; *prose* rewrites land only under `apply-all`. The conservative-by-default asymmetry is spec-review's own (it owns the implementation contract; the reviewer catches drift but doesn't flip a validated default). code-review has no such split — its `apply` fixes both.
 
@@ -140,6 +141,8 @@ Then, on what clears both gates, two resolution rules:
 **The tell:** you are about to restate a finding with "should I…?" appended. If anyone who read the diff would answer it the same way, you already know the answer — write the fix, not the question.
 
 **Convention / lesson candidates are a stricter sub-case.** A pattern worth documenting in a standards doc or `.agent/lessons.md` earns **apply** (an `Insert` verdict) only if it clears ALL of: *generic* · *detectable or review-teachable* · *recurrence-likely* · *not already covered* (grep the target doc first) · *worth its weight* · *not pure preference*. Miss one → **reject**, naming the failed criterion. On the fence → **reject** (a missed convention costs one repeated review comment; a bad one silently mis-flags correct code forever). **Learning-doc edits are never auto-applied even in an apply mode** — they steer every future PR/port and need human sign-off; surface `Insert` drafts + a terse `Reject` list for the user to land. (Calibration lines are the one reviewer-side exception — see §6.)
+
+**An `Enforce` verdict is a separate sub-case with its own bar**, not a convention candidate: it adds a check for a rule that is **already written** in a standards or learning doc, so *not already covered* does not apply to it. It earns `Enforce` only if ALL hold: the rule is written · this PR broke it · `repo-profile §17.1` lists no check for it · the check is mechanical (no runtime state, no product intent) and stays green on correct code. Miss one → no verdict. Same sign-off as an `Insert`: never auto-applied.
 
 ---
 
@@ -185,7 +188,7 @@ How genuine **escalate** findings (§3) reach the human. Branches on run context
 
 **Why opt-in, not inferred.** `AskUserQuestion` **blocks on user input**. In an async / CI / scheduled / sub-agent run it would hang the pipeline forever. There is no reliable interactive-vs-async signal intrinsic to a slash command, so this branch fires **only** on the explicit `interactive` flag; absent it, the run always takes the non-blocking default. When in doubt, non-blocking.
 
-Convention/lesson `Insert` verdicts and calibration echoes (§6) are **reported, never surfaced as blocking prompts** — they are drafts for the user to land, not decisions gating the run.
+Convention/lesson `Insert` and `Enforce` verdicts and calibration echoes (§6) are **reported, never surfaced as blocking prompts** — they are drafts for the user to land, not decisions gating the run.
 
 ---
 
@@ -278,7 +281,7 @@ included in a review's staged commit and never pushed as part of remediation.
 
 ## §8 — Local ship policy (commit / push / merge consent)
 
-An apply flag authorizes **editing the worktree**. Whether it also authorizes commit + push is the **local ship policy** (project config / CLAUDE.md / user memory / the invoking instructions / the skill's own declared policy). **Merge is never covered by any apply flag** — it always needs the explicit word.
+An apply flag authorizes **editing the worktree**. Whether it also authorizes commit + push is the **local ship policy** (project config / CLAUDE.md / user memory / the invoking instructions / the skill's own declared policy). **Merge is never covered by any apply flag** — it always needs the explicit word (or, for `adw-build` §3.7's merge gate only, an approved `merge   auto` line or an intent the owner started whose gate adw-init Phase 2 skipped, below).
 
 - **Default: stage-only (fail-safe)** — binds any skill that does not declare its own policy. After apply + verify (§4), **stage the touched files and STOP.** The staged diff is the deliverable; the human ships. Surface commit / push / merge via the §5 surface (default: terminal gate; `interactive`: `AskUserQuestion`) and report `Action: applied + staged — awaiting your commit/push/merge consent`; never a fabricated "pushed"/"merged".
   - A generic affirmation ("do it", "go ahead", "yes") is **not** commit/push/merge consent — it authorizes only the single act just named.
@@ -286,7 +289,7 @@ An apply flag authorizes **editing the worktree**. Whether it also authorizes co
   - **Push-consent ≠ merge-consent.** Auto-ship ends at `push`. The §5 merge gate still runs.
   - **§7 still binds.** A blast-radius path or a failed gate falls back to comment-only — an auto-ship policy never overrides a safety stop.
   - **Re-runs push again.** A second `apply` on the same PR is a **new** commit + push (never amend, §1.3) — iterating is expected, not an anomaly.
-- **Merge needs explicit merge consent, always:** the word "merge" / "merge it" in the terminal gate, or selecting the Merge option under `interactive`. Nothing weaker counts — not `apply`, not "do it", not "go ahead".
+- **Merge needs explicit merge consent, always:** the word "merge" / "merge it" in the terminal gate, or selecting the Merge option under `interactive`. Nothing weaker counts — not `apply`, not "do it", not "go ahead". One more form, and only for `adw-build` §3.7's merge gate: the owner's `approve` on an `/adw-init` approval surface that printed `merge   auto` (adw-core §6, §7), or the intent the owner started (a typed `/adw-init` line, an `/adw-build` route to init, or an `/adw-dispatch` brief) when adw-init Phase 2's skip test skipped the gate for a `merge: auto` intent. It covers that intent's PRs once the gate passes, and nothing else.
 
 No apply flag ever implies merge. Every Phase-7 commit/push/merge step is read **through this section**.
 

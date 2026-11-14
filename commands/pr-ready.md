@@ -21,7 +21,7 @@ the consuming repo's `.claude/repo-profile.md`, cited below as `repo-profile §N
 
 Examples: `/pr-ready 838` · `/pr-ready 838 apply` · `/pr-ready 839 apply interactive`.
 
-**This command never merges.** Merge needs the explicit word, every time (`review-core.md` §8).
+**This command never merges.** Merge needs the explicit word, every time, except behind `adw-build` §3.7's merge gate on an approved `merge   auto` line or an intent the owner started whose gate adw-init Phase 2 skipped (`review-core.md` §8).
 
 ---
 
@@ -381,7 +381,24 @@ already holds the base run hands it in as `known baseline red: <gate> — <faili
 machine line ends `· ⚠ baseline red: <gate>`. Any other id, or a base run that fails to install or
 build → the row stays red and blocks.
 
-Remove `$VWT` (`git worktree remove --force`) as soon as its verdict is recorded.
+Remove `$VWT` as soon as its verdict is recorded: return it to a clean checkout, then remove it
+**without `--force`**.
+
+```bash
+V="<the VWT literal>"   # §1: a literal, never a variable from an earlier Bash call
+case "$V" in */pr-ready-*) ;; *) echo "not a verify worktree: $V"; exit 1 ;; esac
+git -C "$V" reset -q --hard HEAD && git -C "$V" clean -fdq   # drop the gate-file restore and gate output
+git worktree remove "$V"
+```
+
+The owner's settings deny `git worktree remove --force` in every repo. 74 of 81 worktree-removal
+denials in 2026-10-02..10-21 were the `--force` form. A plain remove refuses any tracked change
+(the gate-file restore, a staged gate file the PR deleted, a lockfile provisioning rewrote) and any
+untracked file that is not ignored (a gate's output, a symlinked `node_modules`). `reset --hard` and
+`clean -fd` clear both; ignored build output does not block the remove, so no `-x`. The `case` guard
+comes first because `git -C ""` runs in the current directory: with an empty `V` the reset would
+hit the main checkout. A remove that still fails is `CLEANUP INCOMPLETE` (§8). Never retry it with
+`--force`.
 
 ### §5 Review evidence — fetched, never asserted
 
@@ -600,7 +617,8 @@ and the verdict, which is exactly when the line would be a lie, and it is the ch
 possible check: one `rev-parse` against a value already in hand.
 
 `ready` here means *the gates and the review agree at this SHA* — it is not merge
-approval. The human owns the merge, and is free to merge over a `blocked` verdict; the
+approval. The human owns the merge, except where an approved `merge   auto` line, or an intent the owner started whose gate adw-init Phase 2 skipped, hands it to
+`adw-build` §3.7's merge gate (`review-core.md` §8), and is free to merge over a `blocked` verdict; the
 verdict's job is to stop **the runner** from claiming a clean state it did not verify.
 
 ### §8 Cleanup
