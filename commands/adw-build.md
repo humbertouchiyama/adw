@@ -228,8 +228,8 @@ gate file to get green · let a subagent create its own worktree.
 
 ## Phase 1 — scheduling
 
-- **Timing series (adw-core §7.1):** reached via `approve` (adw-init
-  Phase 5 step 3), continue init's T-series — do NOT restart it. Invoked fresh, stamp T0 here and report `your gate 0m`.
+- **Timing series (adw-core §7.1):** reached via `approve`, or via a `--followup` whose gate
+  adw-init Phase 2 skipped (both enter through adw-init Phase 5 step 3), continue init's T-series — do NOT restart it. Invoked fresh, stamp T0 here and report `your gate 0m`.
   Any mid-run halt for an owner answer stamps its own T1/T2 pair into the gate total.
 - **Halt only where §6 binds, and batch what you halt for.** The run stops for exactly two
   things: a merge outside adw-core §6's consent carve-out, and an escalation the owner alone
@@ -849,7 +849,7 @@ pipeline knows:
   reported without being measured is the shape §4.8 just retired the clock over.
   `resumed-from` is the recovered cycle count, not `0` by default — see Phase 0 step 7.
   `asks` is the init handoff's `asks` line (adw-core §7), copied verbatim, the same in every PR of the
-  intent; a build not reached through `approve` writes `asks n/a — fresh /adw-build`, and one whose handoff is no longer in context writes `asks n/a — handoff not in context`. Never rebuild the line.
+  intent; a build not reached through adw-init Phase 5 step 3 (`approve`, or a `--followup` whose gate was skipped) writes `asks n/a — fresh /adw-build`, and one whose handoff is no longer in context writes `asks n/a — handoff not in context`. Never rebuild the line.
   `open-findings` is `/pr-ready` §5's result: `none — read <n> comments`, or one
   `closed: <file:line> — <guard>` per graded finding, copied verbatim from the driver's return.
   `tier` records the session's own tier (`ORCH_TIER`, Phase 0 — the one cost term no dispatch

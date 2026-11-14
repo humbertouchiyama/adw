@@ -1,7 +1,8 @@
 # adw
 
 An agentic development workflow. Intent goes in, reviewed pull requests come out, and a human
-approves exactly once — at the unit cut, before any code is written.
+approves exactly once — at the unit cut, before any code is written. A one-unit follow-up to a
+merged intent is approved by the `/adw-init --followup` line the human types.
 
 This repository holds **the contract**: the prompt files a coding agent reads to run the pipeline,
 and the design document that explains why each rule is there. It holds no product code and belongs

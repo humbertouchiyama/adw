@@ -85,6 +85,9 @@ new slug (adw-init Phase 0.5).
   two *folders* for one slug is the bug.
 - **Extend is proposed, never automatic** — a different `base:`, or a different subject,
   is a new intent (run-7's per-team-module-toggles feature was correctly split out).
+- **A merged intent is not live.** A later issue in it is a new intent. The owner names it with
+  `/adw-init --followup <slug>`, which mints the slug `<slug>-f<k>` (adw-init Input) and, for one
+  small unit, skips the approval gate (adw-init Phase 2).
 - A merge rests on durable facts, never on the session (§6, adw-build §3.7): extending across
   sessions builds new units, and an earlier open PR of the intent goes through adw-build §3.7
   like any other. A PR whose head moved off its `verified` row stays the owner's.
@@ -341,7 +344,8 @@ The pipeline may merge ONLY:
   qualify;
 - an independent or final PR of the **current intent**, into the intent's `base:` or the default
   base, when the intent's specs say `merge: auto` (§2) and adw-build §3.7's merge gate passes.
-  The owner's `approve` on a surface that printed `merge   auto` is the consent (§7).
+  The owner's `approve` on a surface that printed `merge   auto` is the consent (§7). For a
+  follow-up whose gate was skipped, the owner's typed `--followup` line is (adw-init Phase 2).
 
 Provenance is durable, not the session's: the `merge:` flag, the `verified` row, the walk line
 and the labels survive a compaction and a new session, so any run building that slug may merge
@@ -360,9 +364,9 @@ was given when the owner typed `approve` on a cut that shows the chain (§7). So
   intent's base, the default base and the production branch: the one consent this section keeps
   for the owner. It stops a sub-PR merge only when it names sub-PRs or the integration branch
   ("do not merge sub-PRs", "stop after each unit"). A session that writes a brief for another
-  session never adds a no-merge line of its own. An approved `merge   auto` line is the owner's
-  word for that intent, given after any standing line; a standing line still binds an intent
-  whose flag is `hold`.
+  session never adds a no-merge line of its own. An approved `merge   auto` line, or a
+  `--followup` line that skipped the gate for a `merge: auto` intent, is the owner's word for that
+  intent, given after any standing line; a standing line still binds an intent whose flag is `hold`.
 - **A `blocked` sub-PR does not stop the chain. It is carried.** The sub-PR keeps its
   `adw:blocked` label and its PR body, is merged into the integration branch, and the chain builds
   on its recommended default. The final PR then lands `blocked`, never `ready`, and lists every
@@ -433,6 +437,7 @@ Intent: <one line>
 base    <branch> — <one clause why>        ← only when not the default base (§2 base:)
 merge   auto → <base>, after a clean walk  ← or: merge   hold — <why>; ALWAYS prints (§2 merge:)
 extends <slug> · u1–u6: merged u1 u2 u3 u5 · open u4 (#820) · unbuilt u6   ← extend mode (§1.1)
+followup <slug> → <slug>-f<k> · the gate stays: <why>   ← `--followup` only, when the skip test failed (adw-init Phase 2)
 
 needs you  2                               ← or: none — answer by number; blank = defaults
   Q1 (u4) — <one plain-language question>? default: <recommended default>
@@ -522,7 +527,9 @@ surface must own:
   that surface, `approve` is the owner's explicit consent for the intent's merges into
   `base:` once adw-build §3.7's merge gate passes (§6). On `merge   hold`, the owner merges
   the PR to `base:`. On a cut with a chain, `approve` is also the consent for every sub-PR
-  merge of that chain (§6): the run does not ask again per sub-PR.
+  merge of that chain (§6): the run does not ask again per sub-PR. A `--followup` that passes
+  adw-init Phase 2's skip test gives the same consent with no surface: the owner typed it to build
+  and merge one small unit, and the handoff prints its `followup` and `merge` lines.
 - **The `merge` line always prints**, `auto` or `hold`, with the base it names. `merge auto` and
   `merge hold` re-render the surface with the new value, and the run writes it to every spec of
   the intent before the build starts. `merge auto` is refused when the base is the production
@@ -541,6 +548,8 @@ the artifact being approved, not detail.
 
 ```
 Next: nothing — building u1 · u3          ← `approve`, clean exit: build starts this turn
+followup   <slug> → <slug>-f<k> · gate skipped: one express unit, nothing to ask   ← `--followup` whose gate was skipped (adw-init Phase 2), both variants
+merge      auto → <base>, after a clean walk   ← with the `followup` line only: no surface printed it; or: merge      hold — <why>
 specs      <specs-dir>/YYYY-MM-DD-<intent-slug>/   N units
 plans      u1 u3  ·  none: u2 u4 (below design — plan is in the spec)
 ⏱ run      machine 41m · your gate 3m                ← unconditional (§7.1)
@@ -555,6 +564,7 @@ Stopping variant — `specs only`, or `approve` with a non-empty `needs you`:
 
 ```
 Next: /adw-build <intent-slug>
+followup   <slug> → <slug>-f<k> · gate skipped: one express unit, nothing to ask   ← and its `merge` line: as in the building variant
 specs      <specs-dir>/YYYY-MM-DD-<intent-slug>/   N units
 plans      u1 u3  ·  none: u2 u4 (below design — plan is in the spec)
 ⏱ run      machine 41m · your gate 3m                ← unconditional (§7.1)
@@ -740,7 +750,7 @@ per-PR `owner-wait` of adw-build §3.4's evidence block is not, and it defaults 
 by subtraction rather than by summing work intervals is deliberate: a halt nobody
 stamped inflates `machine`, which reads as the pipeline's own cost and gets
 investigated — the failure direction that self-corrects. `/adw-build` reached through
-`approve` continues the same T-series rather than restarting it — one invocation
+`approve`, or through a `--followup` whose gate adw-init Phase 2 skipped, continues the same T-series rather than restarting it — one invocation
 the owner experiences as one run reports as one run. A build reached by a fresh
 `/adw-build` starts its own series with `gate 0m`.
 
