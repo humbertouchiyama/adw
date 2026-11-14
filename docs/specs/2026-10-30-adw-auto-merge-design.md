@@ -103,7 +103,10 @@ the source it names, never from memory.
    carried block is `blocked`, so it waits for the owner as it does today (§8, C8).
 4. **Paths.** The diff touches nothing in the repo's `merge-protected paths` row (§8, C19). It also
    matches no `money` row of the repo's trap domains (`repo-profile`, `adw-core` §3), on added or
-   changed lines, outside the repo's artifact exclusion pathspec (§8, C9).
+   changed lines, outside the repo's artifact exclusion pathspec (§8, C9). A path the money row names
+   (a money file) counts as a money change. Paths come from the full diff, both sides of a rename.
+   These rows are read from the base's copy of the profile as well as the local one, and the
+   stricter wins; a profile with no `merge-protected paths` row means the PR waits.
 5. **GitHub.** `gh pr view --json mergeable,mergeStateStatus` says mergeable, and `gh pr checks` shows
    no failed check, read as `repo-profile` §9 says. `UNKNOWN` is re-queried with the bound
    `code-review` step 6 uses. Still `UNKNOWN` means the PR waits.
@@ -115,6 +118,9 @@ the source it names, never from memory.
      `blocking`, whatever the refuter said (§8, C22);
    - no gap row that names an `AC-<n>`, or a device token of §21's Devices row that a case's `Device`
      line needs. Other gap rows print;
+   - a `refuted:` or `polish:` line for every `D` row that is not `polish`. A row with neither waits,
+     so a check line lost to a compaction never reads as cleared;
+   - a walk line that names its devices, and the evidence block's `smoke` row with audit `0`;
    - `polish` rows and non-`blocking` `refuted` rows print and do not stop the merge.
 8. **The screenshots, for a PR with cases.** The comment (§4.5) names that head. The PR's `## Screens`
    list (§4.4) exists, and every listed screen has an image on every device listed for it. A missing
@@ -123,9 +129,10 @@ the source it names, never from memory.
    the repo has a UI-paths row and the diff touches no path in it. No row means the PR waits. A PR with
    neither cases nor `Smoke: none` waits.
 
-**The merge** is `adw-build` §3.7's procedure, two Bash calls with the sha written out. The first call
-also re-reads the `adw:hold` label, so the late stop holds through the base-moved check. The second is
-the merge call alone, with no `--auto`, which merges at once on these repos regardless. Its
+**The merge** is `adw-build` §3.7's procedure, three Bash calls with the sha written out. The first
+runs the gate's check again: the base-moved check can take long, and a switch turned `off` or an
+`adw:hold` added meanwhile still stops the merge. The second re-reads the base, the head and the
+`adw:hold` label. The third is the merge call alone, with no `--auto`, which merges at once on these repos regardless. Its
 `description` names the base. Then the run reads `gh pr view --json state,mergedAt` to confirm:
 `gh pr merge`'s exit code is not reliable when a worktree holds the branch.
 

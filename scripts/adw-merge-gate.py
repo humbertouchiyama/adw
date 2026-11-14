@@ -8,7 +8,11 @@ Every condition is read fresh from GitHub or the profile, never from the run's m
 `pass` (exit 0), or `hold <n> <reason>` (exit 1) for the first condition that fails, in this order:
 1 flag (the specs' `merge: auto`, both profiles' `auto-merge default`, no `adw:hold`), 2 base, 3 verified head,
 4 paths (merge-protected, money lines), 5 GitHub (mergeable, checks), 7 the walk, 8 the screenshots,
-9 `Smoke: none` / `Screens: none` against the UI paths. Condition 6 is the base trial:
+9 `Smoke: none` / `Screens: none` against the UI paths. Every input fails closed: the merge-protected,
+UI and money rows are read from both the local profile and the base's copy, the stricter wins, and a
+missing merge-protected row holds; paths come from the full diff (both sides of a rename); `merge:` and
+`base:` are read from the spec header only; a walk `D` row that is not `polish` holds unless a `refuted:`
+or `polish:` line clears it. Condition 6 is the base trial:
 
   python3 adw-merge-gate.py trial --checkout <main checkout> --pr <N> --slug <slug> --base <branch> --head <sha>
   python3 adw-merge-gate.py discard --checkout <main checkout> --tree <path>
@@ -119,13 +123,16 @@ class Profile:
         s3 = self.sections.get("3", {})
         auto = s3.get("auto-merge default")
         self.auto = auto.replace("`", "").strip().lower() if auto is not None else None
+        # A row whose cell holds no glob in backticks protects nothing, so it counts as no row.
+        self.has_protected = bool(ticks(s3.get("merge-protected paths", "")))
         self.protected = [glob_re(g) for g in ticks(s3.get("merge-protected paths", ""))]
         ui = s3.get("ui paths")
-        self.ui = [glob_re(g) for g in ticks(ui)] if ui is not None else None
+        self.ui = [glob_re(g) for g in ticks(ui)] if ui is not None and ticks(ui) else None
         self.production = (ticks(s3.get("production branch", "")) or [None])[0]
         self.default_base = (ticks(s3.get("default base", "")) or [None])[0]
         self.excluded = [glob_re(g) for g in re.findall(r"':!([^']+)'", self.sections.get("2", {}).get("artifact exclusion pathspec", ""))]
         money = self.sections.get("11", {}).get("money", "")
+        self.money_unreadable = "money" in self.sections.get("11", {}) and not ticks(money)
         self.money_prefix = ticks(money)[0] if "path prefix" in money and ticks(money) else None
         pattern = ticks(money)[0].replace("\\|", "|") if ticks(money) and not self.money_prefix else None
         self.money = re.compile(pattern) if pattern else None
@@ -152,7 +159,17 @@ def section(body: str, heading: str, stop_marker: str | None = None) -> str | No
 
 # ---- the conditions -------------------------------------------------------------------------------
 
-def flag(a, pr, local: Profile, specs: dict[str, str | None]) -> None:
+def header(spec: str) -> str:
+    """The spec's header: every line before its first `## ` heading. merge: and base: live there."""
+    out = []
+    for line in spec.splitlines():
+        if line.startswith("## "):
+            break
+        out.append(line)
+    return "\n".join(out)
+
+
+def flag(pr, local: Profile, basep: Profile | None, specs: dict[str, str | None]) -> None:
     labels = {l["name"] for l in pr["labels"]}
     if "adw:hold" in labels:
         raise Hold(1, "the PR has the adw:hold label")
@@ -160,7 +177,7 @@ def flag(a, pr, local: Profile, specs: dict[str, str | None]) -> None:
     for path, text in specs.items():
         if text is None:
             raise Hold(1, "spec %s is not at the head %s" % (path, pr["headRefOid"][:7]))
-        m = re.search(r"^merge:[ \t]*(auto|hold)\b", text, re.M)
+        m = re.search(r"^merge:[ \t]*(auto|hold)[ \t]*(#.*)?$", header(text), re.M)
         if not m:
             raise Hold(1, "spec %s has no merge: line (omitted = hold)" % path)
         values[path] = m.group(1)
@@ -168,7 +185,7 @@ def flag(a, pr, local: Profile, specs: dict[str, str | None]) -> None:
         raise Hold(1, "the specs disagree on merge: (%s)" % ", ".join("%s %s" % (p, v) for p, v in values.items()))
     if "hold" in values.values():
         raise Hold(1, "the spec says merge: hold")
-    for where, prof in (("the local profile", local), ("the profile on %s" % pr["baseRefName"], base_profile(a, pr))):
+    for where, prof in (("the local profile", local), ("the profile on %s" % pr["baseRefName"], basep)):
         if prof is None:
             raise Hold(1, "%s is missing" % where)
         if prof.auto is None:
@@ -183,7 +200,7 @@ def base_profile(a, pr) -> Profile | None:
 
 
 def base(pr, local: Profile, specs: dict[str, str | None]) -> None:
-    bases = {m.group(1) for t in specs.values() if t for m in [re.search(r"^base:[ \t]*(\S+)", t, re.M)] if m}
+    bases = {m.group(1) for t in specs.values() if t for m in [re.search(r"^base:[ \t]*(\S+)", header(t), re.M)] if m}
     if len(bases) > 1:
         raise Hold(2, "the specs disagree on base: (%s)" % ", ".join(sorted(bases)))
     intent = bases.pop() if bases else local.default_base
@@ -204,24 +221,95 @@ def verified(pr) -> None:
         raise Hold(3, "verified %s is not the head %s" % (m.group(1)[:7], pr["headRefOid"][:7]))
 
 
-def paths(a, local: Profile, names: list[str]) -> None:
-    for p in names:
-        if matches(local.protected, p):
-            raise Hold(4, "%s is a merge-protected path" % p)
+def unquote(p: str) -> str:
+    """A path as git prints it: plain, or C-quoted ("b/pre\\303\\247o.ts") when it has unusual bytes."""
+    if len(p) >= 2 and p[0] == '"' and p[-1] == '"':
+        import codecs
+        return codecs.escape_decode(p[1:-1].encode("latin-1", "backslashreplace"))[0].decode("utf-8", "replace")
+    return p
+
+
+def side(p: str) -> str | None:
+    p = unquote(p.strip())
+    if p == "/dev/null":
+        return None
+    return p[2:] if p[:2] in ("a/", "b/") else p
+
+
+def parse_diff(text: str) -> list[dict]:
+    """Each file of a unified diff: every path it names (both sides of a rename or copy) and its added
+    lines. Header lines count only before the file's first hunk, so an added line that reads `++ x`
+    is content, never a header."""
+    files, cur, hunk = [], None, False
+    for line in text.splitlines():
+        if line.startswith("diff --git "):
+            cur, hunk = {"paths": set(), "path": None, "added": []}, False
+            files.append(cur)
+            rest = line[len("diff --git "):]
+            q = re.findall(r'"(?:[^"\\]|\\.)*"', rest)
+            halves = q if len(q) == 2 else ([rest[:len(rest) // 2], rest[len(rest) // 2 + 1:]]
+                                            if rest[:len(rest) // 2][2:] == rest[len(rest) // 2 + 1:][2:] else [])
+            if not halves:
+                m = re.match(r"(a/.+) (b/.+)$", rest)
+                halves = [m.group(1), m.group(2)] if m else []
+            cur["paths"].update(x for x in map(side, halves) if x)
+            continue
+        if cur is None:
+            continue
+        if not hunk:
+            if line.startswith("@@"):
+                hunk = True
+            elif line.startswith(("--- ", "+++ ")):
+                p = side(line[4:])
+                if p:
+                    cur["paths"].add(p)
+                    if line.startswith("+++ "):
+                        cur["path"] = p
+            else:
+                m = re.match(r"(?:rename|copy) (?:from|to) (.+)$", line)
+                if m:
+                    cur["paths"].add(unquote(m.group(1)))
+            continue
+        if line.startswith("+"):
+            cur["added"].append(line[1:])
+    return files
+
+
+def read_diff(a) -> list[dict]:
     d = run_gh("pr", "diff", str(a.pr), "--repo", a.repo)
     if d.returncode != 0:
         raise Hold(4, "the diff cannot be read: %s" % (d.stderr.strip().splitlines() or ["exit %d" % d.returncode])[-1])
-    path = None
-    for line in d.stdout.splitlines():
-        if line.startswith("+++ "):
-            path = line[6:] if line.startswith("+++ b/") else None
+    return parse_diff(d.stdout)
+
+
+def paths(profiles: list[Profile], files: list[dict]) -> None:
+    """Every safety row is read from both the local and the base copy of the profile, the stricter wins."""
+    for prof in profiles:
+        if not prof.has_protected:
+            raise Hold(4, "the profile has no merge-protected paths row with a glob in backticks")
+        if prof.money_unreadable:
+            raise Hold(4, "the profile's money row has no pattern in backticks")
+    for f in files:
+        for p in sorted(f["paths"]):
+            if any(matches(prof.protected, p) for prof in profiles):
+                raise Hold(4, "%s is a merge-protected path" % p)
+            if all(matches(prof.excluded, p) for prof in profiles):
+                continue
+            # Every path, either side of a rename, deletions and binary files included: the money row
+            # names files too (`money\.ts`), and a change there needs no money word in its lines.
+            for prof in profiles:
+                if prof.money_prefix and p.startswith(prof.money_prefix):
+                    raise Hold(4, "%s is under the money path %s" % (p, prof.money_prefix))
+                if prof.money and prof.money.search(p):
+                    raise Hold(4, "%s is a money file" % p)
+    for f in files:
+        path = f["path"]
+        if path is not None and all(matches(prof.excluded, path) for prof in profiles):
             continue
-        if path is None or not line.startswith("+") or matches(local.excluded, path):
-            continue
-        if local.money_prefix and path.startswith(local.money_prefix):
-            raise Hold(4, "%s is under the money path %s" % (path, local.money_prefix))
-        if local.money and local.money.search(line[1:]):
-            raise Hold(4, "%s adds a money line: %s" % (path, line[1:].strip()[:80]))
+        for line in f["added"]:
+            for prof in profiles:
+                if prof.money and prof.money.search(line):
+                    raise Hold(4, "%s adds a money line: %s" % (path or "a file", line.strip()[:80]))
 
 
 def github(a, pr) -> None:
@@ -268,24 +356,37 @@ def walk(pr) -> None:
         raise Hold(7, "the last walk is at %s, not the head %s" % (m.group(2), head7))
     if "unaudited" in first:
         raise Hold(7, "the walk is unaudited: %s" % first.split("unaudited", 1)[1].strip(" :")[:80])
-    row = re.search(r"^[ \t]*smoke[ \t]+(.*)$", body, re.M)
-    audit = re.search(r"\baudit (\S+)", row.group(1)) if row else None
-    if audit and audit.group(1) != "0":
-        raise Hold(7, "the smoke row's audit is %s" % audit.group(1))
+    rows = re.findall(r"^[ \t]*smoke[ \t]+(walk \d+ .*)$", body, re.M)
+    if not rows:
+        raise Hold(7, "the evidence block has no smoke walk row")
+    audit = re.search(r"\baudit (\S+)", rows[-1])
+    if not audit or audit.group(1) != "0":
+        raise Hold(7, "the smoke row's audit is %s" % (audit.group(1) if audit else "missing"))
+    checked = {}
     for line in result.splitlines():
-        if re.match(r"^(valid|unchecked):", line):
+        m = re.match(r"^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(valid|unchecked|refuted|polish|fixed):[ \t]*(\S*)", line)
+        if not m:
+            continue
+        if m.group(1) in ("valid", "unchecked"):
             raise Hold(7, "a defect is not cleared: %s" % line.strip()[:80])
-        if re.match(r"^fixed:.*unconfirmed", line):
+        if m.group(1) == "fixed" and "unconfirmed" in line:
             raise Hold(7, "a fix is not confirmed by a walk: %s" % line.strip()[:80])
-    devices = re.search(r"\bdevices ([\w,.-]+)", first)
-    tokens = [t for t in devices.group(1).split(",") if t] if devices else []
+        checked.setdefault(m.group(2).rstrip(",:"), set()).add(m.group(1))
+    devices = re.search(r" · devices ([^·]+?)[ \t]*(?: · |$)", first)
+    if not devices:
+        raise Hold(7, "the walk line names no devices")
+    tokens = [t for t in re.split(r"[,\s]+", devices.group(1)) if t]
     for line in result.splitlines():
-        r = re.match(r"^\|\s*([DG])(\d+)\s*\|", line)
+        r = re.match(r"^\s*(?:[-*+]\s+)?\|?\s*([DG])(\d+)\s*\|", line)
         if not r:
             continue
         rid = r.group(1) + r.group(2)
-        if r.group(1) == "D" and re.search(r"\bblocking\b", line):
-            raise Hold(7, "%s was called blocking by the walk" % rid)
+        if r.group(1) == "D":
+            if re.search(r"\bblocking\b", line):
+                raise Hold(7, "%s was called blocking by the walk" % rid)
+            # A defect passes only as polish, or with a refuted: or polish: line; anything else holds.
+            if not re.search(r"\|\s*polish\s*\|", line) and not checked.get(rid, set()) & {"refuted", "polish"}:
+                raise Hold(7, "%s has no check line that clears it" % rid)
         if r.group(1) == "G":
             ac = re.search(r"\bAC-\d+\b", line)
             if ac:
@@ -295,24 +396,28 @@ def walk(pr) -> None:
                     raise Hold(7, "%s is a gap on the walked device %s" % (rid, t))
 
 
-def ui_test(local: Profile, names: list[str], why: str) -> None:
-    if local.ui is None:
-        raise Hold(9, "%s, and the profile has no UI paths row" % why)
+def ui_test(profiles: list[Profile], names: list[str], why: str) -> None:
+    for prof in profiles:
+        if prof.ui is None:
+            raise Hold(9, "%s, and the profile has no UI paths row" % why)
     for p in names:
-        if matches(local.ui, p):
+        if any(matches(prof.ui, p) for prof in profiles):
             raise Hold(9, "%s, but the diff touches the UI path %s" % (why, p))
 
 
-def screens(a, pr, local: Profile, names: list[str]) -> None:
+def screens(a, pr, profiles: list[Profile], names: list[str]) -> None:
     body = pr["body"]
     listed = section(body, "Screens")
     none = re.search(r"^Screens: none — +\S", listed if listed is not None else body, re.M)
     if none:
-        ui_test(local, names, "Screens: none")
+        ui_test(profiles, names, "Screens: none")
         return
     if listed is None:
         raise Hold(8, "the PR has cases and no ## Screens list")
     rows = re.findall(r"^- (SCREEN-\d+) · .+ · ([^·\n]+)$", listed, re.M)
+    for line in listed.splitlines():
+        if re.match(r"^\s*[-*+]?\s*SCREEN-\d+", line) and not re.match(r"^- SCREEN-\d+ · .+ · [^·]+$", line):
+            raise Hold(8, "a ## Screens line is not a row: %s" % line.strip()[:80])
     if not rows:
         raise Hold(8, "the ## Screens list is empty")
     out = gh("api", "repos/%s/issues/%d/comments" % (a.repo, a.pr), "--paginate", "--jq", ".[] | {id: .id, body: .body}")
@@ -347,18 +452,21 @@ def check(a) -> None:
     with open(a.profile, encoding="utf-8") as f:
         local = Profile(f.read())
     specs = {p: contents(a.repo, p, pr["headRefOid"]) for p in a.spec_path}
-    flag(a, pr, local, specs)
-    base(pr, local, specs)
+    basep = base_profile(a, pr)
+    flag(pr, local, basep, specs)
+    profiles = [local, basep]
+    base(pr, basep, specs)
     verified(pr)
-    names = [n for n in gh("pr", "diff", str(a.pr), "--repo", a.repo, "--name-only").splitlines() if n.strip()]
-    paths(a, local, names)
+    files = read_diff(a)
+    names = sorted({p for f in files for p in f["paths"]})
+    paths(profiles, files)
     github(a, pr)
     smoke = section(pr["body"], "Smoke", stop_marker="<!-- /smoke -->")
     if smoke is not None and re.search(r"^### AC-\d+", smoke, re.M):
         walk(pr)
-        screens(a, pr, local, names)
+        screens(a, pr, profiles, names)
     elif re.search(r"^Smoke: none — +\S", pr["body"], re.M):
-        ui_test(local, names, "Smoke: none")
+        ui_test(profiles, names, "Smoke: none")
     else:
         raise Hold(9, "the body has neither ## Smoke cases nor a Smoke: none line")
 

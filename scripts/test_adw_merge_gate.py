@@ -142,6 +142,15 @@ diff --git a/docs/adw/specs/x/u1.md b/docs/adw/specs/x/u1.md
 """
 
 
+def diff_file(path: str, added: str = "x") -> str:
+    """One file's diff block that adds one line."""
+    return ("diff --git a/%s b/%s\n--- a/%s\n+++ b/%s\n@@ -1 +1,2 @@\n ctx\n+%s\n" % (path, path, path, path, added))
+
+
+def diff_for(names) -> str:
+    return "".join(diff_file(n) for n in names)
+
+
 def clean() -> dict:
     return {
         "view": {"number": 7, "baseRefName": "develop", "headRefOid": HEAD, "labels": [],
@@ -218,6 +227,15 @@ class TestFlag(Gate):
         self.fx["contents"][".claude/repo-profile.md?ref=develop"] = profile(auto="off")
         self.assertHold(1)
 
+    def test_merge_template_line_holds(self):
+        self.fx["contents"][SPEC + "?ref=" + HEAD] = spec(merge="auto | hold")
+        self.assertHold(1)
+
+    def test_merge_line_outside_the_header_holds(self):
+        s = spec(merge=None).replace("1. It works.", "1. It works.\n\nmerge: auto-merges duplicate rows\n")
+        self.fx["contents"][SPEC + "?ref=" + HEAD] = s
+        self.assertHold(1)
+
     def test_no_auto_merge_row_locally_holds(self):
         self.local = profile(auto=None)
         self.assertHold(1)
@@ -248,7 +266,7 @@ class TestVerified(Gate):
 
 class TestPaths(Gate):
     def test_protected_path_holds(self):
-        self.fx["names"].append(".claude/repo-profile.md")
+        self.fx["diff"] += diff_file(".claude/repo-profile.md")
         out = self.assertHold(4)
         self.assertIn(".claude/repo-profile.md", out)
 
@@ -261,7 +279,62 @@ class TestPaths(Gate):
         self.assertPass()
 
     def test_diff_too_large_holds(self):
-        self.fx["diff_fail"] = True
+        self.fx["diff_fail"] = True   # --name-only would still answer: the gate must not lean on it
+        self.assertHold(4)
+
+    def test_rename_out_of_a_protected_path_holds(self):
+        self.fx["diff"] += ("diff --git a/.github/workflows/deploy.yml b/ci/deploy.yml\nsimilarity index 100%\n"
+                            "rename from .github/workflows/deploy.yml\nrename to ci/deploy.yml\n")
+        self.fx["names"] = ["src/app.ts", SPEC, "ci/deploy.yml"]
+        out = self.assertHold(4)
+        self.assertIn(".github/workflows/deploy.yml", out)
+
+    def test_money_line_in_a_quoted_path_holds(self):
+        self.fx["diff"] = DIFF.replace("+++ b/src/app.ts", '+++ "b/src/pre\\303\\247o.ts"').replace(
+            "+export const total = sum(rows);", "+export const total = formatMoney(rows);")
+        self.assertHold(4)
+
+    def test_added_line_that_looks_like_a_header_is_still_scanned(self):
+        self.fx["diff"] = DIFF.replace("+export const total = sum(rows);",
+                                       "+++ a note\n+export const total = formatMoney(rows);")
+        self.assertHold(4)
+
+    def test_a_diff_touching_a_money_file_holds_without_a_money_line(self):
+        self.fx["diff"] += diff_file("src/lib/money.ts", added="export const x = 1;")
+        self.assertHold(4)
+
+    def test_rename_into_a_money_path_prefix_holds(self):
+        self.local = self.local.replace("| money | `formatMoney\\|money\\.ts\\|cents` |", "| money | path prefix `api/billing/` |")
+        self.fx["contents"][".claude/repo-profile.md?ref=develop"] = self.local
+        self.fx["diff"] += ("diff --git a/api/x.ts b/api/billing/x.ts\nsimilarity index 100%\n"
+                            "rename from api/x.ts\nrename to api/billing/x.ts\n")
+        self.assertHold(4)
+
+    def test_a_protected_row_with_no_glob_holds(self):
+        self.local = self.local.replace("`.claude/**` `.github/workflows/**` `firebase.json`", ".claude/** .github/workflows/**")
+        self.fx["contents"][".claude/repo-profile.md?ref=develop"] = self.local
+        self.assertHold(4)
+
+    def test_a_money_row_with_no_pattern_holds(self):
+        self.local = self.local.replace("| money | `formatMoney\\|money\\.ts\\|cents` |", "| money | formatMoney or cents |")
+        self.fx["contents"][".claude/repo-profile.md?ref=develop"] = self.local
+        self.assertHold(4)
+
+    def test_a_file_moved_out_of_a_money_prefix_holds(self):
+        self.local = self.local.replace("| money | `formatMoney\\|money\\.ts\\|cents` |", "| money | path prefix `api/billing/` |")
+        self.fx["contents"][".claude/repo-profile.md?ref=develop"] = self.local
+        self.fx["diff"] += ("diff --git a/api/billing/charge.ts b/api/core/charge.ts\nsimilarity index 90%\n"
+                            "rename from api/billing/charge.ts\nrename to api/core/charge.ts\n"
+                            "--- a/api/billing/charge.ts\n+++ b/api/core/charge.ts\n@@ -1 +1 @@\n-return amount*100\n+return amount*10\n")
+        self.assertHold(4)
+
+    def test_no_merge_protected_row_holds(self):
+        self.local = self.local.replace("| **merge-protected paths** | `.claude/**` `.github/workflows/**` `firebase.json` |\n", "")
+        self.assertHold(4)
+
+    def test_path_the_base_profile_protects_holds_when_the_local_copy_is_stale(self):
+        self.local = self.local.replace(" `firebase.json`", "")
+        self.fx["diff"] += diff_file("firebase.json")
         self.assertHold(4)
 
 
@@ -372,6 +445,62 @@ class TestWalk(Gate):
         self.assertPass()
 
 
+    def test_defect_row_with_no_check_line_holds(self):
+        # the refuter was skipped, or its lines were lost: a worth-fixing defect with no verdict
+        self.result(rows="| D1 | worth-fixing | the total is wrong | code | fix |\n")
+        self.assertHold(7)
+
+    def test_overstated_to_polish_passes(self):
+        self.result(rows="| D1 | worth-fixing | a label wraps | code | fix |\n", lines="polish: D1 — overstated\n")
+        self.assertPass()
+
+    def test_valid_line_as_a_list_item_holds(self):
+        self.result(rows="| D1 | worth-fixing | the total is wrong | code | fix |\n", lines="- valid: D1 — image, spec, file:1\n")
+        self.assertHold(7)
+
+    def test_unconfirmed_fix_as_a_list_item_holds(self):
+        self.result(lines="* fixed: D2 (walk 1) in abcdef1, unconfirmed\n")
+        self.assertHold(7)
+
+    def test_walk_line_with_no_devices_holds(self):
+        self.result(first="PASS — 1/1 cases · walk 1 at 0123456 · 12m", rows="| G1 | - | ipad not runnable | runner | none |\n")
+        self.assertHold(7)
+
+    def test_the_word_devices_in_the_verdict_does_not_shadow_the_list(self):
+        self.result(first="clean on all devices pass · walk 1 at 0123456 · devices iphone17,ipad · 12m",
+                    rows="| G1 | - | ipad not runnable | runner | none |\n")
+        self.assertHold(7)
+
+    def test_a_result_line_starting_with_smoke_is_not_the_evidence_row(self):
+        self.result(first="smoke clean · walk 1 at 0123456 · devices iphone17,ipad · 12m")
+        self.set_body(result=RESULT.replace("PASS — 1/1 cases", "smoke clean"), evidence=EVIDENCE.replace("audit 0", "audit 1"))
+        self.assertHold(7)
+
+
+    def test_a_spaced_device_list_keeps_every_device(self):
+        self.result(first="PASS — 1/1 cases · walk 1 at 0123456 · devices iphone17, ipad · 12m",
+                    rows="| G1 | - | ipad not runnable | runner | none |\n")
+        self.assertHold(7)
+
+    def test_check_lines_with_other_list_markers_hold(self):
+        for marker in ("+ ", "1. "):
+            self.result(lines=marker + "fixed: D2 (walk 1) in abcdef1, unconfirmed\n")
+            self.assertHold(7)
+
+    def test_no_smoke_evidence_row_holds(self):
+        self.set_body(evidence=EVIDENCE.replace(
+            "smoke      walk 1 · 0 defects (0 blocking) · 0 gaps · valid 0 · refuted 0 · fixed 0 (0 unconfirmed) · cases 1/1 · audit 0 · 12m\n", ""))
+        self.assertHold(7)
+
+    def test_a_defect_row_without_a_leading_pipe_still_counts(self):
+        self.result(rows="D1 | blocking | the save button does nothing | code | fix |\n")
+        self.assertHold(7)
+
+    def test_a_kept_fixed_line_does_not_shadow_a_later_refuted_line(self):
+        self.result(rows="| D1 | worth-fixing | a label wraps | code | fix |\n",
+                    lines="fixed: D1 (walk 1) in abcdef1\nrefuted: D1 — the spec does not ask for one line\n")
+        self.assertPass()
+
 class TestScreens(Gate):
     def test_missing_image_holds(self):
         self.fx["comments"][1]["body"] = (COMMENT % HEAD).split(" ![SCREEN-1 · ipad]")[0] + "\n"
@@ -394,18 +523,22 @@ class TestScreens(Gate):
         self.set_body(screens="")
         self.assertHold(8)
 
+    def test_a_screens_line_that_is_not_a_row_holds(self):
+        self.set_body(screens="## Screens\n- SCREEN-1 · Painel · iphone17, ipad\n- SCREEN-2 - Ajustes - iphone17\n")
+        self.assertHold(8)
+
     def test_screens_none_on_pr_with_cases_takes_ui_paths_test(self):
         self.set_body(screens="## Screens\nScreens: none — the change is an API field no screen shows\n")
-        self.fx["names"] = ["api/x.ts", SPEC]
+        self.fx["diff"] = diff_for(["api/x.ts", SPEC])
         self.assertPass()
-        self.fx["names"] = ["src/app.ts", SPEC]
+        self.fx["diff"] = diff_for(["src/app.ts", SPEC])
         self.assertHold(9)
 
 
 class TestSmokeNone(Gate):
     def smoke_none(self, names):
         self.set_body(result="", cases="Smoke: none — a backend field no user sees\n", screens="")
-        self.fx["names"] = names
+        self.fx["diff"] = diff_for(names)
         self.fx["comments"] = []
 
     def test_smoke_none_outside_ui_paths_passes(self):
