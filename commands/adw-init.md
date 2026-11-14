@@ -79,8 +79,9 @@ them before anything reads the intent.
   cost more than the implementation it produces; burning it on a mis-cut is the failure
   the gate exists to prevent. Since v2.16 the same approval also releases the build, so
   the cut is the only gate in front of the whole run: everything the human might act on
-  is a `QN` or a `⚠` line, never `fyi` (adw-core §7). **One exception:** a `--followup` that meets
-  Phase 2's skip test has no gate, because the owner's typed line is the approval.
+  is a `QN` or a `⚠` line, never `fyi` (adw-core §7). **So when nothing on the surface needs the owner,
+  nothing waits:** Phase 2's skip test skips the gate, the surface still prints, and the owner's
+  typed intent is the approval.
 - Skill references allowed in produced artifacts and dispatched prompts: plugin skills
   (`superpowers:*`) and tracked commands only. Repo-local symlinked skills
   (`.claude/skills/*` → `.agents/`) are absent in worktrees — a spec or plan that
@@ -93,7 +94,7 @@ them before anything reads the intent.
 
 **Pin the contract first:** `CONTRACT_SHA=$(git -C <cache> log -1 --format=%h)` — the loader stub
 already fetched it (adw-core §9). Substitute the value as a literal; it goes on the handoff and,
-after `approve`, is the value `/adw-build` carries. There is nothing to check: fetching before
+after `approve` or a skipped gate (Phase 2), is the value `/adw-build` carries. There is nothing to check: fetching before
 reading is what the old freshness check could only report on after the fact.
 
 **A `--followup` that passed Input's checks skips the rest of this phase:** the flag named the
@@ -144,7 +145,9 @@ prior state before triage:
   leave the flat spec in place. NEVER mint a second dated folder for one slug.
 
 Extension is **proposed at the approval surface, never assumed** — the `extends` line states it and the verb
-menu still governs. A different `base:`, or a different subject, is a new intent: say so in
+menu governs it while the gate waits. A gate that Phase 2's skip test skips builds the extension as
+printed: the test keeps the gate whenever the `extends` line names an `unbuilt` prior unit. A
+different `base:`, or a different subject, is a new intent: say so in
 one `fyi` line and cut fresh. When nothing matches, this phase is silent.
 
 ## Phase 0.7 — the ask rule (one prompt, at the approval surface)
@@ -254,10 +257,10 @@ Input checked that the intent merged there):
 > as for any intent. The owner asked for one small change: propose `express` (D0) when every D1
 > criterion holds, and never shrink or stretch the cut to reach it.
 
-Run the **decide pass** (first paragraph of Phase 2) on the proposal's questions, THEN render the
-**approval surface exactly** (adw-core §7) from the proposal and end the turn on the verb menu.
-Do not proceed without an answer. The one exception is a `--followup` that passes Phase 2's skip
-test.
+Run the **decide pass** (first paragraph of Phase 2) on the proposal's questions, then Phase 2's
+**skip test**, THEN render the **approval surface exactly** (adw-core §7) from the proposal. When
+the skip test fails, end the turn on the verb menu and do not proceed without an answer. When it
+passes, the surface ends on the skipped-gate line instead and the run goes on (Phase 2 says how).
 
 ## Phase 2 — the human gate
 
@@ -296,22 +299,34 @@ The orchestrator composes the pass's prompt from this text:
 > `Q<N> | ask`. It is `ask` only when <Phase 0.7's ask rule, pasted>; a question you cannot judge is `ask`.
 > `<Q<N> — question — triage's default>`, one per line
 
-**`--followup` skip test — after the decide pass, before the first render.** It applies only to a
-`--followup` that passed Input's checks. The gate is skipped only when all three hold:
+**Skip test — after the decide pass, before the first render.** It applies to every intent, a
+`--followup` or not, at any unit count and any depth. The gate is skipped when all three hold:
 
-1. triage cut exactly one unit and proposed it `express` (D0);
-2. no question is `ask`;
-3. no `⚠` line would print on the approval surface, except adw-core §7's `⚠ spec criteria covered
+1. no question is `ask`;
+2. no `⚠` line would print on the approval surface, except adw-core §7's `⚠ spec criteria covered
    by no unit: none`. An orchestrator above sonnet, or of `unknown` tier, prints its tier `⚠` line
-   (adw-core §8), so it keeps the gate.
+   (adw-core §8), so it keeps the gate;
+3. in extend mode, the `extends` line names no `unbuilt` prior unit. `/adw-build <slug>` builds
+   every unbuilt spec of the slug, and the owner's typed intent does not name a spec held back
+   earlier (an `amend:` targets one, so it keeps the gate too).
 
-Then the surface does not print and nothing waits. The owner's typed `--followup` line is the consent to build that unit and to merge
-it under adw-build §3.7's gate when the intent is `merge: auto` (adw-core §6): the owner asked for
-small follow-ups to skip this step. Freeze the proposal as `approve` does and go to Phase 3. The
-intent's `merge:` is triage's proposal, or `hold` under `--hold`, and the handoff prints it with
-the `followup` line (adw-core §7), so the owner can still add `adw:hold` before the merge. There is
-no T1 or T2 stamp: the gate time is 0. Any other case renders the approval surface as usual, with
-its `followup` line saying why the gate stayed, and every verb works as for any intent.
+When all three hold, the gate is skipped:
+
+- Render the approval surface exactly (adw-core §7) as for any intent, with the skipped-gate line in
+  place of the verb menu. Print it as the text of the message whose tool call starts Phase 3: the
+  first unit agent's dispatch, or, for a D0 unit, the write of its spec. A message that holds the
+  surface and no tool call ends the turn, and the run with it.
+- Nothing waits. Go on exactly as `approve` does: freeze the proposal, Phase 3, Phase 4, then
+  Phase 5, which builds in the same session.
+- The owner's typed intent (the `/adw-init` line, `--followup` included) is the consent to build
+  the proposed cut, to merge its sub-PRs into the integration branch, and to merge into `base:`
+  under adw-build §3.7's gate when the intent is `merge: auto` (adw-core §6). The intent's `merge:`
+  is triage's proposal, or `hold` under `--hold`, and the surface prints it, so the owner can still
+  add `adw:hold` before the merge.
+- There is no T1 or T2 stamp: the gate time is 0.
+
+Any other case renders the approval surface as usual, ends on the verb menu and waits, and every
+verb below works.
 
 - `approve` → freeze the proposal (units, depths, `shape`, packaging, `after`, `verify`, and every
   `QN` answer: `decided` ones, gate answers, `ask` defaults) → Phase 3,
@@ -350,11 +365,13 @@ its `followup` line saying why the gate stayed, and every verb works as for any 
   surface. `merge auto` refuses when the base is the production branch (`repo-profile §3`), and
   overrides `--hold`. Every spec of the intent carries the value before the build starts: Phase
   3's preamble writes it, and a D0 draft carries it in its header. `approve` on a surface that prints `merge   auto` is the owner's consent for that
-  intent's merges once the merge gate passes (adw-core §6, §7).
+  intent's merges once the merge gate passes (adw-core §6, §7), and so is the typed intent when
+  the skip test skips the gate on such a surface.
 - `new intent` (extend mode only) → drop the extension, cut a fresh slug, run the decide pass over
   its questions (first paragraph of this phase), re-render the approval surface.
 
-Any number of rounds. Only `approve` / `decide` / `specs only` exits the gate.
+Any number of rounds. Only `approve` / `decide` / `specs only` exits the gate. A gate the skip test
+skipped never opens, so it has no rounds.
 
 **`approve` was the stopping verb until v2.16 and is now the building one.** The rename is
 deliberate: the round-trip existed so the human could read specs, and in practice they
@@ -363,7 +380,8 @@ told them to type — a step no one skipped on purpose. The consent that moved w
 real, so the approval surface names it (`approve → cut + build`) and every hazard is a
 `⚠` line the brief surface still prints. The merge carve-out (adw-core §6) does not move.
 
-Stamp **T1** immediately before each approval-surface print and **T2** on each answer (adw-core §7.1);
+Stamp **T1** immediately before each approval-surface print that waits and **T2** on each answer
+(adw-core §7.1); a surface printed under the skip test waits for nothing and gets neither;
 across re-cut rounds the gate total accumulates and the re-render itself is machine time.
 
 ## Phase 3 — fan-out (parallel, one subagent per unit)
@@ -462,8 +480,8 @@ skill text asserts them and the skill text is what the agent has at the cursor:*
 
 **`brainstorming`'s `<HARD-GATE>` cannot be satisfied inside the fan-out** — it forbids
 implementation until "your human partner has approved", and a unit agent has no human. That
-approval already happened, at the approval surface (adw-core §7), which is why the fan-out
-runs at all. Say so in the prompt: "the human gate for this unit is already passed; produce
+approval already happened, at the approval surface (adw-core §7), or in the owner's typed intent
+when Phase 2's skip test skipped the gate, which is why the fan-out runs at all. Say so in the prompt: "the human gate for this unit is already passed; produce
 the artifact and stop — do not ask for approval, and do not write code." Also pin the path:
 brainstorming classifies spike/bounded/architectural on its own, which is a second depth
 ladder that can disagree with §3's. **§3's depth wins; the unit's `depth:` is not
@@ -614,7 +632,8 @@ Three ordered steps, no discretion:
    the handoff's `decided` line only after the spec is read back and shows the answer (when the
    resume fails, edit the spec here, or keep the question in `needs you`); only an `ask` stays in `needs you`. Of 12 handoff stops in twelve
    days, 8 were answered with the default. Then: build unless either holds:
-   the gate verb was `specs only`, **or** `needs you` is non-empty. Either → stopping exit.
+   the gate verb was `specs only`, **or** `needs you` is non-empty. Either → stopping exit. A gate
+   Phase 2's skip test skipped counts as `approve`.
 2. **Print the handoff exactly** (adw-core §7) in the variant step 1 chose — `Next: nothing
    — building <units>` for the building exit, `Next: /adw-build <slug>` for the stopping
    one. **On the building exit the handoff is not a message of its own:** print it as the text
