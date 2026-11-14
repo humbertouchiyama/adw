@@ -444,6 +444,8 @@ Five rules (owner feedback, structural after prose failed twice):
 
 ```
 Intent: <one line>
+card    <ref> — <status>                   ← only when the intent came from a card (§10 Intake)
+designs <n>                                ← only when the intent has `designs:`
 base    <branch> — <one clause why>        ← only when not the default base (§2 base:)
 merge   auto → <base>, after a clean walk  ← or: merge   hold — <why>; ALWAYS prints (§2 merge:)
 extends <slug> · u1–u6: merged u1 u2 u3 u5 · open u4 (#820) · unbuilt u6   ← extend mode (§1.1)
@@ -984,7 +986,7 @@ contract PR is a production change everywhere at once. Review it as one.
 
 An intent may name a Trello card or a Linear issue. The run then keeps that card's status up to date.
 **No card named → this section does nothing and prints nothing.** A tracker problem is a warning, never a
-stop: no retry, no question, the run goes on.
+stop (Intake, below, is the one exception): no retry, no question, the run goes on.
 
 - **Ref.** Taken from the intent text, and only when the text says which tracker: a Trello URL
   (`trello.com/c/<id>/…`) or "Trello" followed by a shortlink/id, a `linear.app` issue URL or "Linear"
@@ -1001,6 +1003,24 @@ stop: no retry, no question, the run goes on.
   the run prints ONE line, once per command (init Phase 0.5, build Phase 0 — build may start in a new
   session): `⚠ card <ref>: <trello|linear> MCP not connected — status will not be kept up to date`
   (or `card not found` in place of `MCP not connected`).
+- **Intake: the intent is the card.** When the WHOLE intent text is one ref (a Trello URL or shortlink,
+  a `linear.app` issue URL, `Linear <KEY>`), `/adw-init` builds the intent from the card; a ref inside
+  longer text keeps the rules above. This is the one place a tracker problem stops the run, because
+  there is no intent without the read: tracker off → `⚠ card <ref>: cannot read — paste the intent as
+  text`, and stop.
+  1. Read title, description, labels, status, comments and attachments. Intent text = title, description,
+     then the comments that decide something. Attachments and links are listed, never followed. The
+     approval surface's `Intent:` line summarises it and `detail` prints it in full.
+  2. Card status is `repo-profile §22` `done` (§22 absent → this test is skipped), or the Linear state
+     type is `canceled` or the state is `Duplicate` (a custom name such as "Won't do" is caught by its
+     type), or the Trello card is archived →
+     `⚠ card <ref>: already <status> — nothing to build`, and stop. `--force-closed` overrides and the
+     surface prints `⚠ card <ref>: closed (<status>), run forced`.
+  3. A product question in the card is not a separate stop: the built intent goes to triage, which
+     raises it as a `needs you` row at the approval gate like any other intent.
+  4. `--design <path-or-url>` (repeatable, also on a free-text intent) and, for a card, its image/Figma
+     attachments become a `designs:` list in the intent. Triage and the specs cite them; a port unit (§20) takes them as its visual reference.
+     `designs:` is not a header field; the header gets only `card:` (§2).
 - **Status names are `repo-profile §22`.** The run never guesses a column or status name. §22 absent,
   or a name it holds that the card's board or team does not have →
   `⚠ card <ref>: repo-profile §22 has no status "<name>" — status will not be kept up to date`, and
