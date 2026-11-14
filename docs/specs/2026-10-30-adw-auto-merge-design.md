@@ -200,7 +200,10 @@ Cases today are 1 to 5, written from acceptance criteria (`adw-build` §3.5). Th
 changed screen. So:
 
 - **The list.** The PR body gets a `## Screens` section, after the `<!-- /smoke -->` marker so the
-  relay's case extraction is unchanged. It has one line per changed screen, naming its devices. A final
+  relay's case extraction is unchanged. It has one line per changed screen, naming its devices by
+  §21's Devices tokens that a case walks, never by a case's `Device` word: the runner names each image
+  by token and walks only the cases' devices, so any other device costs a walk that its Audit then
+  fails. `adw-build` §3.8 checks the list against the walk's devices before each walk. A final
   PR's list joins its units' lists. A PR that changes no screen writes `Screens: none — <why>`, which
   §4.2 treats like `Smoke: none`.
 - **The cases.** Each listed screen appears in a case. The limit of 5 cases is lifted where the list
@@ -210,6 +213,11 @@ changed screen. So:
   failed. Today the runner keeps images for defect rows only. So the native skill, its `verify.sh`, and
   §21's Evidence and Audit rows change: Evidence locates every listed screen's image, and the Audit
   fails when one is missing.
+- **The code a device runs.** A case passes only when its devices ran the code the PR changed. A
+  Compose-only change to a screen that iOS draws with a SwiftUI twin, walked on iOS, sees the old
+  screen. Such a case is `blocked`, and its gap row names its `AC-<n>`, so condition 7 holds it (C20
+  as written). Such a screen gets no image, so condition 8 holds too. §21's optional Renders row
+  prints the changed files it cannot show a device runs, and fails closed.
 
 ### 4.5 Screenshots
 

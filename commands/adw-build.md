@@ -946,7 +946,7 @@ against the base (step 2 and 3 of the merge gate).
   <!-- /smoke -->
 
   ## Screens
-  - SCREEN-1 · <screen title as the app shows it> · <device>, <device>
+  - SCREEN-1 · <screen title as the app shows it> · <§21 Devices token>, <§21 Devices token>
 
   ## For your check
   ### CHECK-1 <what to try>
@@ -959,14 +959,14 @@ against the base (step 2 and 3 of the merge gate).
   after it. The marker closes the whole section once, after the last case, never after each case;
   on a final PR it follows the last renumbered case, and a unit's own marker is dropped. Every acceptance criterion that only a look at the running
   app can check (it names a simulator, a device or a manual check, or says no gate covers it) has a
-  case or a CHECK. **A case whose rule holds on more
+  case or a CHECK; a case, when no §21 device runs its change (below). **A case whose rule holds on more
   than one screen ends with a step that repeats the check on each of them, by name**
   (`On <screen>, <screen>: repeat step 2; expect the same`): a screen that differs from its siblings
   is the defect no gate sees. Name there only the screens that should match. A screen whose change
   differs from its siblings gets its own step and its own `Expected`. Preconditions name data, never "any record": §3.8's runner makes what
   its fixture lacks (`repo-profile §21`'s Data row). The final PR's cases are its units' cases, in
   unit order, renumbered `AC-1`, `AC-2`, … in one sequence, each with its `Checks` line. Its
-  `## Screens` joins its units' lists: one line per screen, with the devices of every unit that lists
+  `## Screens` joins its units' lists: one line per screen, with the device tokens of every unit that lists
   it, renumbered `SCREEN-1`, `SCREEN-2`, …, and each case step that names a screen keeps naming it by
   title. Its `## For your check` joins its units' CHECKs, renumbered the same way. A unit
   with nothing to see says `Smoke: none — <why>`. A PR with cases that changes no screen writes
@@ -974,8 +974,13 @@ against the base (step 2 and 3 of the merge gate).
   found still broken on the device, and the owner asked six runs for this list by hand. Then a list
   that named the three broken screens shipped unwalked on AXCMedApp #580, which is why §3.8 walks it.
 - **`## Screens` lists every screen the change alters**, one line each: `SCREEN-<n>`, the screen's
-  title as the app shows it, and the `repo-profile §21` Devices tokens to see it on (with no §21, the
-  device a person would use). §3.8 keeps an image of each listed screen on each listed device, passed
+  title as the app shows it, and the devices to see it on, as `repo-profile §21` Devices tokens (with
+  no §21, the device a person would use). A token is the name §21's Devices row gives a runner device
+  (`iphone17`, `phone-width`). It is never the word a case's `Device` line uses (`iPhone`, `phone`):
+  §21 maps those words to tokens for the cases only, and the walk, its Audit and §3.7's gate read a
+  `## Screens` device as a token. List only tokens a case's `Device` line walks: the walk runs no
+  other device. §3.8 checks the list before each walk, and keeps an image of each
+  listed screen on each listed device, passed
   or failed, and posts them on the PR. The walk captures a screen only where a case reaches it, so
   each listed screen a case can reach appears in a case's steps. A changed screen no case can reach
   (behind the camera, say) is still listed: it gets no image, and the PR waits for the owner. When `repo-profile §3` has a `UI paths` row, every
@@ -989,6 +994,19 @@ against the base (step 2 and 3 of the merge gate).
   step names. A case that names what the code does not have is rewritten. Code that lacks what its
   criterion asks for is a defect: fix it before the walk, back through §3.1. The walk never finds
   this out on its own.
+- **A case checks code its devices run.** A walk sees only the code a §21 device runs. Some screens
+  have two implementations, and a device runs only one of them (a Compose screen that iOS draws with
+  a SwiftUI twin, say). When the PR changes only the other one, a walk sees the old screen and its
+  `pass` proves nothing. So when §21 has a Renders row, run its command on the diff before the cases
+  are final, in the form the row gives for a PR that is not open yet. It prints each changed file it
+  cannot show a §21 device runs. A non-zero exit means a step failed and clears no file: run it again,
+  or treat every changed file as printed. A criterion whose change is only in
+  printed files still gets its case, with a §21 `Device` that shows its screen, and its screen stays
+  on `## Screens`. The walk then marks that case `blocked`, with a gap row that names its `AC-<n>`, and
+  takes no image of that screen, so the PR waits for the owner (§3.7's gate, conditions 7 and 8).
+  Never give such a criterion only a CHECK, which holds nothing, and never write `Smoke: none` for it,
+  which is for a change with nothing to see. Add a CHECK for the device that runs the change as well.
+  With no Renders row, judge from the diff which device runs what.
 - Every adw PR body carries one depth-conditional line, naming the spec/plan dirs
   (`repo-profile §2`) — D3:
   `<specs-dir>/<plans-dir> in this PR = the unit's contract, authored and critical-passed
@@ -1021,7 +1039,7 @@ row from the re-pass, the §5 review-evidence count, the `/pr-ready` §5 open-fi
 and on `blocked` the question with its default. The brief also asks the driver one question before
 `/pr-ready`: **does the PR body's `## Screens` list every screen that a changed file under
 `repo-profile §3`'s `UI paths` renders?** A screen it misses is a finding like any other: the driver
-adds its line to `## Screens` and, when a case can reach it, a step that reaches it to that case
+adds its line to `## Screens`, its devices as §21 Devices tokens (§3.5), and, when a case can reach it, a step that reaches it to that case
 (`gh pr edit <N> --body-file`), and
 returns `screens: +<n> <SCREEN ids>`, `screens: complete`, or `screens: no UI paths row`. **A `ready` return without the open-findings lines
 has not returned:** the PR is `blocked` with `default: run /pr-ready <N>` — not `/adw-build <slug>`,
@@ -1294,9 +1312,32 @@ nothing about taps. A probe that fails, or a driver the runner reports lost mid-
 as `smoke not runnable: <reason>`: a reported gap, never a pass and never a defect. §21's Devices row
 names the runtimes the runner is valid on.
 
+**Check the `## Screens` devices before each walk.** One listed device the walk does not run spends a
+whole walk: a case word (`iPhone` for `iphone17`), or a token no case walks. The runner names each
+image by its token and walks only the devices the cases name, the Audit finds no image for the rest,
+and §3.7's gate holds the walk as unaudited. Two Bash calls, with `<N>` written in. First, the walk's
+devices:
+```bash
+gh pr view <N> --json body --jq .body | tr -d '\r' | awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && (/^## / || /^<!-- \/smoke -->/) {exit} f && /^### AC-[0-9]+/ {if (id != "") print id ": " (d == "" ? "none" : d); id = $2; d = ""} f && /^- \*\*Device\*\*:/ {sub(/^- \*\*Device\*\*:[ \t]*/, ""); d = $0} END {if (id != "") print id ": " (d == "" ? "none" : d)}'
+```
+It prints `AC-<n>: <its Device line>` for each case, and `none` for a case with no `Device` line. The
+walk's devices are the tokens §21's Devices row maps those words to, each once; `none` takes the
+row's set for a case with no `Device` line. Second, with one `-e '<token>'` for each walk device:
+```bash
+gh pr view <N> --json body --jq .body | tr -d '\r' | awk '/^## Screens[[:space:]]*$/ {f=1; next} f && /^## / {exit} f && /^- SCREEN-[0-9]+ · /' | awk -F' · ' '{n = split($NF, d, ","); for (i = 1; i <= n; i++) {gsub(/^[ \t]+|[ \t]+$/, "", d[i]); if (d[i] != "") print d[i]}}' | grep -vxF -e '<token>' -e '<token>' | sort -u
+```
+It prints each listed device the walk does not run. Nothing printed → dispatch the relay. A printed
+word that §21's Devices row maps for a case's `Device` line → replace it on the `- SCREEN-` rows with
+the tokens it maps to that the walk runs (`all` takes every walk device), each token once per row, in
+one `gh pr edit <N> --body-file`, then run the second call again. Any other device (a word that maps
+to no walk device, a token no case walks, a word the row does not map), or one the second run still
+prints → dispatch no relay: the walk's return is `smoke not run — screens: '<device>' is not a device
+this walk runs`, recorded as below.
+
 **Dispatch one `model: sonnet` smoke relay** (adw-core §8's Re-execute and relay row,
 `subagent_type: general-purpose`), and never two smokes at once: a runner owns its devices. Its
-brief carries the PR number `<N>`, `$VSHA` written out in full, `repo-profile §21` pasted whole,
+brief carries the PR number `<N>`, `$VSHA` written out in full, the walk's devices from the check
+above, `repo-profile §21` pasted whole,
 steps 1 to 5 below pasted, and `review-core.md` §11's brief floor. The relay and its runner edit no
 code, commit nothing, push nothing and post nothing on the PR. The relay:
 
@@ -1305,12 +1346,12 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
 2. Extracts the cases, in one Bash call that prints the directory, and copies that path as a literal
    into every later call:
    ```bash
-   D="$(mktemp -d)"; gh pr view <N> --json body --jq .body > "$D/body.md"; awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && (/^## / || /^<!-- \/smoke -->/) {exit} f' "$D/body.md" > "$D/cases.md"; awk '/^## Screens[[:space:]]*$/ {f=1; print; next} f && /^## / {exit} f' "$D/body.md" > "$D/screens.md"; [ -s "$D/screens.md" ] || grep -m1 '^Screens: none — ' "$D/body.md" > "$D/screens.md"; echo "$D"
+   D="$(mktemp -d)"; gh pr view <N> --json body --jq .body | tr -d '\r' > "$D/body.md"; awk '/^## Smoke[[:space:]]*$/ {f=1; next} f && (/^## / || /^<!-- \/smoke -->/) {exit} f' "$D/body.md" > "$D/cases.md"; awk '/^## Screens[[:space:]]*$/ {f=1; print; next} f && /^## / {exit} f' "$D/body.md" > "$D/screens.md"; [ -s "$D/screens.md" ] || grep -m1 '^Screens: none — ' "$D/body.md" > "$D/screens.md"; echo "$D"
    ```
    `<D>/screens.md` holds the PR's `## Screens` list (§3.5), or its `Screens: none` line, or nothing.
    Before it runs anything from §21, it checks §21's Cases check, Devices, Launch, Driver probe, Wait
-   test, Result, Evidence, Audit, Max minutes, Abandon and Build floor rows (the Lock and Second
-   account rows are optional): a row that is missing or empty →
+   test, Result, Evidence, Audit, Max minutes, Abandon and Build floor rows (the Lock, Second
+   account and Renders rows are optional): a row that is missing or empty →
    return `smoke not run — §21 <row> is empty` and stop; a Max minutes that is not a whole number →
    return `smoke not run — §21 Max minutes is not a whole number` and stop. Nothing has launched, so
    there is nothing to abandon. Then it compares the case counts:
@@ -1323,8 +1364,8 @@ code, commit nothing, push nothing and post nothing on the PR. The relay:
    and Max minutes as `<n>`. `DEADLINE` → run Build floor once more and return `smoke not run — build
    floor: <what it printed>` and stop; nothing has launched. Two of six walks died of a host that could not
    finish the build. Then it starts §21's Launch with `<N>`, `$VSHA`, `<D>/cases.md`,
-   `--screens <D>/screens.md` when that file is not empty, and the devices §21's Devices row derives
-   from the cases' `Device` lines, and keeps every value §21's Wait test, Result, Evidence, Audit and
+   `--screens <D>/screens.md` when that file is not empty, and the walk's devices its brief names (the
+   tokens §21's Devices row maps the cases' `Device` lines to), and keeps every value §21's Wait test, Result, Evidence, Audit and
    Abandon rows name, as literals. **`<start>`** is the `<epoch>` of the runner's `adw-lock: taken
    <epoch>` line, so a walk that waited for the lock does not spend its own Max minutes; a runner
    that prints no lock line takes `date +%s`, printed once just before Launch. **Queued:** a runner
@@ -1403,6 +1444,14 @@ check: it fixes nothing and changes no state. In a walk that passed:
 A row reported here and not fixed can still hold the merge: a `G<n>` that names an `AC-<n>` or a
 device a case needs, any row the walk called `blocking`, whatever the check finds, and a `D<n>` that
 is not `polish` with no `refuted:` or `polish:` line (§3.7's merge gate, condition 7).
+
+**A `pass` needs the changed code to run.** A case passes only when its walked devices ran the code
+the PR changed for it (§3.5). The runner runs the command of §21's Renders row before the walk: it
+prints each changed file it cannot show a walked device runs, and a run that fails clears no file.
+With no such row, the runner judges from the diff. A case whose change is only in such files is
+`blocked`, and its `G<n>` names its `AC-<n>`, so condition 7 holds the PR (design C20). A listed
+screen whose change is only in such files gets no image and a `G<n>` that names its `SCREEN-<n>`, so
+condition 8 holds. A `G` row is never checked or fixed, so neither row reaches the refuter below.
 
 **Check each row before anyone fixes it: `review-core.md` §9's refutation pass.** The walk's
 verdict is a model reading a simulator screen, and no run has measured how often its `blocking` rows
