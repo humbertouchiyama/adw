@@ -1220,10 +1220,14 @@ its next unit. No label is added for a hold.
    print it on a `note` line, and it does not change the result. A later trial of the same PR
    removes a leftover tree that is clean, and holds `0` on one that is not. Gates red → write the row and stop. Green → step 4, and the row will end
    `· base trial ok at <base sha7>`.
-4. **The merge, two Bash calls.** First: `gh pr view <N> --json baseRefName,headRefOid,labels`
+4. **The merge, three Bash calls.** First, run step 1's check again, exactly as step 1 writes it:
+   the trial can take long (a lock wait, a cold build, the gates), and the owner may have turned the
+   switch `off`, added `adw:hold` or changed the profile meanwhile (design §4.1: `off` also stops a
+   run already in flight). `pass` → go on. `hold <n> <reason>` → write the row as step 1 says and
+   stop. Second: `gh pr view <N> --json baseRefName,headRefOid,labels`
    must show the base equal to `<INTENT_BASE>`, the head equal to the `verified` row, and no
    `adw:hold` label. Any mismatch → `hold 2 base changed`, `hold 3 head moved` or `hold 1
-   adw:hold`, and stop. Second,
+   adw:hold`, and stop. Third,
    alone in its own Bash call, the sha written out as a literal: `gh pr merge <N> <flag>
    --match-head-commit <full sha>`, where `<flag>` is `repo-profile §3`'s merge convention
    (`squash` → `--squash`, `merge` → `--merge`, `rebase` → `--rebase`). No `--auto`, no
@@ -1440,7 +1444,9 @@ section and the evidence row before anything moves the head (smoke fix cycle ste
   <token>,<token> · <m>m`, the devices passed to Launch, with `· unaudited: <failing check>` appended
   when the Audit exit is not `0`. Then the returned
   rows, as they came. Then one line per checked row: `valid: <id> — <the three links>`,
-  `refuted: <id> — <the link that breaks>` or `unchecked: <id>`. Then one `fixed: <id> (walk <k>)
+  `refuted: <id> — <the link that breaks>`, `polish: <id> — overstated` (an `OVERSTATED` to
+  `polish`) or `unchecked: <id>`. Every `D` row that is not `polish` needs one of these lines: §3.7's
+  gate holds a `D` row with no `refuted:` or `polish:` line, so a lost line never reads as cleared. Then one `fixed: <id> (walk <k>)
   in <sha7>, unconfirmed` line per row a smoke fix cycle fixed, `<sha7>` being the head that cycle
   pushed; a later walk that passes its audit and leaves no `valid` row drops `, unconfirmed` from
   every such line. Then `smoke fix cycle <c> running — the head moves past <sha7>` while a cycle
