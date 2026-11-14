@@ -324,7 +324,7 @@ def false_passes(prs: list) -> set:
             if q.title.startswith('Revert "'):
                 if q.title == f'Revert "{p.title}"' or re.search(rf"(?m)^Reverts \S*#{p.number}\b", q.body):
                     hit.add((p.repo, p.number))
-            elif FIX_TITLE.search(q.title) and re.search(rf"#{p.number}\b", q.title + "\n" + q.body):
+            elif FIX_TITLE.search(q.title) and re.search(rf"(?<![\w/])#{p.number}\b", q.title + "\n" + q.body):
                 hit.add((p.repo, p.number))
     return hit
 

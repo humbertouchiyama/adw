@@ -343,7 +343,8 @@ New reader numbers, each from the `merge` row:
 
 - PRs auto-merged, as a share of independent and final PRs.
 - Holds per failed condition. This shows what to fix next.
-- Auto-merged PRs that got a follow-up intent or a revert within 7 days. This is the false-pass rate.
+- Auto-merged PRs that got a follow-up intent, a fix PR citing them, or a revert within 7 days. This is
+  the false-pass rate.
 
 **Kill test:** if reverts rise, or the false-pass rate stays high, turn the §4.1 row to `off` and
 read the holds. The auto-merge share over the first four weeks after both repos are on says whether

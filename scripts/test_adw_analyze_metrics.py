@@ -274,6 +274,12 @@ class AutoMerge(unittest.TestCase):
         r = compute("outcome.auto_merge_false_pass.v1", F.Slice(gate_facts(prs), START, END))
         self.assertAlmostEqual(r.value, 1.0)
 
+    def test_a_fix_pr_citing_another_repo_is_not_a_false_pass(self):
+        prs = [pr(21, "[adw a] A", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", block=merge_row("merged 1111111 · base unmoved")),
+               pr(43, "fix: bump the lib", "2026-10-07T10:00:00Z", "2026-10-07T11:00:00Z", body="Needs o/lib#21 first.")]
+        r = compute("outcome.auto_merge_false_pass.v1", F.Slice(gate_facts(prs), START, END))
+        self.assertAlmostEqual(r.value, 0.0)
+
     def test_one_followup_counts_once_against_the_latest_merge(self):
         auto = merge_row("merged 1111111 · base unmoved")
         prs = [pr(21, "[adw d u04] D4", "2026-10-05T10:00:00Z", "2026-10-07T10:00:00Z", block=auto),
