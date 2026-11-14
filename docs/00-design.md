@@ -573,7 +573,9 @@ defect no cycle fixed (still there after the second, or its cycle could not star
 not allowed on a PR with a red gate) makes the PR `blocked`. `polish` and gap rows only report. The `refuted` count on each PR's `smoke` evidence row
 is the false-positive measure the step lacked. A device the driver can read but not tap would pass
 every case it cannot reach, so a tap probe runs first, and a failed probe ends the smoke as `smoke
-not runnable`, never as a pass.
+not runnable`, never as a pass. For the same reason a case passes only when its devices ran the code
+the PR changed: a case whose screen they draw from another implementation (an iOS SwiftUI twin of a
+changed Compose screen) is `blocked`, and its gap row holds the merge (adw-build §3.8).
 
 ### 4.3 Environment failures abort; they do not consume cycles
 
