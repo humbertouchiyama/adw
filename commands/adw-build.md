@@ -131,7 +131,8 @@ gate file to get green · let a subagent create its own worktree.
    units but not all (or with differing values, or a value other than `auto` or `hold`), a
    `merge: auto` whose base is the production branch (`repo-profile §3`), or a `shape: port` unit
    whose depth is not D1, that shares a PR or sub-PR with another unit, or whose repo profile
-   has no complete §20 (adw-core §2) → refuse the whole
+   has no complete §20 (adw-core §2), or a `card:` present on some units but not all (or with
+   differing values) → refuse the whole
    run, print what to fix, stop. No partial builds on a broken manifest.
 5. **Base resolution:** `INTENT_BASE` = the intent's `base:` header value, default
    `repo-profile §3`'s default base; `git ls-remote --heads origin <INTENT_BASE>` must return it,
@@ -226,6 +227,10 @@ gate file to get green · let a subagent create its own worktree.
    unit still builds — the human already saw the coverage concern at the init approval gate,
    which is the targeting decision point — but its PR body and run-report line carry
    `· ⚠ no trustworthy gate sees this unit's correctness`.
+9. **Card (adw-core §10), last, after every refusal and halt above has passed.** When the headers carry
+   `card:`, run §10's connection read, print its `⚠` line if it fails, and move the card to
+   `repo-profile §22` `started` with its comment. A card already in `started`, `review` or `done` is not moved
+   and gets no comment.
 
 ## Phase 1 — scheduling
 
@@ -1783,6 +1788,13 @@ for a unit. The cost is the provisioning and one cold build. When that work has 
 reported the PR's new state, run the cleanup call above again with the same flags, and print its
 last line and each `kept` line as `note` lines at the end of that report, not as a second run report: it removes the re-created worktree and the verify and review
 worktrees the fix made.
+
+**Card first (adw-core §10).** When the headers carry `card:`, run §10's connection read again (do not
+rely on Phase 0's result: the context may have been compacted since). When the tracker is on, move the
+card to `repo-profile §22` `done` when every PR of the run is `merged`, else to `review` if at least one
+PR is `ready` or (some PR `merged` and another `blocked`), and post or skip the comment as adw-core
+§10's skip rule says. Blocked-only or failed with nothing merged: comment, no move. Then print the report. A `note card` line goes on the
+report only for an off tracker or a failed call.
 
 Print the **run report exactly** (adw-core §7): one line per PR, merged → ready → blocked → failed →
 unbuilt; `Next:` names the merge order, or, when every PR merged, `Next: when you test, gh pr list

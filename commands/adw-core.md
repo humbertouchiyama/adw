@@ -7,8 +7,8 @@ description: "Shared ADW contract — spec headers, naming, depth ladder, packag
 **This file lives in the `adw` repository and is fetched, not copied** (§9). It is repo-agnostic:
 every command, path, branch and gate it needs is declared per-repo in the consuming repo's
 `.claude/repo-profile.md`, cited throughout as `repo-profile §N` against frozen anchors §1–§18,
-plus three optional ones a profile may omit: §19 (code-review lanes), §20 (visual port loop, §3)
-and §21 (app smoke, adw-build §3.8).
+plus four optional ones a profile may omit: §19 (code-review lanes), §20 (visual port loop, §3),
+§21 (app smoke, adw-build §3.8) and §22 (card tracker, §10).
 Both `/adw-init` and `/adw-build` read that file at their Phase 0 alongside this one — it is not
 auto-included.
 
@@ -109,6 +109,7 @@ after: [u1, u2]                   # in-chain ordering; [] when independent
 verify: <a command per the rules below and repo-profile §5's allowlist>
 base: <a branch that exists on origin>   # OPTIONAL — omitted = repo-profile §3's default base
 shape: port                       # OPTIONAL — §3 Port shape; D1 only, needs a complete repo-profile §20 (below)
+card: trello:dQV3tHEq             # OPTIONAL — the card or issue this intent keeps up to date (§10): trello:<id> | linear:<KEY>
 merge: auto | hold                # OPTIONAL — omitted = hold
 ```
 
@@ -134,6 +135,8 @@ Rules:
   a command in backticks (Renders, Score), a command or env var (Fast mode), a number of minutes
   (Gate mode), a path or command (References), path globs (Port surface), a number of rounds (Stop
   rule) — and the fail-closed `verify` template below the table.
+- **`card:` is optional and intent-wide** like `base:`: every spec of one intent carries the same
+  value or none (`/adw-build` refuses a mixed set). Its rules are §10. An unreachable tracker never blocks a run; a mixed set is refused, like `base:`.
 - **`merge:` is optional, and `auto` or `hold` are its only values.** It says whether the intent's
   PRs merge without the owner after a clean walk (adw-build §3.7). Intent-wide, like `base:`: every
   spec of one intent carries the same value or none, and `/adw-build` refuses a mixed set.
@@ -639,6 +642,7 @@ note     window <N>k — compact before resuming             ← only when ≥40
 note     tier <uNN> <word> author=<tier> impl=<tier>       ← only for units built below opus (§8)
 note     orchestrator <tier> — restart the next run with claude --model sonnet   ← only when the session ran above sonnet (§8)
 note     level <uNN>+<uNN> built concurrently              ← only when a DAG level ran >1 unit
+note     card <ref> — <what was not kept up to date, and why>   ← only when the tracker was off or a call failed (§10)
 note     run-clean: 3 worktrees, 2 DerivedData dirs, freed 7.9 GB; kept 1   ← unconditional (adw-build Phase 5)
 note     kept     adw-<slug>-u2  uncommitted: <paths>      ← one per item run-clean kept
 note     <further run-level caveats — one line each, only when present>
@@ -965,7 +969,7 @@ and it names an unverified contract rather than a stale one it cannot do anythin
 failure with no cache at all is **exit 1**, and the run stops.
 
 **What is still per-repo.** `repo-profile.md`, authored in the consuming repo and never fetched.
-Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19, §20 and §21 optional). A contract file that
+Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19, §20, §21 and §22 optional). A contract file that
 needs a value which could differ between two repos is wrong: the value belongs in the profile. The
 failing test is always the same — could this exact sentence be true in a repo with a different
 stack? If not, it names a value, and the value moves.
@@ -973,3 +977,49 @@ stack? If not, it names a value, and the value moves.
 **A contract change is now one PR in one repository** and is live in every consuming repo on their
 next run. That is the whole benefit and the whole risk: there is no per-repo staging step, so a
 contract PR is a production change everywhere at once. Review it as one.
+
+## 10. Card tracker (optional, never blocks)
+
+An intent may name a Trello card or a Linear issue. The run then keeps that card's status up to date.
+**No card named → this section does nothing and prints nothing.** A tracker problem is a warning, never a
+stop: no retry, no question, the run goes on.
+
+- **Ref.** Taken from the intent text, and only when the text says which tracker: a Trello URL
+  (`trello.com/c/<id>/…`) or "Trello" followed by a shortlink/id, a `linear.app` issue URL or "Linear"
+  followed by a key (`ABC-123`). A bare `ABC-123` is not a ref (`UTF-8` and `SHA-256` look the same).
+  `/adw-init` writes it to every header as `card: trello:<id>` or
+  `card: linear:<KEY>` (§2). A bare card number (`#167`) is not a ref: print
+  `⚠ card #167: not a ref — status will not be kept up to date` and write no `card:`. Extend mode
+  (§1.1) writes the `card:` the intent's existing specs carry, or none if they carry none; a ref in
+  the new text is then ignored, with one `⚠ card <ref>: the intent has its own card` line.
+- **Connected means a real read works.** Trello: a tool whose name ends `get_card` and one ending
+  `get_lists`. Linear: a tool ending `get_issue` and one ending `list_issue_statuses`. Deferred tools
+  are loaded first (`ToolSearch`); not found there = absent. Then read the card once. A tool that is
+  absent, a call that errors, or a card that is not found turns the tracker **off for the run**, and
+  the run prints ONE line, once per command (init Phase 0.5, build Phase 0 — build may start in a new
+  session): `⚠ card <ref>: <trello|linear> MCP not connected — status will not be kept up to date`
+  (or `card not found` in place of `MCP not connected`).
+- **Status names are `repo-profile §22`.** The run never guesses a column or status name. §22 absent,
+  or a name it holds that the card's board or team does not have →
+  `⚠ card <ref>: repo-profile §22 has no status "<name>" — status will not be kept up to date`, and
+  the tracker is off for the run.
+- **Up to three moves, one comment each. A sub-PR never touches the card.**
+
+  | When | Move to | Comment |
+  |---|---|---|
+  | `/adw-build` Phase 0 step 9, after every refusal and halt | `repo-profile §22` `started` | `adw <slug> started: <units>` |
+  | `/adw-build` Phase 5, before the run report prints, when every PR of the run is `merged` (`merge: auto`, §2) | `repo-profile §22` `done` | the PR numbers with their URLs |
+  | the same point, when at least one PR is `ready`, or some PR is `merged` and another is `blocked` (not every PR `merged`) | `repo-profile §22` `review` | the PR numbers with their URLs and states |
+
+  Blocked-only, or `failed`, with nothing merged: the comment, no move. A run whose final PR the owner merges by hand
+  (`merge: hold`) ends on `review`: the run cannot see that merge, and `done` is the owner's move.
+- **Skip the move when it would not advance the card:** the card already sits in the target, or in
+  `done`, or the target is `started` or `review` and the card sits in `done`, or the target is
+  `started` and the card sits in `review`. A skipped `started` move skips its
+  comment too; a skipped `review` move still posts its comment, because the PR list is new, unless the card sits in `done`. Move
+  first, then comment; the two calls are independent.
+- **Comment text** is one or two lines in the language of the card's own title; the table's wording
+  says what to cover, not what to type. A run touches nothing
+  else on the card: it never edits, creates, archives or deletes.
+- **A failed move or comment** is one `note card <ref> — <what failed>` line on the run report, and the
+  run goes on. A tracker that was off prints the same `note` line, naming the warning it printed.

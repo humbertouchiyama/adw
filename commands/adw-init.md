@@ -144,6 +144,14 @@ prior state before triage:
   has no folder: create one at its BIRTH date, **under the root that intent already uses**, and
   leave the flat spec in place. NEVER mint a second dated folder for one slug.
 
+**Then the card (adw-core §10), only when the intent text names one.** Parse the ref here, and read nothing yet.
+Phase 3 starts by settling which ref the headers carry: a new intent takes the ref it parsed, an
+extension takes the `card:` its existing specs carry (none if they carry none), and a different ref in
+the new text is ignored with §10's `⚠ card <ref>: the intent has its own card` line. Then run §10's
+connection read once on that ref and print its `⚠` line if it fails. The ref goes into every header
+whether or not the tracker is connected: the header is a fact about the intent, and build checks the
+connection again.
+
 Extension is **proposed at the approval surface, never assumed** — the `extends` line states it and the verb
 menu still governs: Phase 2's skip test never skips the gate in extend mode. A
 different `base:`, or a different subject, is a new intent: say so in
@@ -411,8 +419,9 @@ with the most to discover), so blocking on it is a pure loss every time.
 > never code, never a branch. Spec path: `<exact path per adw-core §1>`. The spec MUST
 > open with the exact header block (adw-core §2):
 > `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`
-> when the unit was approved as `port`, `base:` when the intent overrides it, and
-> `merge: <auto | hold>` as the gate printed it. Approved answers for this intent, one per line as
+> when the unit was approved as `port`, `base:` when the intent overrides it, `merge: <auto | hold>` as
+> the gate printed it, and `card: <ref>` when the intent names a card (adw-core §10; `<ref>` is the ref
+> Phase 3 settled). Approved answers for this intent, one per line as
 > `QN — <question>: <answer>`: `<list>`. Follow each one that touches this unit and
 > record it in the spec under its `QN` id. The spec body
 > states: the problem, the change, acceptance criteria numbered `AC 1`, `AC 2`, … (adw-build §3.5's
@@ -551,7 +560,8 @@ live in the task outputs; the specs and the handoff carry everything that matter
 Fix in place on any failure, except where a bullet says it only reports:
 - every approved unit has a spec at its expected path, opening with all six required
   header fields (`base:` optional — when the intent overrides it, every unit carries the
-  same value, adw-core §2);
+  same value, adw-core §2); `card:` likewise: the same value on every spec, or on none
+  (adw-core §2, §10);
 - `intent:` equals the slug everywhere; `unit:` ids are unique **against every id the
   intent has ever used**, merged units included (extend mode: re-check `max` from the PR
   titles — a reused id collides in a PR title and breaks resume); `after:` references only

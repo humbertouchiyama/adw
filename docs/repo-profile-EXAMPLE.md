@@ -4,7 +4,7 @@
 > repository ADW was built in: a full-stack TypeScript monorepo (React 19 + Vite, Hono + PostgreSQL
 > 16 + Drizzle, one shared npm workspace). Copy it to `.claude/repo-profile.md` in your repo and
 > replace **every** value. Keep the section numbers: the contract cites them as `repo-profile §N`
-> and the anchors §1–§18 are frozen. §19, §20 and §21 are optional; §20 and §21 are sketched at
+> and the anchors §1–§18 are frozen. §19 to §22 are optional; §20, §21 and §22 are sketched at
 > the end.
 
 Every repo-specific value the shared agent contract needs. One of these lives in each repo that
@@ -17,7 +17,7 @@ The format is prose and tables, not a parsed config. The reader is an agent, so 
 more than syntax.
 
 **Section anchors are frozen** — the contract files cite `repo-profile §1`…`§18` by number, and the
-optional §19, §20 and §21 where a profile carries them. Do not renumber. Add new sections at the end.
+optional §19 to §22 where a profile carries them. Do not renumber. Add new sections at the end.
 
 | § | Section | Read by |
 |---|---|---|
@@ -42,6 +42,7 @@ optional §19, §20 and §21 where a profile carries them. Do not renumber. Add 
 | §19 | Review-lane map, layer to angle (optional; absent → derived) | code-review lane table |
 | §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2/§3.3/§3.4/§3.6 |
 | §21 | App smoke (optional; absent → no smoke) | adw-build §3.5/§3.7/§3.8, adw-core §7 |
+| §22 | Card tracker status names (optional; absent → status is never moved) | adw-core §2/§10, adw-init Phase 0.5, adw-build Phase 0/5 |
 
 ---
 
@@ -691,3 +692,18 @@ description:
 | **Lock** | optional: the command that takes the runner's lock, the one that releases it, and the lock file, whose existence means a walk or a build holds the host. The relay waits on the file while a walk is queued (adw-build §3.8) |
 | **Renders** | optional: which code each device runs, and a command that prints, one per line, each file of a PR's diff that it cannot show a device above runs: code for another platform, or one implementation of a screen that the devices draw with another (a Compose screen that iOS draws with a SwiftUI twin). It fails closed: a file it cannot place prints, a deleted file it would need to read prints, and a step that fails (the diff, the sha) exits non-zero, which clears no file. State both forms of its input: the open PR's (`gh pr diff <N> --name-only`), and the one adw-build §3.5 uses before the PR exists (`git diff --name-only <base>...<sha>`). A file it prints by mistake only holds a PR. adw-build §3.5 runs it before the cases are final, and the runner before the walk: a case whose change is only in printed files is `blocked`, and a listed screen whose change is only there gets no image and a gap row that names its `SCREEN-<n>` |
 
+## §22 — Card tracker (optional)
+
+A repo whose intents name a Trello card or a Linear issue (adw-core §10) lists the status names the run
+moves it between. **Delete the whole section unless the repo uses a tracker**: absent → the run warns
+once and never moves a card. Each name is the column (Trello) or status (Linear) exactly as the board
+or team shows it; the run does not guess. Fill only the tracker rows the repo uses.
+
+| Tracker | `started` | `review` | `done` |
+|---|---|---|---|
+| Trello | `Doing` | `Review` | `Done` |
+| Linear | `In Progress` | `In Review` | `Done` |
+
+`started` is where the card goes when `/adw-build` begins. `review` is where it goes when a PR the
+owner must merge is open. `done` is where it goes when the run merged every PR itself (`merge: auto`);
+after a merge by hand the owner moves it.
