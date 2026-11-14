@@ -628,11 +628,21 @@ in `§6`; the single-test invocation traps in `§12`; the environment-fault list
 provisioning in `§4`. Read them before the first gate — they are the contract. `<BASE>` is
 `adw/<slug>` for a sub-PR, otherwise the chain's origin base.
 
-**The implementer runs them** — the list, the order and the obligation rule go in its brief —
+**The implementer runs them** — the list, the order, the obligation rule and the `[slow]` rule below go in its brief —
 and returns the exit-code vector with the tail of each red. The orchestrator classifies (3.3),
 counts, and feeds back; it does not re-run a gate to check the report. Independence is 3.4's
 job, and it is the point of 3.4: a re-run in this window is neither independent nor cheap
 (§3 discipline). The mutation check below is the implementer's too; 3.4's verifier repeats it.
+
+**A gate `repo-profile §5` marks `[slow]` belongs to 3.4's verifier, not to the implementer.** The
+implementer runs every other gate the diff obligates. It returns each marked gate as
+`<gate> skipped: slow` in its vector, and that slot counts as `not-run` for §3's conditions. The
+unit's `verify` is what the implementer iterates on meanwhile (adw-core §2). 3.4's verifier runs
+the marked gate (`/pr-ready` §4.3). **One exception:** in a fix cycle that a marked gate's genuine
+red started, the implementer runs that gate after its fix, to confirm the fix. A red that starts no
+fix cycle starts no such run: a port unit's render red (§3.1), `/pr-ready` §4.2's clean-checkout
+evidence, and a baseline red (§3.3). A `skipped: slow` slot is not "a report missing an obligated
+gate's row". That rule is for the verifier's report (§3.4), not for the implementer's vector.
 
 Three properties hold in every repo, whatever that file declares:
 
@@ -739,7 +749,8 @@ fault, no fix cycle spent):
 when it is red at `<BASE>` too and the unit added nothing to it: every failing test id in the
 unit's run (for a gate with no test ids, every error line, normalised as §3 condition 2
 normalises) also fails at `<BASE>`. To know, a `model: sonnet` relay runs that one gate once
-against a base checkout and returns its failing ids — the orchestrator runs no gate, §3. Then:
+against a base checkout and returns its failing ids — the orchestrator runs no gate, §3. The relay
+runs the gate whether or not `repo-profile §5` marks it `[slow]`. Then:
 
 - every id also fails at `<BASE>` → skip that gate for this unit and carry
   `· ⚠ baseline red: <gate>` on the PR's run-report line and in its body. Never `failed`, never
@@ -748,7 +759,9 @@ against a base checkout and returns its failing ids — the orchestrator runs no
 
 Run that relay once per gate per `<BASE>`, and paste `known baseline red: <gate> — <failing ids>`
 into every later brief that runs gates (implementer, 3.4 verifier, 3.6 driver), so no agent proves
-it again. After a sub-PR merges, `<BASE>` is the new integration tip: run the relay again for
+it again. A verifier's `baseline red` row (`/pr-ready` §4.3) is the same proof: the verifier ran
+the gate at `<BASE>` and every id matched. Paste its line the same way, so the next pass of the
+unit does not run that gate at `<BASE>` again. After a sub-PR merges, `<BASE>` is the new integration tip: run the relay again for
 any gate on the list before pasting, and drop the line for a gate that is green there. The same condition used to end three ways — `ready` on one PR, `blocked` on four, and the
 `failed` this section prescribed on none — and eight sessions re-proved one red (2026-09-20 to
 10-01).
@@ -771,6 +784,11 @@ of it here — one copy, and this file is the caller.
 A tripwire hit still routes to `blocked` (3.7) whichever way A and B land; what the pair
 changes is the PR body, which must say **which** run disagreed, or that both were green
 and the PR therefore needs a signature rather than a fix.
+
+**The verifier runs every gate the diff obligates, including the ones `repo-profile §5` marks
+`[slow]`** (`/pr-ready` §4.3). This pass is where those gates run (§3.2). A report missing an
+obligated gate's row is the verifier's red. The implementer's `skipped: slow` slot (§3.2) is not
+one.
 
 adw-build supplies the parameters `/pr-ready` §1 declares, and adds what only the
 pipeline knows:
@@ -827,6 +845,9 @@ pipeline knows:
   A port unit's block reads `depth D1 · shape port`, its `cycles` row adds `rounds N` (the unit's total across fix cycles), its
   `mutation` row ends `· fast` or `· gate` (the mode that graded discrimination; `gate` means the per-file sweep was skipped), and its `gates`
   field adds `render gate-mode <exit code>`, so the TRIAL (adw-core §3) leaves a record.
+
+  A re-pass that `/pr-ready` §4.0 reused writes `reverify reused <PASS id>` in place of
+  `reverify <N>m` in `phases`, and keeps the reused pass's `gates` and `mutation` rows.
 
   A PR that §3.8 applies to gets one more row after each walk, written by one more `gh pr edit`
   and replaced by the next walk's: `smoke      walk <k> · <d> defects (<b> blocking) · <g> gaps ·
@@ -1035,11 +1056,15 @@ brief you write with `review-core.md` §11's lines" (for a port
 unit also §3.1's wait block and `repo-profile §20`'s Gate mode row, which the driver pastes into the
 verifier's brief for its gate-mode `verify`), and:
 run `/pr-ready <N> apply` with `BASE`, `PASS=v2` (the next `PASS` id when 3.4 already used `v2`) and `REF` set to 3.4's values, carrying the
-unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and return
+unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and `PRIOR`
+(`/pr-ready` §1) set to this unit's last pass: its `PASS` id, its `$VSHA` as a 40-character
+literal, and its rows (the per-gate table, the mutation row, and a port unit's render-grade row),
+pasted from that pass's return. Return
 **Layer 2 only, plus the open-findings lines below** (`/pr-ready` §7 — suppress Layer 1 in the
 brief): the `ready|blocked` machine
 line with `verified <sha7>`, the review cycle count and tier, the per-gate table and mutation
-row from the re-pass, the §5 review-evidence count, the `/pr-ready` §5 open-findings lines
+row from the re-pass (or the reused ones, with `/pr-ready` §7's `pass: reused <PASS id> at <sha7>`
+line), the §5 review-evidence count, the `/pr-ready` §5 open-findings lines
 (`closed:` / `open:`, or `open-findings: none` / `fetch failed` / `NOT RUN`), the §8 cleanup line,
 and on `blocked` the question with its default. The brief also asks the driver one question before
 `/pr-ready`: **does the PR body's `## Screens` list every screen that a changed file under
@@ -1124,11 +1149,13 @@ consent — and adds:
 - **Escalation → `blocked`**: label, PR body carrying the question + recommended default.
   A blocked sub-PR is carried, not asked about: §3.7 merges it and the chain builds on the
   default.
-- **After the review loop's LAST push, 3.4 runs in full against the PUSHED head** — inside the
+- **After the review loop, 3.4 runs against the PUSHED head** — inside the
   driver, as `/pr-ready` §4 and §5 with `PASS=v2` (the next id on a re-run), which is why the brief carries the unit's `verify`
   and the mutation obligation. `/code-review apply` verifies in its own worktree — not the
   clean checkout with gate files restored — so without this re-pass a reviewer edit to
-  `package.json` would be the one unchecked path into `ready`. **The orchestrator asserts the
+  `package.json` would be the one unchecked path into `ready`. **A head equal to `PRIOR`'s
+  `$VSHA` reuses that pass** (`/pr-ready` §4.0): no commit landed after it, so the tree is the
+  one that pass checked, and §5 still runs. A head that moved by any commit gets a full pass. **The orchestrator asserts the
   returned `verified <sha7>` against `git rev-parse origin/<unit-branch>` before printing
   anything** — one `rev-parse`, the single check this session does run itself, and the
   `$VSHA` 3.7 keys on is the returned value, never a fresh derivation.
@@ -1236,7 +1263,8 @@ its next unit. No label is added for a hold.
    end; a lock another walk holds is waited on as §3.8 step 3's Queued step waits, and still held
    at its deadline is `hold 6 lock held by <s>`. Provision the tree as `repo-profile §4` says, then
    dispatch ONE agent, `model: sonnet`, with the tree path, `origin/<INTENT_BASE>` as the base and
-   the `repo-profile §5` gates the PR's diff obligates (`repo-profile §6`). It runs each gate in the
+   the `repo-profile §5` gates the PR's diff obligates (`repo-profile §6`), including the ones §5
+   marks `[slow]`: no pass has checked this tree. It runs each gate in the
    tree, writes every output under a `mktemp -d` directory outside the tree, edits nothing, and
    returns one line per gate: `<gate> <exit code>`. Any non-zero exit, or a gate with no line →
    `hold 6 gate <name> red`. Then, gates green or red, run step 1's first line, then `python3 "$C"
@@ -1545,11 +1573,12 @@ not red). One cycle:
 3. Dispatch one fix agent: `model: sonnet` (adw-core §8's Apply a diagnosed finding row),
    `subagent_type: general-purpose`. Its brief carries the worktree path and the head branch,
    written out; `<BASE>` (§3.2); each `valid` row with its three links; the gate list, order and
-   obligation rule §3.2 puts in an implementer's brief; every `known baseline red` line (§3.3); for
+   obligation rule §3.2 puts in an implementer's brief, without its `[slow]` skip; every `known baseline red` line (§3.3); for
    a port unit, §3.1's wait block and `repo-profile §20`'s Gate mode row; and `review-core.md` §11's
    brief floor. The agent fixes the app, never the spec and never the case, and edits no gate file.
-   One commit per row: `smoke-fix-<c>: <row id> <what>`. Then it runs the gates §3.2 obligates for
-   `git diff --name-only <BASE>...HEAD` and returns the exit-code vector with each red's tail. Only
+   One commit per row: `smoke-fix-<c>: <row id> <what>`. Then it runs every gate §3.2 obligates for
+   `git diff --name-only <BASE>...HEAD`, including the ones `repo-profile §5` marks `[slow]` (§3.2's
+   skip is the implementer's alone), and returns the exit-code vector with each red's tail. Only
    when every obligated gate is green does it push (`git -C "<worktree>" push origin <head branch>`)
    and return the pushed sha.
 4. A red goes to §3.3's classifier. A genuine red goes back to the same agent once, by SendMessage;
@@ -1642,7 +1671,8 @@ code — catching a real auto-merge defect on the way, with no escalation raised
 
 Otherwise the final PR (`adw/<slug>` → `<INTENT_BASE>`) runs the FULL Phase 3 loop on the
 composition — gates, 3.4 verify against `origin/<INTENT_BASE>`, **and 3.6's review** — and
-lands `ready`. With `merge: auto`, §3.7's merge gate then merges it once §3.8 is done; with
+lands `ready`. Its gates stage leaves the gates `repo-profile §5` marks `[slow]` to its 3.4 verify,
+as §3.2 does on any PR. With `merge: auto`, §3.7's merge gate then merges it once §3.8 is done; with
 `merge: hold`, or a gate that holds, it waits for the one human consent. Its body's `## Screens` and `## For your check` join its
 units' lists (§3.5). After the carried blocks below are listed, it runs §3.8's
 app smoke on its verified head, with its smoke fix cycles: the one smoke of the chain. A smoke fix

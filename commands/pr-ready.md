@@ -145,6 +145,12 @@ re-points a `log -1`/`rev-parse`/`diff` at `HEAD`, and an empty `$REF` makes §8
 mis-measures the thing the section exists to measure. A `# $X from §N` comment records
 provenance; it does **not** discharge this rule.
 
+**One optional value comes only from a caller: `PRIOR`.** It is the last pass of the same `REF`:
+its `PASS` id, its `$VSHA` as a 40-character literal, and every row that pass returned (the
+per-gate table or §4.2's A/B tables, its `baseline red` rows, and any rows the caller adds).
+`/adw-build` §3.6 hands it in. §4.0 uses it. With no `PRIOR`, §4.0 does nothing and §4 runs in
+full, as it does when a person types this command.
+
 `review-core.md` §7 (blast-radius safety stops) binds this command as it binds the others.
 
 ### §2 Tier
@@ -230,6 +236,25 @@ detecting false success. So this pass never asks for an opinion; it re-executes.
 
 Everything below runs against the **pushed** head, never a local branch: `/code-review
 apply` pushes to origin, and a local branch that was never pulled does not advance.
+
+**§4.0 — Reuse the prior pass on an unchanged head.** Only when the caller handed in `PRIOR`
+(§1). With no `PRIOR`, go to §4.1. Run one Bash call, with both values written out as literals:
+
+```bash
+git fetch origin
+[ "<PRIOR's VSHA literal>" = "$(git rev-parse origin/<headRefName>)" ] && echo "REUSE <PRIOR's PASS id>" || echo "RUN"
+```
+
+- `RUN` → the head moved after that pass. Run §4.1 to §4.3 in full, with this `PASS`.
+- `REUSE` → no commit landed after that pass, so it checked this exact tree. Set `VSHA` to
+  `PRIOR`'s `$VSHA` literal. `PRIOR`'s rows are this pass's rows, and they keep their meaning: a
+  red row blocks, a `baseline red` row does not, and §4.2's clean-checkout tables keep the verdict
+  `blocked`. Create no worktree and dispatch no verifier. Go to §5, which runs in full at this
+  `$VSHA`. §7 prints `pass: reused <PRIOR's PASS id> at <sha7>`.
+
+Never reason about what changed in place of this comparison. A head that moved by any commit,
+docs-only included, prints `RUN` (§6). Each "run §4 anyway" in §3 starts here too, so a reused pass
+stands in for it only when this call printed `REUSE`.
 
 **§4.1 — Resolve the verified head.**
 
@@ -350,6 +375,8 @@ the provisioning that the gates then run against.
 
 Then dispatch a **fresh verifier subagent** that re-runs every gate
 `review-core.md` §4 obligates for this diff (`repo-profile §6` maps them), inside `$VWT`.
+That includes every gate `repo-profile §5` marks `[slow]`. The implementer and `/code-review apply`
+leave those gates to this pass (`review-core.md` §4), so the verifier runs them.
 
 - **Pin it to `model: sonnet`.** The verifier re-executes and relays; it never judges. An
   unpinned dispatch inherits the session's most expensive tier for a job that is exit
@@ -379,7 +406,8 @@ already holds the base run hands it in as `known baseline red: <gate> — <faili
 (`/adw-build` §3.3), and the verifier compares against that and skips the base run. Every id of the
 `$VSHA` run also fails at `$BASE` → the row reads `baseline red`, it does not block, and the
 machine line ends `· ⚠ baseline red: <gate>`. Any other id, or a base run that fails to install or
-build → the row stays red and blocks.
+build → the row stays red and blocks. A `baseline red` row carries the base run's ids, so the caller
+hands them to the next pass of the same unit as its `known baseline red` line.
 
 Remove `$VWT` as soon as its verdict is recorded: return it to a clean checkout, then remove it
 **without `--force`**.
@@ -541,7 +569,8 @@ git fetch origin
 
 Non-empty output → the state is void: run the next `PASS`, or print `blocked`. Never
 reason about *what* the delta contains as grounds for skipping the re-run — that reasoning
-is the failure mode, and this comparison does not admit it.
+is the failure mode, and this comparison does not admit it. §4.0 runs the same comparison
+before it reuses a pass, so a void head never reuses one.
 
 ### §7 Verdict
 
@@ -581,6 +610,9 @@ everything else on that line, each as `· ⚠ <flag>`: §1's production-base war
 `open-findings: fetch failed` / `open-findings: NOT RUN`. It is evidence, not Layer 1 prose. A
 `ready` report with none of them did not run the check. A `blocked` decided before §5 — a red §4
 gate, an escalation, a count of `0` — prints none of them, and its reason says which.
+
+**When §4.0 reused a pass, also print `pass: reused <PASS id> at <sha7>` above the machine line**,
+for a caller too. It tells a reused pass from one that ran. `verified <sha7>` is that pass's `$VSHA`.
 
 **`blocked` is one token covering two unrelated situations, and Layer 1 MUST say which.**
 The token cannot split — `/adw-build` switches on `ready|blocked` — so the disambiguation
@@ -666,8 +698,8 @@ surfaces). When a rule in this file changes, that is the caller to re-read — a
 copy of these rules that should exist is this one.
 
 **§3.6 does not run this file in its own session.** It dispatches a `model: sonnet` driver
-(adw-core §8's Drive row) whose brief is this command with `apply` and the three overrides, and
-it consumes §7's Layer 2 and §5's open-findings lines — Layer 1 is suppressed in the brief. Run
+(adw-core §8's Drive row) whose brief is this command with `apply`, the three overrides and
+`PRIOR`, and it consumes §7's Layer 2, the `pass: reused` line and §5's open-findings lines — Layer 1 is suppressed in the brief. Run
 that way, §3's `/code-review` invocation, the lanes it dispatches, §4's relay verifier and §5's
 grader all nest under the driver: a subagent can invoke skills and dispatch agents. §3.4 still reaches §4 directly for the
 pre-PR `v1` pass, where there is no review to drive. Measured reason in adw-build §3.6.

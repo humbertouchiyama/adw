@@ -163,8 +163,13 @@ Four properties hold in every repo, whatever those sections declare:
 - **A gate that inspected nothing is not a pass.** Where a gate can be handed an empty scope,
   `repo-profile §5` states how to opt in explicitly. Reaching for that opt-in to turn a real code
   change green reinstates the exact lie the exit code exists to close.
-- Each gate must pass with **zero errors** before any push. Any failure → safety stop (§7); never
+- Each gate run before a push must pass with **zero errors**. Any failure → safety stop (§7); never
   push partially-passing remediation.
+- **A gate `repo-profile §5` marks `[slow]` runs in the independent pass.** `/code-review apply`
+  runs every other obligated gate before a push and lists each marked one as skipped
+  (`code-review.md` 7a step 2). `/pr-ready` §4's verifier runs the marked gates on every pass. Each
+  other runner of this map runs them too: `adw-build` §3.2 names the one role there that leaves them
+  to the pass.
 - **Docs-only is a first-class outcome.** A docs/prose/skill-only PR reports
   `verification: N/A — docs-only` and passes; it must never fabricate a green line for gates that
   never ran. `repo-profile §2` declares which paths are non-code, and `§6` declares which layers do

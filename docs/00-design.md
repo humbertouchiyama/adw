@@ -560,6 +560,13 @@ than dropping the gate, and carry the narrowing as a flag (adw-build §3.2) — 
 practice, not a concession to a clock. Baseline-red is the one exception (§4.2's own
 `⚠ no trustworthy gate` flag, and `⚠ baseline red` for a red proved at `<BASE>`).
 
+**Slow gates run where they count (2026-11-14).** A profile can mark a gate `[slow]` (`repo-profile
+§5`). The implementer and `/code-review apply` skip a marked gate; the independent pass, the merge
+gate's trial, the base-red relay and a smoke fix agent run it. An implementer-side run of a slow
+gate duplicated the pass that followed it, and in one repo a single simulator suite added about ten
+minutes to every pass of a unit whose diff obligated it. In a fix cycle that a marked gate's red
+started, the implementer runs that gate to confirm its fix (adw-build §3.2).
+
 **App smoke (TRIAL, 2026-10-19).** No gate looks at the running app, and on a native client the
 gates cannot render native chrome at all. Where `repo-profile §21` declares a runner, every independent
 and final PR (never a sub-PR) gets one walk of the
@@ -651,6 +658,12 @@ head holds the weakened files, and only the final PR's restore from `origin/deve
 
 The verifier's value is that gates are re-executed in a process whose transcript the
 implementer never touched. It is not an agent judging whether another agent finished.
+
+**One pass per tree (2026-11-14).** The post-review re-pass reuses the pre-PR pass when the head
+still equals that pass's verified SHA (`/pr-ready` §4.0). The check is mechanical: a fetch, then the
+literal SHA against the remote head. Over 30 days of runs, re-running the gates on an unchanged
+tree found no real defect; the reds the re-runs did find came after the code changed. A head that
+moved by any commit still gets a full pass, and the void rule is unchanged.
 
 ### 4.6 Review runs after the PR opens
 
