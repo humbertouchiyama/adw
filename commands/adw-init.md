@@ -94,11 +94,13 @@ prior state before triage:
   has no folder: create one at its BIRTH date, **under the root that intent already uses**, and
   leave the flat spec in place. NEVER mint a second dated folder for one slug.
 
-**Then the card (adw-core §10), only when the intent text names one.** Parse the ref, run §10's connection
-read once, and print §10's `⚠` line if it fails. Which ref goes into the headers is decided at Phase 3,
-once the approval has settled new intent or extension: a new intent writes the ref it parsed, whether or
-not the tracker is connected (the header is a fact about the intent, and build checks the connection
-again); an extension writes the `card:` its existing specs carry (adw-core §10).
+**Then the card (adw-core §10), only when the intent text names one.** Parse the ref here, and read nothing yet.
+Phase 3 starts by settling which ref the headers carry: a new intent takes the ref it parsed, an
+extension takes the `card:` its existing specs carry (none if they carry none), and a different ref in
+the new text is ignored with §10's `⚠ card <ref>: the intent has its own card` line. Then run §10's
+connection read once on that ref and print its `⚠` line if it fails. The ref goes into every header
+whether or not the tracker is connected: the header is a fact about the intent, and build checks the
+connection again.
 
 Extension is **proposed at the approval surface, never assumed** — the `extends` line states it and the verb
 menu still governs. A different `base:`, or a different subject, is a new intent: say so in
@@ -299,7 +301,7 @@ with the most to discover), so blocking on it is a pure loss every time.
 > open with the exact header block (adw-core §2):
 > `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`
 > when the unit was approved as `port`, plus `card: <ref>` when the intent names a card
-> (adw-core §10; `<ref>` is the value Phase 0.5 resolved). Approved answers for this intent, one per line as
+> (adw-core §10; `<ref>` is the ref Phase 3 settled). Approved answers for this intent, one per line as
 > `QN — <question>: <answer>`: `<list>`. Follow each one that touches this unit and
 > record it in the spec under its `QN` id. The spec body
 > states: the problem, the change, acceptance criteria, and (bugs) root cause with

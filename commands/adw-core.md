@@ -910,7 +910,7 @@ stop: no retry, no question, the run goes on.
   `repo-profile §21` `done` exists only so the run can recognise a finished card.
 - **Skip the move when it would not advance the card:** the card already sits in the target, or in
   `done`, or the target is `started` and the card sits in `review`. A skipped `started` move skips its
-  comment too; a skipped `review` move still posts its comment, because the PR list is new. Move
+  comment too; a skipped `review` move still posts its comment, because the PR list is new, unless the card sits in `done`. Move
   first, then comment; the two calls are independent.
 - **Comment text** is one or two lines in the language of the card's own title; the table's wording
   says what to cover, not what to type. A run touches nothing
