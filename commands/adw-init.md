@@ -95,9 +95,10 @@ prior state before triage:
   leave the flat spec in place. NEVER mint a second dated folder for one slug.
 
 **Then the card (adw-core §10), only when the intent text names one.** Parse the ref, run §10's connection
-read once, and print §10's `⚠` line if it fails. A ref that parses goes into every spec header as
-`card:` whether or not the tracker is connected: the header is a fact about the intent, and build
-checks the connection again. Extend mode takes the `card:` from the live intent's specs.
+read once, and print §10's `⚠` line if it fails. Which ref goes into the headers is decided at Phase 3,
+once the approval has settled new intent or extension: a new intent writes the ref it parsed, whether or
+not the tracker is connected (the header is a fact about the intent, and build checks the connection
+again); an extension writes the `card:` its existing specs carry (adw-core §10).
 
 Extension is **proposed at the approval surface, never assumed** — the `extends` line states it and the verb
 menu still governs. A different `base:`, or a different subject, is a new intent: say so in

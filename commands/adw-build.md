@@ -146,10 +146,6 @@ gate file to get green · let a subagent create its own worktree.
    abandoned `/adw-build` for want of it — design v2.8.
 6. Reconstruct topology: independent PRs (respecting grouped packaging) + chains ordered
    by `after`.
-
-   **Card (adw-core §10).** When the headers carry `card:`, run §10's connection read, print its
-   `⚠` line if it fails, and move the card to §21 `started` with its comment. Once per run: a
-   resumed run whose card already sits in `started` or `review` skips the move.
 7. **Recover the cycle counts before anything else in this step** — they are the operative
    stop metric now (§3), and a session boundary must not reset them. For every unit being
    resumed, against **`origin/<unit-branch>`** and the unit's own `<BASE>` (sub-PR →
@@ -225,6 +221,10 @@ gate file to get green · let a subagent create its own worktree.
    unit still builds — the human already saw the coverage concern at the init approval gate,
    which is the targeting decision point — but its PR body and run-report line carry
    `· ⚠ no trustworthy gate sees this unit's correctness`.
+9. **Card (adw-core §10), last, after every refusal and halt above has passed.** When the headers carry
+   `card:`, run §10's connection read, print its `⚠` line if it fails, and move the card to
+   `repo-profile §21` `started` with its comment. A card already in `started` or `review` is not moved
+   and gets no comment.
 
 ## Phase 1 — scheduling
 
@@ -1237,8 +1237,10 @@ run actually shows that shape**, else `note  CI red — verify before merge`. #8
 
 ## Phase 5 — run report
 
-**Card first (adw-core §10).** When the tracker is on and at least one PR is `ready` or `blocked`,
-move the card to §21 `review` with its comment, then print the report. A `note card` line goes on the
+**Card first (adw-core §10).** When the headers carry `card:`, run §10's connection read again (do not
+rely on Phase 0's result: the context may have been compacted since). When the tracker is on, move the
+card to `repo-profile §21` `review` if at least one PR is `ready`, and post the comment whether or not
+the card moved. Blocked-only: comment, no move. Then print the report. A `note card` line goes on the
 report only for an off tracker or a failed call.
 
 Print the **run report exactly** (adw-core §7): one line per PR, ready → blocked → failed → unbuilt;

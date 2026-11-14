@@ -131,7 +131,7 @@ Rules:
   (Gate mode), a path or command (References), path globs (Port surface), a number of rounds (Stop
   rule) — and the fail-closed `verify` template below the table.
 - **`card:` is optional and intent-wide** like `base:`: every spec of one intent carries the same
-  value or none (`/adw-build` refuses a mixed set). Its rules are §10; it never blocks a run.
+  value or none (`/adw-build` refuses a mixed set). Its rules are §10. An unreachable tracker never blocks a run; a mixed set is refused, like `base:`.
 - No spec, no build: `/adw-build` refuses a unit whose header is missing any of the six
   required fields.
 
@@ -880,11 +880,14 @@ An intent may name a Trello card or a Linear issue. The run then keeps that card
 **No card named → this section does nothing and prints nothing.** A tracker problem is a warning, never a
 stop: no retry, no question, the run goes on.
 
-- **Ref.** Taken from the intent text: a Trello URL (`trello.com/c/<id>/…`) or its shortlink/id, a
-  Linear key (`ABC-123`) or issue URL. `/adw-init` writes it to every header as `card: trello:<id>` or
+- **Ref.** Taken from the intent text, and only when the text says which tracker: a Trello URL
+  (`trello.com/c/<id>/…`) or "Trello" followed by a shortlink/id, a `linear.app` issue URL or "Linear"
+  followed by a key (`ABC-123`). A bare `ABC-123` is not a ref (`UTF-8` and `SHA-256` look the same).
+  `/adw-init` writes it to every header as `card: trello:<id>` or
   `card: linear:<KEY>` (§2). A bare card number (`#167`) is not a ref: print
   `⚠ card #167: not a ref — status will not be kept up to date` and write no `card:`. Extend mode
-  (§1.1) keeps whatever `card:` the intent already has.
+  (§1.1) writes the `card:` the intent's existing specs carry, or none if they carry none; a ref in
+  the new text is then ignored, with one `⚠ card <ref>: the intent has its own card` line.
 - **Connected means a real read works.** Trello: a tool whose name ends `get_card` and one ending
   `get_lists`. Linear: a tool ending `get_issue` and one ending `list_issue_statuses`. Deferred tools
   are loaded first (`ToolSearch`); not found there = absent. Then read the card once. A tool that is
@@ -900,15 +903,17 @@ stop: no retry, no question, the run goes on.
 
   | When | Move to | Comment |
   |---|---|---|
-  | `/adw-build` Phase 0 step 6, once the manifest parses | §21 `started` | `adw <slug> started: <units>` |
-  | `/adw-build` Phase 5, before the run report prints, when at least one PR is `ready` or `blocked` | §21 `review` | the final or independent PR numbers with their URLs and states |
+  | `/adw-build` Phase 0 step 9, after every refusal and halt | `repo-profile §21` `started` | `adw <slug> started: <units>` |
+  | `/adw-build` Phase 5, before the run report prints | `repo-profile §21` `review`, only when at least one PR is `ready`; blocked-only gets the comment and no move | the final or independent PR numbers with their URLs and states |
 
   There is no move to done. The owner merges the final PR (§6), and the run cannot see the merge.
-  §21 `done` exists only so the run can recognise a finished card.
-- **Skip the move, and its comment, when it would not advance the card:** the card already sits in the
-  target, or in `done`, or the target is `started` and the card sits in `review`. Move first, then
-  comment; the two calls are independent.
-- **Comment text** is one or two lines, in the language of the card's own title. A run touches nothing
+  `repo-profile §21` `done` exists only so the run can recognise a finished card.
+- **Skip the move when it would not advance the card:** the card already sits in the target, or in
+  `done`, or the target is `started` and the card sits in `review`. A skipped `started` move skips its
+  comment too; a skipped `review` move still posts its comment, because the PR list is new. Move
+  first, then comment; the two calls are independent.
+- **Comment text** is one or two lines in the language of the card's own title; the table's wording
+  says what to cover, not what to type. A run touches nothing
   else on the card: it never edits, creates, archives or deletes.
 - **A failed move or comment** is one `note card <ref> — <what failed>` line on the run report, and the
   run goes on. A tracker that was off prints the same `note` line, naming the warning it printed.

@@ -15,7 +15,7 @@ The format is prose and tables, not a parsed config. The reader is an agent, so 
 more than syntax.
 
 **Section anchors are frozen** — the contract files cite `repo-profile §1`…`§18` by number, and the
-optional §19 and §20 where a profile carries them. Do not renumber. Add new sections at the end.
+optional §19, §20 and §21 where a profile carries them. Do not renumber. Add new sections at the end.
 
 | § | Section | Read by |
 |---|---|---|
