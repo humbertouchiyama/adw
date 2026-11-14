@@ -429,7 +429,8 @@ with the most to discover), so blocking on it is a pure loss every time.
 > `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`
 > when the unit was approved as `port`, `base:` when the intent overrides it, `merge: <auto | hold>` as
 > the gate printed it, and `card: <ref>` when the intent names a card (adw-core §10; `<ref>` is the ref
-> Phase 3 settled). Approved answers for this intent, one per line as
+> Phase 3 settled). `designs:` for this intent, one path or URL per line, verbatim (absent when the
+> intent has none). Approved answers for this intent, one per line as
 > `QN — <question>: <answer>`: `<list>`. Follow each one that touches this unit and
 > record it in the spec under its `QN` id. The spec body
 > states: the problem, the change, acceptance criteria numbered `AC 1`, `AC 2`, … (adw-build §3.5's

@@ -442,7 +442,8 @@ Five rules (owner feedback, structural after prose failed twice):
 
 ```
 Intent: <one line>
-card    <ref> — <status>, designs: <n>              ← only when the intent came from a card (§10 Intake)
+card    <ref> — <status>                   ← only when the intent came from a card (§10 Intake)
+designs <n>                                ← only when the intent has `designs:`
 base    <branch> — <one clause why>        ← only when not the default base (§2 base:)
 merge   auto → <base>, after a clean walk  ← or: merge   hold — <why>; ALWAYS prints (§2 merge:)
 extends <slug> · u1–u6: merged u1 u2 u3 u5 · open u4 (#820) · unbuilt u6   ← extend mode (§1.1)
