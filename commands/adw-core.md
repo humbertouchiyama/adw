@@ -86,8 +86,8 @@ new slug (adw-init Phase 0.5).
 - **Extend is proposed, never automatic** — a different `base:`, or a different subject,
   is a new intent (run-7's per-team-module-toggles feature was correctly split out).
 - **A merged intent is not live.** A later issue in it is a new intent. The owner names it with
-  `/adw-init --followup <slug>`, which mints the slug `<slug>-f<k>` (adw-init Input) and, for one
-  small unit, skips the approval gate (adw-init Phase 2).
+  `/adw-init --followup <slug>`, which mints the slug `<slug>-f<k>` (adw-init Input). Its gate
+  follows adw-init Phase 2's skip test, like any intent's.
 - A merge rests on durable facts, never on the session (§6, adw-build §3.7): extending across
   sessions builds new units, and an earlier open PR of the intent goes through adw-build §3.7
   like any other. A PR whose head moved off its `verified` row stays the owner's.
@@ -229,7 +229,8 @@ For a single-unit intent meeting every D1 criterion: the triage agent itself dra
 flat spec in its one pass, the approval surface presents cut + spec together, and `approve` is the whole
 contract approval (no fan-out, no critical-pass subagent — the mutation gate carries
 the discriminating-verify property; AC completeness has no catcher but the approval glance —
-accepted at this tier). The do-side never thins at any depth.
+accepted at this tier). When adw-init Phase 2's skip test skips the gate, the intent the owner started is
+that approval, and the glance is at a surface that does not wait. The do-side never thins at any depth.
 
 **Port shape (`shape: port`) — status: TRIAL, the first run under it is the proof.**
 A unit whose acceptance is **pixel parity with a design reference**, graded by `repo-profile §20`'s
@@ -344,8 +345,9 @@ The pipeline may merge ONLY:
   qualify;
 - an independent or final PR of the **current intent**, into the intent's `base:` or the default
   base, when the intent's specs say `merge: auto` (§2) and adw-build §3.7's merge gate passes.
-  The owner's `approve` on a surface that printed `merge   auto` is the consent (§7). For a
-  follow-up whose gate was skipped, the owner's typed `--followup` line is (adw-init Phase 2).
+  The owner's `approve` on a surface that printed `merge   auto` is the consent (§7). When
+  adw-init Phase 2's skip test skipped the gate, the intent the owner started is: a typed
+  `/adw-init` line, an `/adw-build <unknown slug>` routed to init, or an `/adw-dispatch` brief.
 
 Provenance is durable, not the session's: the `merge:` flag, the `verified` row, the walk line
 and the labels survive a compaction and a new session, so any run building that slug may merge
@@ -355,7 +357,8 @@ intent's `base:` branch (§2) requires explicit human consent, always — a `bas
 open a consent side-door.
 
 **A chain asks the owner once, at the final PR.** The consent for every sub-PR merge of a chain
-was given when the owner typed `approve` on a cut that shows the chain (§7). So:
+was given when the owner typed `approve` on a cut that shows the chain (§7), or started the intent
+whose gate adw-init Phase 2 skipped on such a cut. So:
 
 - **Never ask before a sub-PR merge.** "May I merge #N into `adw/<slug>`?" is not a question this
   contract has. Merge it (adw-build §3.7) and build the next unit.
@@ -364,9 +367,9 @@ was given when the owner typed `approve` on a cut that shows the chain (§7). So
   intent's base, the default base and the production branch: the one consent this section keeps
   for the owner. It stops a sub-PR merge only when it names sub-PRs or the integration branch
   ("do not merge sub-PRs", "stop after each unit"). A session that writes a brief for another
-  session never adds a no-merge line of its own. An approved `merge   auto` line, or a
-  `--followup` line that skipped the gate for a `merge: auto` intent, is the owner's word for that
-  intent, given after any standing line; a standing line still binds an intent whose flag is `hold`.
+  session never adds a no-merge line of its own. An approved `merge   auto` line, or an intent
+  the owner started whose gate adw-init Phase 2 skipped for a `merge: auto` intent, is the owner's
+  word for that intent, given after any standing line; a standing line still binds an intent whose flag is `hold`.
 - **A `blocked` sub-PR does not stop the chain. It is carried.** The sub-PR keeps its
   `adw:blocked` label and its PR body, is merged into the integration branch, and the chain builds
   on its recommended default. The final PR then lands `blocked`, never `ready`, and lists every
@@ -402,7 +405,8 @@ and appeared in three files' cross-references:
 
 Five rules (owner feedback, structural after prose failed twice):
 1. Every surface has a **directive slot** — async surfaces open with a `Next:` first line;
-   interactive prompts end on the verb menu at the cursor.
+   interactive prompts end on the verb menu at the cursor (an approval surface whose gate was
+   skipped ends on its skipped-gate line instead).
 2. **The report is the whole message.** No narration before or after. Each fenced template below
    ends with a `← nothing follows this block` annotation for this reason: stated only here,
    the rule loses to whatever instruction sits at the cursor when the surface is printed.
@@ -419,7 +423,8 @@ Five rules (owner feedback, structural after prose failed twice):
    say what you decided in one line, so the owner can reverse it: a `note` row on the run report, or
    one line in the chat after it. This includes "say `rerun` and I start" and "C1 or C2?" with a
    recommendation a reasonable owner would not reject. Three things still wait for the owner: a merge
-   (§6), the `base:` branch (adw-init Phase 0.7), and the `default:` printed after a stop: `blocked`,
+   (§6), the `base:` branch (adw-init Phase 0.7; a base other than the default keeps adw-init
+   Phase 2's gate), and the `default:` printed after a stop: `blocked`,
    `failed`, or an adw-build §3 progress condition or backstop. That default is the owner's to take.
    A run that re-runs itself after its own backstop has defeated the backstop. In 2026-10-02..10-21,
    where the outcome of such a choice was clear, the owner took the recommendation or delegated it 29
@@ -437,12 +442,12 @@ Intent: <one line>
 base    <branch> — <one clause why>        ← only when not the default base (§2 base:)
 merge   auto → <base>, after a clean walk  ← or: merge   hold — <why>; ALWAYS prints (§2 merge:)
 extends <slug> · u1–u6: merged u1 u2 u3 u5 · open u4 (#820) · unbuilt u6   ← extend mode (§1.1)
-followup <slug> → <slug>-f<k> · the gate stays: <why>   ← `--followup` only, when the skip test failed (adw-init Phase 2)
+followup <slug> → <slug>-f<k>              ← `--followup` only (adw-init Input)
 
 needs you  2                               ← or: none — answer by number; blank = defaults
   Q1 (u4) — <one plain-language question>? default: <recommended default>
   Q2 — <question>? default: <recommended default>
-decided  Q3 <few words>: <answer> · Q4 <few words>: <answer> — reopen by number   ← only when the decide pass settled any (adw-init Phase 2)
+decided  Q3 <few words>: <answer> · Q4 <few words>: <answer> — reopen by number   ← only when the decide pass settled any (adw-init Phase 2); a skipped gate prints it without `— reopen by number`
 
 cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · u6
   u1  plan     <unit title>
@@ -460,7 +465,7 @@ cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · 
 approve → cut + build · decide → you settle the open questions, then build · specs only → stop after specs ·
 detail · re-cut "<instruction>" · regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port" · merge auto · merge hold · reopen Q3   ← `merge auto` only when the base is not the production branch (§2 merge:); `decide` only when `needs you` is not `none`; `shape` only when repo-profile has a complete §20 (§2); `reopen` only when a `decided` line prints
 
-                        ← nothing follows this block: no summary, no narration
+                        ← nothing follows this block: no summary, no narration. A skipped gate ends otherwise: see the skipped-gate variant below
 ```
 
 The surface is **brief by default**: everything above is all that prints. `detail` and
@@ -527,9 +532,9 @@ surface must own:
   that surface, `approve` is the owner's explicit consent for the intent's merges into
   `base:` once adw-build §3.7's merge gate passes (§6). On `merge   hold`, the owner merges
   the PR to `base:`. On a cut with a chain, `approve` is also the consent for every sub-PR
-  merge of that chain (§6): the run does not ask again per sub-PR. A `--followup` that passes
-  adw-init Phase 2's skip test gives the same consent with no surface: the owner typed it to build
-  and merge one small unit, and the handoff prints its `followup` and `merge` lines.
+  merge of that chain (§6): the run does not ask again per sub-PR. When adw-init Phase 2's skip
+  test skips the gate, the intent the owner started gives the same consent as `approve` on the surface
+  it prints: nothing on that surface asked for the owner.
 - **The `merge` line always prints**, `auto` or `hold`, with the base it names. `merge auto` and
   `merge hold` re-render the surface with the new value, and the run writes it to every spec of
   the intent before the build starts. `merge auto` is refused when the base is the production
@@ -541,15 +546,26 @@ surface must own:
 
 D0 (`express`) approval variant: the draft flat spec body renders as a fenced block
 between the `⚠` lines and the verb menu — cut + spec are one approval surface, and the
-prompt still ends on the verb menu (rule 1). The body renders in brief mode too; it is
+prompt still ends on the verb menu, or on the skipped-gate line (rule 1). The body renders in brief mode too; it is
 the artifact being approved, not detail.
+
+**Skipped-gate variant.** When adw-init Phase 2's skip test passes, the surface prints as it does
+at a gate that waits, with this one line in place of the verb menu:
+
+```
+gate skipped — no question needs you and no ⚠ line, so this runs as if you typed approve
+
+                        ← no TEXT follows this block, and the same message carries the tool call that starts adw-init Phase 3 (the first unit agent's dispatch, or a D0 spec's write)
+```
+
+That line is the directive slot (rule 1): it tells the owner that nothing waits. The run goes on in
+the same turn: a message that holds the surface and no tool call ends the run. No verb is read on
+this surface, so it offers none: the `decided` line drops `— reopen by number`.
 
 ### handoff — end of init (async; a run boundary, not always a stop)
 
 ```
-Next: nothing — building u1 · u3          ← `approve`, clean exit: build starts this turn
-followup   <slug> → <slug>-f<k> · gate skipped: one express unit, nothing to ask   ← `--followup` whose gate was skipped (adw-init Phase 2), both variants
-merge      auto → <base>, after a clean walk   ← with the `followup` line only: no surface printed it; or: merge      hold — <why>
+Next: nothing — building u1 · u3          ← `approve` or a skipped gate, clean exit: build starts this turn
 specs      <specs-dir>/YYYY-MM-DD-<intent-slug>/   N units
 plans      u1 u3  ·  none: u2 u4 (below design — plan is in the spec)
 ⏱ run      machine 41m · your gate 3m                ← unconditional (§7.1)
@@ -560,11 +576,10 @@ decided    Q1 <few words>: <answer> · Q4 <few words>: <answer>   ← only what 
                         ← no TEXT follows this block, and the same message carries the tool call that starts the build (adw-init Phase 5 step 3)
 ```
 
-Stopping variant — `specs only`, or `approve` with a non-empty `needs you`:
+Stopping variant — `specs only`, or `approve` or a skipped gate with a non-empty `needs you`:
 
 ```
 Next: /adw-build <intent-slug>
-followup   <slug> → <slug>-f<k> · gate skipped: one express unit, nothing to ask   ← and its `merge` line: as in the building variant
 specs      <specs-dir>/YYYY-MM-DD-<intent-slug>/   N units
 plans      u1 u3  ·  none: u2 u4 (below design — plan is in the spec)
 ⏱ run      machine 41m · your gate 3m                ← unconditional (§7.1)
@@ -739,7 +754,8 @@ blocked on a human answer. Both surfaces carry the line unconditionally, `0m` in
 
 Take `date +%s` at these points: **T0** run start (before any dispatch) · a **T1/T2**
 pair around every halt that waits on the owner — the approval surface, a re-cut round, a mid-build
-question — T1 immediately before the print, T2 on the answer · **T3** at every `⏱ run`
+question — T1 immediately before the print, T2 on the answer (a surface printed under adw-init
+Phase 2's skip test waits for nothing and gets no pair) · **T3** at every `⏱ run`
 print, which on a chained run means twice: once for the handoff's partial, once for the
 run report's total, over one continuing series.
 **Tag every pair with the unit whose PR loop it interrupted** (`—` for a run-level halt
@@ -750,7 +766,7 @@ per-PR `owner-wait` of adw-build §3.4's evidence block is not, and it defaults 
 by subtraction rather than by summing work intervals is deliberate: a halt nobody
 stamped inflates `machine`, which reads as the pipeline's own cost and gets
 investigated — the failure direction that self-corrects. `/adw-build` reached through
-`approve`, or through a `--followup` whose gate adw-init Phase 2 skipped, continues the same T-series rather than restarting it — one invocation
+`approve`, or through a gate adw-init Phase 2 skipped, continues the same T-series rather than restarting it — one invocation
 the owner experiences as one run reports as one run. A build reached by a fresh
 `/adw-build` starts its own series with `gate 0m`.
 
