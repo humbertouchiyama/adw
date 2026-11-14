@@ -1009,9 +1009,9 @@ stop: no retry, no question, the run goes on.
   |---|---|---|
   | `/adw-build` Phase 0 step 9, after every refusal and halt | `repo-profile §22` `started` | `adw <slug> started: <units>` |
   | `/adw-build` Phase 5, before the run report prints, when every PR of the run is `merged` (`merge: auto`, §2) | `repo-profile §22` `done` | the PR numbers with their URLs |
-  | the same point, when at least one PR is `ready` and not every PR is `merged` | `repo-profile §22` `review` | the PR numbers with their URLs and states |
+  | the same point, when at least one PR is `ready`, or some PR is `merged` and another is `blocked` (not every PR `merged`) | `repo-profile §22` `review` | the PR numbers with their URLs and states |
 
-  Blocked-only, or `failed`: the comment, no move. A run whose final PR the owner merges by hand
+  Blocked-only, or `failed`, with nothing merged: the comment, no move. A run whose final PR the owner merges by hand
   (`merge: hold`) ends on `review`: the run cannot see that merge, and `done` is the owner's move.
 - **Skip the move when it would not advance the card:** the card already sits in the target, or in
   `done`, or the target is `started` or `review` and the card sits in `done`, or the target is

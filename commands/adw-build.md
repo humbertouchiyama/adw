@@ -229,7 +229,7 @@ gate file to get green · let a subagent create its own worktree.
    `· ⚠ no trustworthy gate sees this unit's correctness`.
 9. **Card (adw-core §10), last, after every refusal and halt above has passed.** When the headers carry
    `card:`, run §10's connection read, print its `⚠` line if it fails, and move the card to
-   `repo-profile §22` `started` with its comment. A card already in `started` or `review` is not moved
+   `repo-profile §22` `started` with its comment. A card already in `started`, `review` or `done` is not moved
    and gets no comment.
 
 ## Phase 1 — scheduling
@@ -1792,8 +1792,8 @@ worktrees the fix made.
 **Card first (adw-core §10).** When the headers carry `card:`, run §10's connection read again (do not
 rely on Phase 0's result: the context may have been compacted since). When the tracker is on, move the
 card to `repo-profile §22` `done` when every PR of the run is `merged`, else to `review` if at least one
-PR is `ready`, and post the comment whether or not the card moved. Blocked-only or failed: comment,
-no move. Then print the report. A `note card` line goes on the
+PR is `ready` or (some PR `merged` and another `blocked`), and post or skip the comment as adw-core
+§10's skip rule says. Blocked-only or failed with nothing merged: comment, no move. Then print the report. A `note card` line goes on the
 report only for an off tracker or a failed call.
 
 Print the **run report exactly** (adw-core §7): one line per PR, merged → ready → blocked → failed →
