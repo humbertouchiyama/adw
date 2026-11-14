@@ -242,6 +242,61 @@ def _(sl):
     return ratio(n, len(merged)), len(merged), {}
 
 
+# --- auto-merge: the merge row adw-build §3.7's gate writes on independent and final PRs -----------
+
+MERGE_ROW = re.compile(r"(merged)\b|hold (\d|call)\b")
+FALSE_PASS_DAYS = 7
+
+
+def gate_result(p) -> tuple[str, str | None] | None:
+    """("merged", None) or ("hold", <condition>) from the PR's merge row; None when it has none."""
+    m = MERGE_ROW.match((p.block or {}).get("merge", ""))
+    if not m:
+        return None
+    return ("merged", None) if m.group(1) else ("hold", m.group(2))
+
+
+def holds(sl) -> dict:
+    """Hold count per gate condition (0-9 or call), over ADW PRs opened in the slice."""
+    out = {}
+    for r in map(gate_result, sl.prs("created")):
+        if r and r[0] == "hold":
+            out[r[1]] = out.get(r[1], 0) + 1
+    return out
+
+
+@metric("outcome.auto_merged_share", "rate", 20, "ratio",
+        "opened ADW PRs whose merge row reads merged / opened ADW PRs with a merge row (the independent and final PRs the gate ran on)")
+def _(sl):
+    gated = [r for r in map(gate_result, sl.prs("created")) if r]
+    return ratio(sum(1 for r in gated if r[0] == "merged"), len(gated)), len(gated), {}
+
+
+def false_pass(p, prs) -> bool:
+    """A <slug>-f<k> ADW PR, or a revert PR of p, opened within FALSE_PASS_DAYS after p merged."""
+    lo = ts_seconds(p.merged)
+    hi = lo + FALSE_PASS_DAYS * 86400
+    follow = re.compile(re.escape(p.slug) + r"-f\d+")
+    cites = re.compile(rf"#{p.number}\b")
+    for q in prs:
+        if q.repo != p.repo or not lo < ts_seconds(q.created) <= hi:
+            continue
+        if q.adw and q.slug and follow.fullmatch(q.slug):
+            return True
+        if q.title.startswith('Revert "') and (q.title == f'Revert "{p.title}"' or cites.search(q.body)):
+            return True
+    return False
+
+
+@metric("outcome.auto_merge_false_pass", "rate", 20, "ratio",
+        f"auto-merged ADW PRs with a <slug>-f<k> follow-up PR or a revert PR within {FALSE_PASS_DAYS} days / "
+        f"auto-merged ADW PRs, merged in the window and at least {FALSE_PASS_DAYS} days before the run date")
+def _(sl):
+    limit = ts_seconds(sl.facts.until) - FALSE_PASS_DAYS * 86400
+    auto = [p for p in sl.prs("merged") if gate_result(p) == ("merged", None) and ts_seconds(p.merged) <= limit]
+    return ratio(sum(1 for p in auto if false_pass(p, sl.facts.prs)), len(auto)), len(auto), {}
+
+
 # --- evidence block --------------------------------------------------------------------------------
 
 @metric("evidence.block_missing_rate", "rate", 20, "ratio", "opened ADW PRs with no evidence block")

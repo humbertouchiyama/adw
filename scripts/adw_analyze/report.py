@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass, field
 
 from .facts import WAIT_CAP_H, Facts, Slice
-from .metrics import REGISTRY, TRANSCRIPT_GROUPS, MetricValue, uncovered
+from .metrics import REGISTRY, TRANSCRIPT_GROUPS, MetricValue, holds, uncovered
 from .pricing import PRICES, PRICES_AS_OF
 from .verdicts import record_entry
 
@@ -18,6 +18,9 @@ NOT_MEASURED = [
     "base-red truth on a repo with no CI",
     "transcript metrics in any window before complete transcripts (complete transcripts start {complete}; earliest transcript read: {earliest})",
 ]
+HOLD_CONDITIONS = (("0", "gate error"), ("1", "flag"), ("2", "base"), ("3", "verified head"), ("4", "paths"),
+                   ("5", "GitHub"), ("6", "base trial"), ("7", "walk"), ("8", "screenshots"),
+                   ("9", "no Smoke or Screens"), ("call", "merge call"))
 SELF_REPORT = "evidence"
 LOOP = "loop"
 
@@ -172,6 +175,7 @@ def report_md(run: Run, verdicts: dict, t: dict) -> str:
         for mid, bd in bds:
             parts = ", ".join(f"{k} {fmt(mid, v) if REGISTRY[mid].unit != 'ratio' else v}" for k, v in sorted(bd.items()))
             out.append(f"- `{mid}`: {parts}")
+    out += holds_md(run)
     out += ["", "## Self-report trust", "", "PR-body evidence block, checked against git and gh.", "",
             "| id | window | prior | change | n |", "|---|---|---|---|---|"]
     out += metric_rows(run, lambda m: m.group == SELF_REPORT)
@@ -189,6 +193,18 @@ def report_md(run: Run, verdicts: dict, t: dict) -> str:
             for x in NOT_MEASURED]
     out += ["", "## Critical pass", "", "critical pass: pending", ""]
     return "\n".join(out)
+
+
+def holds_md(run: Run) -> list:
+    """Holds per gate condition, most held first: what to fix next (auto-merge design §7)."""
+    hw, hp = holds(Slice(run.facts, *run.window)), holds(Slice(run.facts, *run.prior))
+    order = [n for n, _ in HOLD_CONDITIONS]
+    rows = sorted(((hw.get(n, 0), hp.get(n, 0), n, name) for n, name in HOLD_CONDITIONS if hw.get(n) or hp.get(n)),
+                  key=lambda r: (-r[0], -r[1], order.index(r[2])))
+    out = ["", "## Auto-merge holds", "", "ADW PRs the merge gate held, by its condition (adw-build §3.7). The top row is what to fix next.", ""]
+    if not rows:
+        return out + ["None."]
+    return out + ["| condition | window | prior |", "|---|---|---|"] + [f"| {n} · {name} | {w} | {p} |" for w, p, n, name in rows]
 
 
 def metric_rows(run: Run, keep) -> list:

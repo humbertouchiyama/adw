@@ -221,6 +221,65 @@ class Values(unittest.TestCase):
             self.assertIn(r.status, ("ok", "no data", "below minimum"), mid)
 
 
+def merge_row(row):
+    return f"contract   aaaaaaa\nmerge      {row}"
+
+
+def gate_facts(prs):
+    return F.assemble([APP, ADW], {"app": []}, prs, [], until=END)
+
+
+class AutoMerge(unittest.TestCase):
+    def test_auto_merged_share(self):
+        prs = [pr(21, "[adw a] A", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", block=merge_row("merged 1111111 · base unmoved")),
+               pr(22, "[adw b u01] B", "2026-10-06T10:00:00Z", "2026-10-06T12:00:00Z",
+                  block=merge_row("merged 2222222 · base trial ok at 3333333")),
+               pr(23, "[adw c] C", "2026-10-07T10:00:00Z", state="OPEN", block=merge_row("hold 7 — walk failed · at 4444444")),
+               pr(24, "[adw d] D", "2026-10-08T10:00:00Z", "2026-10-09T12:00:00Z", block=merge_row("hold call — denied · at 5555555")),
+               pr(25, "[adw e u01] E", "2026-10-08T10:00:00Z", "2026-10-08T12:00:00Z", block="contract   aaaaaaa")]
+        r = compute("outcome.auto_merged_share.v1", F.Slice(gate_facts(prs), START, END))
+        self.assertAlmostEqual(r.value, 0.5)
+        self.assertEqual(r.n, 4)
+
+    def test_auto_merge_false_pass(self):
+        auto = merge_row("merged 1111111 · base unmoved")
+        prs = [pr(21, "[adw alpha] A", "2026-10-05T10:00:00Z", "2026-10-05T12:00:00Z", block=auto),
+               pr(31, "[adw alpha-f1] logo bigger", "2026-10-08T10:00:00Z", "2026-10-08T12:00:00Z"),
+               pr(41, 'Revert "[adw alpha] A"', "2026-10-09T10:00:00Z", "2026-10-09T11:00:00Z", body="Reverts o/app#21"),
+               pr(22, "[adw beta] B", "2026-10-06T10:00:00Z", "2026-10-06T12:00:00Z", block=auto),
+               pr(32, "[adw beta-f1] late", "2026-10-14T13:00:00Z", state="OPEN"),
+               pr(23, "[adw gamma] G", "2026-10-07T10:00:00Z", "2026-10-07T12:00:00Z", block=auto),
+               pr(33, "[adw big-gamma-f1] other", "2026-10-08T10:00:00Z", state="OPEN"),
+               pr(24, "[adw delta] D", "2026-10-07T10:00:00Z", "2026-10-10T12:00:00Z", block=merge_row("hold 7 — walk failed · at 4444444")),
+               pr(34, "[adw delta-f1] fix", "2026-10-11T10:00:00Z", state="OPEN"),
+               pr(25, "[adw eps] E", "2026-10-24T10:00:00Z", "2026-10-25T12:00:00Z", block=auto),
+               pr(26, "[adw zeta u01] Z", "2026-10-10T10:00:00Z", "2026-10-11T12:00:00Z", block=auto),
+               pr(42, 'Revert "[adw zeta u01] Z"', "2026-10-12T10:00:00Z", "2026-10-12T11:00:00Z", body="")]
+        r = compute("outcome.auto_merge_false_pass.v1", F.Slice(gate_facts(prs), START, END))
+        self.assertAlmostEqual(r.value, 0.5)   # alpha once (follow-up and revert), zeta (revert); not beta, gamma
+        self.assertEqual(r.n, 4)               # delta was held, eps has not had its 7 days
+
+    def test_holds_by_condition_table(self):
+        from adw_analyze.report import Run, report_md, totals
+        prior = ("2026-09-03T00:00:00Z", START)
+        prs = [pr(21, "[adw a] A", "2026-10-05T10:00:00Z", state="OPEN", block=merge_row("hold 7 — walk failed · at 1111111")),
+               pr(22, "[adw b] B", "2026-10-06T10:00:00Z", state="OPEN", block=merge_row("hold 7 — 2 gaps · at 2222222")),
+               pr(23, "[adw c] C", "2026-10-07T10:00:00Z", state="OPEN", block=merge_row("hold 1 — merge: hold · at 3333333")),
+               pr(24, "[adw d] D", "2026-10-08T10:00:00Z", state="OPEN", block=merge_row("hold call — denied · at 4444444")),
+               pr(25, "[adw e] E", "2026-10-08T10:00:00Z", "2026-10-08T12:00:00Z", block=merge_row("merged 5555555 · base unmoved")),
+               pr(26, "[adw f] F", "2026-09-20T10:00:00Z", state="OPEN", block=merge_row("hold 7 — walk failed · at 6666666"))]
+        facts = gate_facts(prs)
+        run = Run(until=END, window=(START, END), prior=prior, facts=facts,
+                  win={m: compute(m, F.Slice(facts, START, END)) for m in REGISTRY},
+                  pri={m: compute(m, F.Slice(facts, *prior)) for m in REGISTRY})
+        report = report_md(run, {}, totals(facts))
+        self.assertIn("## Auto-merge holds", report)
+        self.assertIn("| 1 · flag | 1 | 0 |", report)
+        self.assertIn("| 7 · walk | 2 | 1 |", report)
+        self.assertIn("| call · merge call | 1 | 0 |", report)
+        self.assertNotIn("| 2 · base |", report)
+
+
 class Build(TmpCase):
     def test_build_facts_reads_files_and_drops_the_analyzer(self):
         projects = self.mkdir("projects")
