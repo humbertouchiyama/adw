@@ -94,6 +94,11 @@ prior state before triage:
   has no folder: create one at its BIRTH date, **under the root that intent already uses**, and
   leave the flat spec in place. NEVER mint a second dated folder for one slug.
 
+**Then the card (adw-core §10), only when the intent text names one.** Parse the ref, run §10's connection
+read once, and print §10's `⚠` line if it fails. A ref that parses goes into every spec header as
+`card:` whether or not the tracker is connected: the header is a fact about the intent, and build
+checks the connection again. Extend mode takes the `card:` from the live intent's specs.
+
 Extension is **proposed at the approval surface, never assumed** — the `extends` line states it and the verb
 menu still governs. A different `base:`, or a different subject, is a new intent: say so in
 one `fyi` line and cut fresh. When nothing matches, this phase is silent.
@@ -292,7 +297,8 @@ with the most to discover), so blocking on it is a pure loss every time.
 > never code, never a branch. Spec path: `<exact path per adw-core §1>`. The spec MUST
 > open with the exact header block (adw-core §2):
 > `unit / intent / depth / packaging / after / verify` — values as approved, plus `shape: port`
-> when the unit was approved as `port`. Approved answers for this intent, one per line as
+> when the unit was approved as `port`, plus `card: <ref>` when the intent names a card
+> (adw-core §10; `<ref>` is the value Phase 0.5 resolved). Approved answers for this intent, one per line as
 > `QN — <question>: <answer>`: `<list>`. Follow each one that touches this unit and
 > record it in the spec under its `QN` id. The spec body
 > states: the problem, the change, acceptance criteria, and (bugs) root cause with
@@ -430,7 +436,8 @@ live in the task outputs; the specs and the handoff carry everything that matter
 Fix in place on any failure, except where a bullet says it only reports:
 - every approved unit has a spec at its expected path, opening with all six required
   header fields (`base:` optional — when the intent overrides it, every unit carries the
-  same value, adw-core §2);
+  same value, adw-core §2); `card:` likewise: the same value on every spec, or on none
+  (adw-core §2, §10);
 - `intent:` equals the slug everywhere; `unit:` ids are unique **against every id the
   intent has ever used**, merged units included (extend mode: re-check `max` from the PR
   titles — a reused id collides in a PR title and breaks resume); `after:` references only

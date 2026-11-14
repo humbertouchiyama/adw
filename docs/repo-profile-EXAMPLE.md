@@ -4,7 +4,7 @@
 > repository ADW was built in: a full-stack TypeScript monorepo (React 19 + Vite, Hono + PostgreSQL
 > 16 + Drizzle, one shared npm workspace). Copy it to `.claude/repo-profile.md` in your repo and
 > replace **every** value. Keep the section numbers: the contract cites them as `repo-profile §N`
-> and the anchors §1–§18 are frozen. §19 and §20 are optional; §20 is sketched at the end.
+> and the anchors §1–§18 are frozen. §19, §20 and §21 are optional; §20 and §21 are sketched at the end.
 
 Every repo-specific value the shared agent contract needs. One of these lives in each repo that
 runs `/adw-init`, `/adw-build`, `/pr-ready` or `/code-review`; the contract files themselves
@@ -39,6 +39,7 @@ optional §19 and §20 where a profile carries them. Do not renumber. Add new se
 | §18 | Disposable state | cleanup Phase 3, 5 |
 | §19 | Review-lane map, layer to angle (optional; absent → derived) | code-review lane table |
 | §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2/§3.3/§3.4/§3.6 |
+| §21 | Card tracker status names (optional; absent → status is never moved) | adw-core §2/§10, adw-init Phase 0.5, adw-build Phase 0/5 |
 
 ---
 
@@ -627,3 +628,18 @@ them all in one build, then `&&`-chain one score per screen, each exiting 1 on a
 that names a screen (its score, and any per-screen delete or filter) is a per-row part that
 `/adw-init` repeats for each row. Its first token must be on §5's allowlist (adw-init Phase 4); wrap it in `bash -c '…'` otherwise.
 
+## §21 — Card tracker (optional)
+
+A repo whose intents name a Trello card or a Linear issue (adw-core §10) lists the status names the run
+moves it between. **Delete the whole section unless the repo uses a tracker**: absent → the run warns
+once and never moves a card. Each name is the column (Trello) or status (Linear) exactly as the board
+or team shows it; the run does not guess. Fill only the tracker rows the repo uses.
+
+| Tracker | `started` | `review` | `done` |
+|---|---|---|---|
+| Trello | `Doing` | `Review` | `Done` |
+| Linear | `In Progress` | `In Review` | `Done` |
+
+`started` is where the card goes when `/adw-build` begins. `review` is where it goes when the PR the
+owner must merge is open. `done` is never a target: the owner merges, and the run only uses it to
+recognise a card that is already finished.
