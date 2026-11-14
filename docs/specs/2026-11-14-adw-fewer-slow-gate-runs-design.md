@@ -98,5 +98,8 @@ does not, and an implementer-side run of a slow gate duplicates the pass that fo
   With no `PRIOR`, §4 runs as before.
 - A reused pass prints `pass: reused <PASS id> at <sha7>` above the machine line, and the evidence
   block's `phases` row reads `reverify reused <PASS id>`.
+- The evidence block carries `pass <PASS id> <40-char sha>` from the first PR body on, written from
+  the pass's own `$VSHA`. `adw-build` §3.6 reads `PRIOR` from that row, never from the branch or
+  from memory; a body with no `pass` row gets no `PRIOR`, so its re-pass runs in full.
 - A verifier's `baseline red` row counts as the base run for `adw-build` §3.3's
   `known baseline red` line, for any gate, marked or not.

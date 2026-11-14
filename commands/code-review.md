@@ -680,7 +680,7 @@ Phase 7 always runs.
    - file:line — what changed
 
    **👍 OK**
-   - Verified: <§4 result — one field per obligated gate, named as `repo-profile §5` names it, OR "N/A — docs-only, no code gates apply">
+   - Verified: <§4 result — one field per obligated gate, named as `repo-profile §5` names it (`<gate> skipped: slow` for a gate §5 marks `[slow]`, step 2), OR "N/A — docs-only, no code gates apply">
    - CI: <job green | job RED | not requested — why, per repo-profile §9>
 
    **⏳ Your decision** (<M>) — cleared the §3.1 bar; everything engineering-clear is in Done
@@ -690,6 +690,7 @@ Phase 7 always runs.
 
    **⏳ Coverage** — mechanically generated, NOT counted in <M>
    - <gate> not run: <why> — obligated by repo-profile §6 for this diff
+   - <gate> skipped: slow — /pr-ready <N> runs it
    - <§16.4 check> assigned to lane <X>, no verdict returned
    - refuted: <file:line> <claim> — <named guard / why unreachable>
    ```

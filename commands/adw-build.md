@@ -75,7 +75,9 @@ merges nowhere. A run never merges a PR of another slug. The owner who is testin
 compaction is not schedulable from inside the loop, so the durable defences are the ones
 that survive it — §3.4's evidence block in the PR body, the `fix-attempt-N`/`fix(review):`
 prefixes step 7 recovers counts from, and re-deriving `$VSHA` and the base rather than
-trusting a remembered value.
+trusting a remembered value. One value is read, never re-derived: `PRIOR`'s `$VSHA` (§3.6) comes
+from the evidence block's `pass` row (§3.4). Re-derived from the branch, it would equal the head,
+and §3.6 would reuse a pass for a commit that pass never checked.
 
 **After a compaction, re-read this file's Phase 3 (§3 to §3.8) before the next dispatch.** A
 summary keeps what the run did and drops what the contract told it to do next. Of the PRs opened
@@ -202,6 +204,9 @@ gate file to get green · let a subagent create its own worktree.
    (§3.4). A prior run shipped **`fix-attempt-4`** against a cap of 3 because the counter
    restarted across a 3-day, two-sync resume (retro 2026-08-01, #829). The prefixes are the
    durable record: `fix-attempt-N` is mandated by §3.2, `fix(review):` by §3.6 below.
+   The last pass's sha is durable too: the evidence block's `pass` row (§3.4). A resumed or
+   compacted run that dispatches §3.6 reads `PRIOR` from that row. A body with no `pass` row hands
+   the driver no `PRIOR`, so its re-pass runs in full.
 
    Resume (adw-core §5): enumerate every adw PR for the slug — merged, open AND
    closed-unmerged, across BOTH bases (`adw/<slug>` and `<INTENT_BASE>`; independent units
@@ -642,7 +647,9 @@ the marked gate (`/pr-ready` §4.3). **One exception:** in a fix cycle that a ma
 red started, the implementer runs that gate after its fix, to confirm the fix. A red that starts no
 fix cycle starts no such run: a port unit's render red (§3.1), `/pr-ready` §4.2's clean-checkout
 evidence, and a baseline red (§3.3). A `skipped: slow` slot is not "a report missing an obligated
-gate's row". That rule is for the verifier's report (§3.4), not for the implementer's vector.
+gate's row". That rule is for the verifier's report (§3.4), not for the implementer's vector. A
+`skipped: slow` slot does not hold back the mutation check below either: "the gates first go green"
+means every gate the implementer runs.
 
 Three properties hold in every repo, whatever that file declares:
 
@@ -840,6 +847,7 @@ pipeline knows:
   mutation   aggregate red · per-file 4/4
   artifact   plan 260L / diff 71L = 3.66x
   open-findings none — read 4 comments
+  pass       v1 <40-char sha>
   ```
 
   A port unit's block reads `depth D1 · shape port`, its `cycles` row adds `rounds N` (the unit's total across fix cycles), its
@@ -856,6 +864,13 @@ pipeline knows:
   are the last walk's, except `fixed`, which counts every row a smoke fix cycle fixed (`<u>` of them
   with a `fixed:` line still ending `, unconfirmed`, §3.8), and `<m>`,
   the minutes of every walk. No other PR carries the row.
+
+  One row from the first body on: `pass       <PASS id> <40-char sha>`, the last pass that ran its
+  gates and the `$VSHA` it checked. 3.5 writes it with the body, from the `$VSHA` that `/pr-ready`
+  §4.1 resolved for 3.4's pass. Each later pass that runs replaces it by one `gh pr edit`: a 3.4
+  pass, and a 3.6 re-pass that returned no `pass: reused` line (from the 40-char head that §3.6's
+  assertion matched). A reused pass leaves it. Never write it from a `git rev-parse` of the branch
+  taken at any other time. §3.6 reads `PRIOR` from this row.
 
   Two more rows, each by one more `gh pr edit`, each replaced by the next write:
   - `verified   <40-char sha>`: written at §3.7 when the PR reaches `ready`, or `blocked` with a
@@ -1057,9 +1072,17 @@ unit also §3.1's wait block and `repo-profile §20`'s Gate mode row, which the 
 verifier's brief for its gate-mode `verify`), and:
 run `/pr-ready <N> apply` with `BASE`, `PASS=v2` (the next `PASS` id when 3.4 already used `v2`) and `REF` set to 3.4's values, carrying the
 unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and `PRIOR`
-(`/pr-ready` §1) set to this unit's last pass: its `PASS` id, its `$VSHA` as a 40-character
-literal, and its rows (the per-gate table, the mutation row, and a port unit's render-grade row),
-pasted from that pass's return. Return
+(`/pr-ready` §1) set to this unit's last pass. Its `PASS` id and its 40-character `$VSHA` come
+from the evidence block's `pass` row (§3.4), never from the branch and never from memory:
+
+```bash
+gh pr view <N> --json body --jq .body | grep -m1 -oE '^[[:space:]]*pass[[:space:]]+v[0-9]+[[:space:]]+[0-9a-f]{40}' || echo "no pass row"
+```
+
+`no pass row` → hand the driver no `PRIOR`; its re-pass runs in full. Its rows are copied from the
+PR body: the per-gate table (on a `/pr-ready` §4.2 tripwire hit, both A/B tables under their
+`clean-checkout evidence — NOT verifier-green` header), the mutation row, and a port unit's
+render-grade row. Return
 **Layer 2 only, plus the open-findings lines below** (`/pr-ready` §7 — suppress Layer 1 in the
 brief): the `ready|blocked` machine
 line with `verified <sha7>`, the review cycle count and tier, the per-gate table and mutation
