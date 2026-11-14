@@ -67,8 +67,8 @@ and exploratory testing. §6 is the authoritative list and this line must not dr
 - **Not more PRs.** PR count is an output of the packaging rule (§3.5), never a goal.
 - Does not remove design authority. The human approves the cut and owns every merge, except
   where an approved `merge   auto` line hands an intent's merges to `adw-build §3.7`'s gate. A
-  cut that needs nothing from the human is approved by the line the human typed (adw-init Phase 2's
-  skip test).
+  cut that needs nothing from the human is approved by the intent the human started (adw-init Phase
+  2's skip test).
 
 ---
 
@@ -192,8 +192,8 @@ the unit cut, a **depth** per unit, and a **packaging** per unit (§3.5). Nothin
 runs before approval — the per-unit front-end (§3.3) can cost more than the implementation,
 and burning it on a mis-cut is the failure this gate exists to prevent. The gate waits only when
 something on it needs the human: a question still `ask`, a `⚠` line other than `spec criteria
-covered by no unit: none`, or an extension that would build a prior unit left unbuilt. Otherwise
-the surface prints, the human's typed line is the approval, and the run goes on (adw-init Phase 2).
+covered by no unit: none`, a `base:` other than the default, or an extension of a live intent. Otherwise
+the surface prints, the intent the human started is the approval, and the run goes on (adw-init Phase 2).
 Over 58 intents with an approval surface in 30 days, 88% were built on the proposed cut unchanged, and the
 owner's wait was about two thirds of run time.
 
@@ -479,7 +479,7 @@ final PR (`adw-core §6`, `adw-build §3.7`). Widened past it once, in the auto-
 owner approved on 2026-10-30: an independent or final PR of an intent whose approved surface
 printed `merge   auto` merges into `develop` when `adw-build §3.7`'s merge gate passes, and the
 approved line is that consent (`adw-core §6`). A cut that passes `adw-init` Phase 2's skip test does not
-wait at the surface: the typed line is that consent. `main`, the
+wait at the surface: the intent the human started is that consent. `main`, the
 production branch, never. (Operational note: `gh pr merge --auto`
 merges immediately in this repo — checks are not a hard gate — which is the desired
 behaviour here since the loop's own gates are the gate.)
@@ -880,7 +880,7 @@ assert that the thing which should go red still goes red.
 
 Intake, the §3.2 cut approval — where `approve` buys the cut *and* the build, so it is the
 only gate at which code consent is collected, except a cut with nothing for the owner, whose
-typed line gives it — reading the produced specs/plans (optional),
+started intent gives it — reading the produced specs/plans (optional),
 then per PR targeting `develop`/`main`:
 review, `npm run preview` + visual verification, merge consent (for a `merge: hold` intent, or a
 PR the gate held). Plus deploy and the
@@ -908,14 +908,15 @@ current text):
 1. **Every surface has a directive slot** — the single action to take now. Asynchronous
    surfaces (run reports, PR bodies) open with a `Next:` first line; interactive prompts
    (the approval surface) end on the verb menu instead, which is the same slot at the
-   cursor.
+   cursor. A surface whose gate was skipped ends on its `gate skipped — …` line (adw-core §7).
 2. **The report is the whole message.** No narration before or after it.
 3. **Decisions read plainly.** Anything asked of the owner is one sentence a non-engineer
    can act on, recommended default stated first. Engineering detail lives one level down
    (the spec, a `<details>` fold), never in the decision line.
 4. **The ask rule binds every question**, mid-build and after the run report too (§3.2). A
    question it would decide is decided and reported in one line. Merges, `base:` and the
-   `default:` after a stop still wait for the owner.
+   `default:` after a stop still wait for the owner; a non-default `base:` keeps the approval
+   gate (adw-init Phase 2).
 5. **Depth renders as its word** (`express` / `spec` / `plan` / `design`, or `port`), never as
    `D<N>`.
 

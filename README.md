@@ -2,7 +2,7 @@
 
 An agentic development workflow. Intent goes in, reviewed pull requests come out, and a human
 approves exactly once — at the unit cut, before any code is written. When nothing on the cut needs
-the human, the `/adw-init` line they typed is that approval, and the run does not wait.
+the human, the intent they started is that approval, and the run does not wait.
 
 This repository holds **the contract**: the prompt files a coding agent reads to run the pipeline,
 and the design document that explains why each rule is there. It holds no product code and belongs

@@ -80,8 +80,8 @@ them before anything reads the intent.
   the gate exists to prevent. Since v2.16 the same approval also releases the build, so
   the cut is the only gate in front of the whole run: everything the human might act on
   is a `QN` or a `⚠` line, never `fyi` (adw-core §7). **So when nothing on the surface needs the owner,
-  nothing waits:** Phase 2's skip test skips the gate, the surface still prints, and the owner's
-  typed intent is the approval.
+  nothing waits:** Phase 2's skip test skips the gate, the surface still prints, and the intent
+  the owner started is the approval.
 - Skill references allowed in produced artifacts and dispatched prompts: plugin skills
   (`superpowers:*`) and tracked commands only. Repo-local symlinked skills
   (`.claude/skills/*` → `.agents/`) are absent in worktrees — a spec or plan that
@@ -145,8 +145,7 @@ prior state before triage:
   leave the flat spec in place. NEVER mint a second dated folder for one slug.
 
 Extension is **proposed at the approval surface, never assumed** — the `extends` line states it and the verb
-menu governs it while the gate waits. A gate that Phase 2's skip test skips builds the extension as
-printed: the test keeps the gate whenever the `extends` line names an `unbuilt` prior unit. A
+menu still governs: Phase 2's skip test never skips the gate in extend mode. A
 different `base:`, or a different subject, is a new intent: say so in
 one `fyi` line and cut fresh. When nothing matches, this phase is silent.
 
@@ -279,7 +278,7 @@ sentence, no identifiers the owner has to look up, the default and its consequen
 Triage's questions take ids `Q1`, `Q2`, … in order, and no id is ever renumbered, so `ask` rows can skip a number.
 `decided` items print as ONE line under `needs you`
 (`decided  Q2 cap refunds: yes · Q3 export: pick-lists only — reopen by number`), a few words of the
-question then the answer. A `decided` answer goes to every unit author, who follows the ones that
+question then the answer; a skipped gate drops `— reopen by number` (adw-core §7). A `decided` answer goes to every unit author, who follows the ones that
 touch its unit. `reopen Q<N>` turns a `decided` question back into an `ask` with its default;
 on any other question it does nothing. Only `re-cut` and `new intent` rerun the pass, and only over
 the questions triage marks `new` (none new, no dispatch): every other question keeps its id and its
@@ -300,17 +299,18 @@ The orchestrator composes the pass's prompt from this text:
 > `<Q<N> — question — triage's default>`, one per line
 
 **Skip test — after the decide pass, before the first render.** It applies to every intent, a
-`--followup` or not, at any unit count and any depth. The gate is skipped when all three hold:
+`--followup` or not, at any unit count and any depth. The gate is skipped when all four hold:
 
 1. no question is `ask`;
 2. no `⚠` line would print on the approval surface, except adw-core §7's `⚠ spec criteria covered
    by no unit: none`. An orchestrator above sonnet, or of `unknown` tier, prints its tier `⚠` line
    (adw-core §8), so it keeps the gate;
-3. in extend mode, the `extends` line names no `unbuilt` prior unit. `/adw-build <slug>` builds
-   every unbuilt spec of the slug, and the owner's typed intent does not name a spec held back
-   earlier (an `amend:` targets one, so it keeps the gate too).
+3. the intent's base is the default base (`repo-profile §3`): the surface prints no `base` line.
+   The `base:` branch waits for the owner (Phase 0.7, adw-core §7 rule 4);
+4. Phase 0.5 matched no live intent: the surface prints no `extends` line. Extension is the owner's
+   choice (adw-core §1.1), so extend mode keeps the gate, where `new intent` can drop it.
 
-When all three hold, the gate is skipped:
+When all four hold, the gate is skipped:
 
 - Render the approval surface exactly (adw-core §7) as for any intent, with the skipped-gate line in
   place of the verb menu. Print it as the text of the message whose tool call starts Phase 3: the
@@ -318,7 +318,8 @@ When all three hold, the gate is skipped:
   surface and no tool call ends the turn, and the run with it.
 - Nothing waits. Go on exactly as `approve` does: freeze the proposal, Phase 3, Phase 4, then
   Phase 5, which builds in the same session.
-- The owner's typed intent (the `/adw-init` line, `--followup` included) is the consent to build
+- The intent the owner started is the consent: a typed `/adw-init` line (`--followup` included), an
+  `/adw-build <unknown slug>` routed to init, or an `/adw-dispatch` brief. It consents to build
   the proposed cut, to merge its sub-PRs into the integration branch, and to merge into `base:`
   under adw-build §3.7's gate when the intent is `merge: auto` (adw-core §6). The intent's `merge:`
   is triage's proposal, or `hold` under `--hold`, and the surface prints it, so the owner can still
@@ -365,8 +366,8 @@ verb below works.
   surface. `merge auto` refuses when the base is the production branch (`repo-profile §3`), and
   overrides `--hold`. Every spec of the intent carries the value before the build starts: Phase
   3's preamble writes it, and a D0 draft carries it in its header. `approve` on a surface that prints `merge   auto` is the owner's consent for that
-  intent's merges once the merge gate passes (adw-core §6, §7), and so is the typed intent when
-  the skip test skips the gate on such a surface.
+  intent's merges once the merge gate passes (adw-core §6, §7), and so is the intent the owner
+  started when the skip test skips the gate on such a surface.
 - `new intent` (extend mode only) → drop the extension, cut a fresh slug, run the decide pass over
   its questions (first paragraph of this phase), re-render the approval surface.
 
@@ -480,8 +481,8 @@ skill text asserts them and the skill text is what the agent has at the cursor:*
 
 **`brainstorming`'s `<HARD-GATE>` cannot be satisfied inside the fan-out** — it forbids
 implementation until "your human partner has approved", and a unit agent has no human. That
-approval already happened, at the approval surface (adw-core §7), or in the owner's typed intent
-when Phase 2's skip test skipped the gate, which is why the fan-out runs at all. Say so in the prompt: "the human gate for this unit is already passed; produce
+approval already happened, at the approval surface (adw-core §7), or in the intent the owner
+started when Phase 2's skip test skipped the gate, which is why the fan-out runs at all. Say so in the prompt: "the human gate for this unit is already passed; produce
 the artifact and stop — do not ask for approval, and do not write code." Also pin the path:
 brainstorming classifies spike/bounded/architectural on its own, which is a second depth
 ladder that can disagree with §3's. **§3's depth wins; the unit's `depth:` is not

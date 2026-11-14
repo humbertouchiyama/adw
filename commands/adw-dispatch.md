@@ -39,7 +39,7 @@ running the intent here and a subagent.
 
 An ADW run always qualifies for a pane: `/adw-init` either waits at an approval surface that only
 the owner answers, or, when adw-init Phase 2's skip test skips the gate, prints that surface and
-builds and merges on the owner's intent.
+builds and merges on the intent the owner started, which the brief carries.
 
 ## 2. `status`
 
