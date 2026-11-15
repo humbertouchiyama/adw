@@ -54,7 +54,6 @@ mkdir -p .claude/adw .claude/commands
 curl -fsSL https://raw.githubusercontent.com/humbertouchiyama/adw/main/install/fetch.sh \
   -o .claude/adw/fetch.sh && chmod +x .claude/adw/fetch.sh
 bash .claude/adw/fetch.sh
-cp .claude/adw/cache/install/stubs/*.md .claude/commands/
 echo '.claude/adw/cache/' >> .gitignore
 ```
 
@@ -76,9 +75,16 @@ your repo mirroring `install/` here. So they drift exactly the way the contract 
 ran a revision-old loader for a day: its stubs did not know exit 2 existed, so an unverified cache
 would have run as verified.
 
-`fetch.sh` now compares itself and your stubs against the freshly-fetched `install/` on every
-successful fetch and prints one line when they differ. It never rewrites them — diff first, then
-copy. This is a report, not a gate: it is the honest residual of keeping a bootstrap out-of-band.
+`fetch.sh` now syncs the **stubs** on every successful fetch: a missing stub is installed, a stub it
+installed earlier and nobody edited is updated, and anything else is left alone and reported (a
+customised `code-review.md` is yours). It records what it installed in `.claude/adw/stubs.manifest`;
+commit that file with the stubs. `fetch.sh` itself is only reported when it differs, because it is
+the running script.
+
+Every stub runs `fetch.sh` first, so the sync happens the first time any installed ADW command runs
+in a repo. A repo whose `fetch.sh` predates this sync needs one manual `cp` of the new `fetch.sh`
+(the old script prints the command). Restart the session after a new stub lands: Claude Code lists
+commands at start.
 
 ## How a run resolves the contract
 
