@@ -19,29 +19,48 @@ LOCK="$DIR/.fetch.lock"
 
 stamp() { git -C "$CACHE" log -1 --format='%h' 2>/dev/null; }
 
-# The loader is the one part of ADW that is still a COPY. This script and the stubs in
-# .claude/commands/ are tracked files mirroring install/ upstream, so they drift exactly the way
-# the contract used to — and nothing else in the system will ever tell you. AXCMedApp ran a
-# revision-old loader for a day: its stubs did not know exit 2 existed, so an unverified cache
-# would have run as verified, and a human code review is what caught it.
-# Report only. Never rewrite a tracked file behind the author's back.
-loader_drift() {
-  up="$CACHE/install"; cmds="$(cd "$DIR/.." 2>/dev/null && pwd)/commands"; drift=""; missing=""; have=""
-  [ -d "$up" ] || return 0
+# The loader is the one part of ADW that is still a COPY: this script and the stubs in
+# .claude/commands/ mirror install/ upstream, so they drift, and a new command (adw-dispatch,
+# adw) never appears in a repo unless someone copies its stub. AXCMedApp also ran a revision-old
+# loader for a day: its stubs did not know exit 2 existed.
+#
+# So every successful fetch syncs the STUBS (never fetch.sh itself, which is running):
+#   - missing stub            -> installed
+#   - stub we installed before and nobody edited -> updated (stubs.manifest records its hash)
+#   - any other difference    -> a customised file: left alone, reported
+# fetch.sh itself is only reported when it differs.
+sync_loader() {
+  up="$CACHE/install"; cmds="$(cd "$DIR/.." 2>/dev/null && pwd)/commands"; man="$DIR/stubs.manifest"
+  [ -d "$up/stubs" ] || return 0
+  mkdir -p "$cmds"; drift=""; added=""; updated=""; newman=""
   cmp -s "$DIR/fetch.sh" "$up/fetch.sh" 2>/dev/null || drift="fetch.sh"
   for s in "$up"/stubs/*.md; do
     [ -f "$s" ] || continue
-    n=$(basename "$s")
-    [ -f "$cmds/$n" ] || { missing="$missing commands/$n(missing)"; continue; }
-    have=1
-    cmp -s "$cmds/$n" "$s" 2>/dev/null || drift="$drift commands/$n"
+    n=$(basename "$s"); h=$(git hash-object "$s"); dest="$cmds/$n"
+    if [ ! -f "$dest" ]; then
+      cp "$s" "$dest" && { added="$added $n"; newman="$newman$n $h
+"; }
+    elif cmp -s "$dest" "$s"; then
+      newman="$newman$n $h
+"
+    else
+      prev=$(awk -v n="$n" '$1==n{print $2}' "$man" 2>/dev/null)
+      if [ -n "$prev" ] && [ "$prev" = "$(git hash-object "$dest")" ]; then
+        cp "$s" "$dest" && { updated="$updated $n"; newman="$newman$n $h
+"; }
+      else
+        drift="$drift commands/$n"
+        [ -z "$prev" ] || newman="$newman$n $prev
+"
+      fi
+    fi
   done
-  # A repo with no stub at all is mid-install (the README runs this before the cp): say nothing.
-  [ -z "$have" ] || drift="$drift$missing"
+  printf '%s' "$newman" > "$man"
+  [ -z "$added" ] || echo "adw: installed stubs into $cmds:$added" >&2
+  [ -z "$updated" ] || echo "adw: updated stubs in $cmds:$updated" >&2
   [ -n "$drift" ] || return 0
-  echo "adw: the LOADER is behind $REPO —$drift" >&2
-  echo "adw: these are copies, not fetched, so nothing else reports this. Diff before overwriting:" >&2
-  echo "adw:   cp '$up/fetch.sh' '$DIR/fetch.sh' && cp '$up'/stubs/*.md '$cmds'/" >&2
+  echo "adw: NOT synced (edited locally, or fetch.sh itself) —$drift" >&2
+  echo "adw: diff against '$up' before overwriting; a customised stub is yours to keep or replace." >&2
 }
 
 # Serialize concurrent runs in the same repo: two sessions resetting one cache can
@@ -66,7 +85,7 @@ if [ -d "$CACHE/.git" ]; then
   git -C "$CACHE" remote set-url origin "$REPO" 2>/dev/null
   if git -C "$CACHE" fetch --quiet --depth 1 origin "$REF" 2>/dev/null \
      && git -C "$CACHE" reset --hard --quiet FETCH_HEAD; then
-    loader_drift
+    sync_loader
     echo "adw contract $(stamp)  ($REF, fetched)"
     exit 0
   fi
@@ -76,7 +95,7 @@ if [ -d "$CACHE/.git" ]; then
 fi
 
 if git clone --quiet --depth 1 --branch "$REF" "$REPO" "$CACHE" 2>/dev/null; then
-  loader_drift
+  sync_loader
   echo "adw contract $(stamp)  ($REF, cloned)"
   exit 0
 fi
