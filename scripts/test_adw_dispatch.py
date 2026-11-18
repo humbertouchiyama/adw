@@ -186,11 +186,17 @@ class Launch(Base):
         self.assertEqual([c[2] for c in calls if c[:2] == ["agent", "wait"]], ["w1:pNEW"])
         self.assertEqual([c[2] for c in calls if c[:2] == ["agent", "get"]], ["w1:pNEW"])
 
-    def test_rename_failure_is_failed_before_anything_runs(self):
+    def test_rename_failure_is_failed_and_the_pane_closed(self):
         r = self.launch(FAKE_FAIL="agent rename")
         self.assertEqual(r.returncode, 3)
-        self.assertFalse([c for c in self.calls() if c[:2] == ["pane", "run"]])
         self.assertEqual([x["status"] for x in self.rows()], ["failed"])
+        self.assertIn(["pane", "close", "w1:pNEW"], self.calls())
+
+    def test_agent_is_named_only_after_it_exists(self):
+        self.launch()
+        order = [" ".join(c[:2]) for c in self.calls()
+                 if c[:2] in (["pane", "run"], ["agent", "wait"], ["agent", "rename"])]
+        self.assertEqual(order, ["pane run", "agent wait", "agent rename"])
 
     def test_run_failure_is_failed(self):
         r = self.launch(FAKE_FAIL="pane run")

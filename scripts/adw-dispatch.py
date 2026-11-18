@@ -161,10 +161,9 @@ def cmd_launch(a):
     pane = dig(data, "result", "pane", "pane_id")
     if not isinstance(pane, str):
         fail(f"pane split gave no pane id: {raw}")
-    # The name is how the ledger and `status` find this pane. No name, no launch.
-    ok, _, raw = herdr("agent", "rename", pane, a.name)
-    if not ok:
-        fail(f"agent rename {pane}: {raw}", close=pane)
+    # Best effort: a label on the bare shell (herdr >= 0.9 accepts it). It is cosmetic, the
+    # ledger does not read it, so a herdr without `pane rename` is not a failure.
+    herdr("pane", "rename", pane, a.name)
     prompt = f"Read {a.brief} in full, then execute it."
     line = f"{a.launcher} --model {shlex.quote(a.model)} {shlex.quote(prompt)}"
     ok, _, raw = herdr("pane", "run", pane, line)
@@ -176,6 +175,12 @@ def cmd_launch(a):
     if status in (None, "unknown"):
         _, _, tail = herdr("pane", "read", pane, "--lines", "15")
         fail(f"no agent detected in {pane}. Last lines:\n{tail}", close=pane)
+    # The agent name is how the ledger and `status` find this pane. herdr 0.9 refuses to name a
+    # bare shell (agent_not_found), so it is applied only now that an agent exists. No name, no
+    # launch: an unnamed child must not stay half-registered.
+    ok, _, raw = herdr("agent", "rename", pane, a.name)
+    if not ok:
+        fail(f"agent rename {pane}: {raw}", close=pane)
     if status != "working":
         # An agent that never reached `working` sits at a prompt of its own (trust this folder,
         # a permission) and has not read the brief. The pane stays open: the owner answers there.
