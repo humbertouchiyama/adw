@@ -16,6 +16,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 
 HOME = os.environ.get("ADW_DISPATCH_HOME") or os.path.expanduser("~/.claude/adw-dispatch")
 LEDGER = os.path.join(HOME, "ledger.jsonl")
@@ -164,14 +165,34 @@ def cmd_launch(a):
     # Best effort: a label on the bare shell (herdr >= 0.9 accepts it). It is cosmetic, the
     # ledger does not read it, so a herdr without `pane rename` is not a failure.
     herdr("pane", "rename", pane, a.name)
-    prompt = f"Read {a.brief} in full, then execute it."
+    # herdr 0.9.5 types `pane run` text before a slow shell is ready and the Enter is lost:
+    # wait until the shell has printed something, then type.
+    for _ in range(30):
+        ok, _, shown = herdr("pane", "read", pane, "--lines", "3")
+        if ok and shown.strip():
+            break
+        time.sleep(0.5)
+    time.sleep(3)  # the prompt is drawn after the first output (zsh plugins load late)
+    prompt =f"Read {a.brief} in full, then execute it."
     line = f"{a.launcher} --model {shlex.quote(a.model)} {shlex.quote(prompt)}"
     ok, _, raw = herdr("pane", "run", pane, line)
     if not ok:
         fail(f"pane run: {raw}", close=pane)
-    herdr("agent", "wait", pane, "--status", "working", "--timeout", str(a.timeout_ms))
-    ok, data, _ = herdr("agent", "get", pane)
-    status = dig(data, "result", "agent", "agent_status") if ok else None
+    time.sleep(1)
+    herdr("pane", "send-keys", pane, "Enter")  # herdr 0.9.5 `pane run` types the line and does not submit it
+    # herdr 0.9.5: `agent wait` returns at once while no agent is detected yet, so poll `agent get`.
+    status = None
+    deadline = time.time() + a.timeout_ms / 1000
+    while time.time() < deadline:
+        ok, data, _ = herdr("agent", "get", pane)
+        status = dig(data, "result", "agent", "agent_status") if ok else None
+        if status not in (None, "unknown"):
+            break
+        time.sleep(1)
+    if status == "idle":  # a fresh agent may still be starting its first turn
+        herdr("agent", "wait", pane, "--status", "working", "--timeout", "15000")
+        ok, data, _ = herdr("agent", "get", pane)
+        status = dig(data, "result", "agent", "agent_status") if ok else status
     if status in (None, "unknown"):
         _, _, tail = herdr("pane", "read", pane, "--lines", "15")
         fail(f"no agent detected in {pane}. Last lines:\n{tail}", close=pane)
