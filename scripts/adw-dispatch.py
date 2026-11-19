@@ -6,7 +6,7 @@ must be identical every time: place the pane beside the caller, carry PATH, subm
 keep the ledger.
 
 Exit codes: 0 ok · 1 not inside herdr, or a bad path or name · 2 bad flag or value (argparse) ·
-3 the child did not start.
+3 the launch failed (the `failed` ledger row and the message say why).
 """
 import argparse
 import datetime
@@ -173,14 +173,21 @@ def cmd_launch(a):
             break
         time.sleep(0.5)
     time.sleep(3)  # the prompt is drawn after the first output (zsh plugins load late)
-    prompt =f"Read {a.brief} in full, then execute it."
+    prompt = f"Read {a.brief} in full, then execute it."
     line = f"{a.launcher} --model {shlex.quote(a.model)} {shlex.quote(prompt)}"
     ok, _, raw = herdr("pane", "run", pane, line)
     if not ok:
         fail(f"pane run: {raw}", close=pane)
+    # `pane run` sends the line and its Enter, yet on herdr 0.9.5 the line was seen typed and not
+    # submitted. Press Enter again only while the shell still holds the foreground: once the
+    # launcher runs, an Enter lands in its UI and can accept a dialog (trust this folder).
     time.sleep(1)
-    herdr("pane", "send-keys", pane, "Enter")  # herdr 0.9.5 `pane run` types the line and does not submit it
-    # herdr 0.9.5: `agent wait` returns at once while no agent is detected yet, so poll `agent get`.
+    ok, data, _ = herdr("pane", "process-info", "--pane", pane)
+    shell = dig(data, "result", "process_info", "shell_pid")
+    if ok and isinstance(shell, int) and \
+            dig(data, "result", "process_info", "foreground_process_group_id") == shell:
+        herdr("pane", "send-keys", pane, "Enter")
+    # Poll `agent get`: it answers at once, also while the pane has no agent yet.
     status = None
     deadline = time.time() + a.timeout_ms / 1000
     while time.time() < deadline:
@@ -190,7 +197,7 @@ def cmd_launch(a):
             break
         time.sleep(1)
     if status == "idle":  # a fresh agent may still be starting its first turn
-        herdr("agent", "wait", pane, "--status", "working", "--timeout", "15000")
+        herdr("agent", "wait", pane, "--until", "working", "--timeout", "15000")
         ok, data, _ = herdr("agent", "get", pane)
         status = dig(data, "result", "agent", "agent_status") if ok else status
     if status in (None, "unknown"):
@@ -225,10 +232,11 @@ def cmd_reply(a):
     status = dig(data, "result", "agent", "agent_status") if ok else None
     if status in (None, "unknown"):
         return skip(f"no agent in caller pane {a.pane} ({raw[:120]})")
-    ok, _, raw = herdr("agent", "send", a.pane, REPLY_MARK + a.text.replace("\n", " "))
+    # `agent prompt` types the line and submits it in one step. It refuses a caller that is gone
+    # or that waits at a dialog of its own, so the line never answers that dialog.
+    ok, _, raw = herdr("agent", "prompt", a.pane, REPLY_MARK + a.text.replace("\n", " "))
     if not ok:
-        return skip(f"caller pane {a.pane} is gone ({raw[:120]})")
-    herdr("pane", "send-keys", a.pane, "Enter")  # without this the line is typed, not sent
+        return skip(f"caller pane {a.pane} did not take it ({raw[:120]})")
     print("replied")
 
 
