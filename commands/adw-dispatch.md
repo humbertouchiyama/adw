@@ -45,7 +45,7 @@ builds and merges on the intent the owner started, which the brief carries.
 
 Run `python3 "$DISPATCH" status`, print its output verbatim, and stop. One line per dispatch
 of the last 7 days: `name@repo  status  age  ref`. `dispatched:<state>` is a pane that is still
-open, with its live state: `blocked` or `idle` means it waits for someone, and `unknown` means
+open, with its live state: `blocked`, `idle` or `done` means it waits for someone, and `unknown` means
 the pane is open but no agent runs in it (the child session exited without `finish`). `lost`
 means the row says `dispatched` and no pane has that name any more; the ref is then the brief
 path, so the work can be dispatched again.
@@ -146,7 +146,7 @@ The Rules lines, verbatim:
 - `Reply: notify` or `monitor` — `Then run:
   python3 "<CHILD_DISPATCH>" reply "<HERDR_PANE_ID>" "From: <name>@<repo> | <status> | <one line> | <PR URL or path>"`
   The script puts a fixed marker in front of the line and skips the reply when your pane no
-  longer runs an agent.
+  longer runs an agent or waits at a dialog of its own. `status` still shows the result.
 - If either command fails because the script is missing, skip it and say so in your last line.
 
 **Every brief ends with the brief floor** (adw-core §8): read §11 of
@@ -205,7 +205,8 @@ answer to a surface question **in the child's pane himself**; you do not carry t
 for word. What the owner decided before the dispatch goes in the brief. Any other line the
 owner gives you for the child, you may send word for word, with the pane id `launch` printed:
 `herdr agent prompt "<child pane id>" "<the line>"`. It types the line and submits it in one
-step. Do not use `reply` for this: it marks the line as a report.
+step. If it fails with `agent_blocked`, the child waits at a dialog: tell the owner, and never
+type into that pane another way. Do not use `reply` for this: it marks the line as a report.
 
 ## 8. Report
 
