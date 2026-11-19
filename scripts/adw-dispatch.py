@@ -6,7 +6,7 @@ must be identical every time: place the pane beside the caller, carry PATH, subm
 keep the ledger.
 
 Exit codes: 0 ok · 1 not inside herdr, or a bad path or name · 2 bad flag or value (argparse) ·
-3 the child did not start.
+3 the launch failed (the `failed` ledger row and the message say why).
 """
 import argparse
 import datetime
@@ -16,6 +16,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 
 HOME = os.environ.get("ADW_DISPATCH_HOME") or os.path.expanduser("~/.claude/adw-dispatch")
 LEDGER = os.path.join(HOME, "ledger.jsonl")
@@ -161,21 +162,53 @@ def cmd_launch(a):
     pane = dig(data, "result", "pane", "pane_id")
     if not isinstance(pane, str):
         fail(f"pane split gave no pane id: {raw}")
-    # The name is how the ledger and `status` find this pane. No name, no launch.
-    ok, _, raw = herdr("agent", "rename", pane, a.name)
-    if not ok:
-        fail(f"agent rename {pane}: {raw}", close=pane)
+    # Best effort: a label on the bare shell (herdr >= 0.9 accepts it). It is cosmetic, the
+    # ledger does not read it, so a herdr without `pane rename` is not a failure.
+    herdr("pane", "rename", pane, a.name)
+    # herdr 0.9.5 types `pane run` text before a slow shell is ready and the Enter is lost:
+    # wait until the shell has printed something, then type.
+    for _ in range(30):
+        ok, _, shown = herdr("pane", "read", pane, "--lines", "3")
+        if ok and shown.strip():
+            break
+        time.sleep(0.5)
+    time.sleep(3)  # the prompt is drawn after the first output (zsh plugins load late)
     prompt = f"Read {a.brief} in full, then execute it."
     line = f"{a.launcher} --model {shlex.quote(a.model)} {shlex.quote(prompt)}"
     ok, _, raw = herdr("pane", "run", pane, line)
     if not ok:
         fail(f"pane run: {raw}", close=pane)
-    herdr("agent", "wait", pane, "--status", "working", "--timeout", str(a.timeout_ms))
-    ok, data, _ = herdr("agent", "get", pane)
-    status = dig(data, "result", "agent", "agent_status") if ok else None
+    # `pane run` sends the line and its Enter, yet on herdr 0.9.5 the line was seen typed and not
+    # submitted. Press Enter again only while the shell still holds the foreground: once the
+    # launcher runs, an Enter lands in its UI and can accept a dialog (trust this folder).
+    time.sleep(1)
+    ok, data, _ = herdr("pane", "process-info", "--pane", pane)
+    shell = dig(data, "result", "process_info", "shell_pid")
+    if ok and isinstance(shell, int) and \
+            dig(data, "result", "process_info", "foreground_process_group_id") == shell:
+        herdr("pane", "send-keys", pane, "Enter")
+    # Poll `agent get`: it answers at once, also while the pane has no agent yet.
+    status = None
+    deadline = time.time() + a.timeout_ms / 1000
+    while time.time() < deadline:
+        ok, data, _ = herdr("agent", "get", pane)
+        status = dig(data, "result", "agent", "agent_status") if ok else None
+        if status not in (None, "unknown"):
+            break
+        time.sleep(1)
+    if status == "idle":  # a fresh agent may still be starting its first turn
+        herdr("agent", "wait", pane, "--until", "working", "--timeout", "15000")
+        ok, data, _ = herdr("agent", "get", pane)
+        status = dig(data, "result", "agent", "agent_status") if ok else status
     if status in (None, "unknown"):
         _, _, tail = herdr("pane", "read", pane, "--lines", "15")
         fail(f"no agent detected in {pane}. Last lines:\n{tail}", close=pane)
+    # The agent name is how the ledger and `status` find this pane. herdr 0.9 refuses to name a
+    # bare shell (agent_not_found), so it is applied only now that an agent exists. No name, no
+    # launch: an unnamed child must not stay half-registered.
+    ok, _, raw = herdr("agent", "rename", pane, a.name)
+    if not ok:
+        fail(f"agent rename {pane}: {raw}", close=pane)
     if status != "working":
         # An agent that never reached `working` sits at a prompt of its own (trust this folder,
         # a permission) and has not read the brief. The pane stays open: the owner answers there.
@@ -199,10 +232,11 @@ def cmd_reply(a):
     status = dig(data, "result", "agent", "agent_status") if ok else None
     if status in (None, "unknown"):
         return skip(f"no agent in caller pane {a.pane} ({raw[:120]})")
-    ok, _, raw = herdr("agent", "send", a.pane, REPLY_MARK + a.text.replace("\n", " "))
+    # `agent prompt` types the line and submits it in one step. It refuses a caller that is gone
+    # or that waits at a dialog of its own, so the line never answers that dialog.
+    ok, _, raw = herdr("agent", "prompt", a.pane, REPLY_MARK + a.text.replace("\n", " "))
     if not ok:
-        return skip(f"caller pane {a.pane} is gone ({raw[:120]})")
-    herdr("pane", "send-keys", a.pane, "Enter")  # without this the line is typed, not sent
+        return skip(f"caller pane {a.pane} did not take it ({raw[:120]})")
     print("replied")
 
 

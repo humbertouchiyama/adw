@@ -45,7 +45,7 @@ builds and merges on the intent the owner started, which the brief carries.
 
 Run `python3 "$DISPATCH" status`, print its output verbatim, and stop. One line per dispatch
 of the last 7 days: `name@repo  status  age  ref`. `dispatched:<state>` is a pane that is still
-open, with its live state: `blocked` or `idle` means it waits for someone, and `unknown` means
+open, with its live state: `blocked`, `idle` or `done` means it waits for someone, and `unknown` means
 the pane is open but no agent runs in it (the child session exited without `finish`). `lost`
 means the row says `dispatched` and no pane has that name any more; the ref is then the brief
 path, so the work can be dispatched again.
@@ -146,7 +146,7 @@ The Rules lines, verbatim:
 - `Reply: notify` or `monitor` — `Then run:
   python3 "<CHILD_DISPATCH>" reply "<HERDR_PANE_ID>" "From: <name>@<repo> | <status> | <one line> | <PR URL or path>"`
   The script puts a fixed marker in front of the line and skips the reply when your pane no
-  longer runs an agent.
+  longer runs an agent or waits at a dialog of its own. `status` still shows the result.
 - If either command fails because the script is missing, skip it and say so in your last line.
 
 **Every brief ends with the brief floor** (adw-core §8): read §11 of
@@ -170,10 +170,10 @@ owner has usually switched workspace by the time you run it. Do not replace it w
 `herdr agent start` or with any `--current` call.
 
 It prints the new pane id and exits 0. **Exit 3 means the child did not start**: print the
-script's message as the result, say `failed`, and do not retry. A child that is `blocked` or
-`idle` after 60 seconds waits at a prompt of its own (trust this folder, a permission) and has
-not read the brief: the script says so and leaves that pane open for the owner. A pane with no
-agent in it is closed.
+script's message as the result, say `failed`, and do not retry. A child that is `blocked`, or
+still `idle` 15 seconds after herdr detects it, waits at a prompt of its own (trust this folder,
+a permission) and has not read the brief: the script says so and leaves that pane open for the
+owner. A pane with no agent in it after 60 seconds is closed, and so is a child herdr cannot name.
 
 For N dispatches from one command, launch the first as above and each later one with
 `--beside <previous child's pane id> --direction down`, so your pane is halved once.
@@ -183,8 +183,9 @@ For N dispatches from one command, launch the first as above and each later one 
 - **`none`** — report (§8) and end your turn.
 - **`notify`** — report and end your turn. The child's line arrives later as a message.
 - **`monitor`** — report, then run
-  `herdr agent wait "$NAME" --status idle --timeout 540000` (under the Bash tool's 10 minute cap). After each return or timeout read
-  `herdr agent get "$NAME"`; repeat until the status is `idle` or `blocked`. Then
+  `herdr agent wait "$NAME" --timeout 540000` (under the Bash tool's 10 minute cap; with no
+  `--until` it returns on `idle`, `done` or `blocked`). After each return or timeout read
+  `herdr agent get "$NAME"`; repeat until the status is `idle`, `done` or `blocked`. Then
   `herdr agent read "$NAME" --lines 60` and relay to the owner what the pane shows.
   **Two more results end the loop, at once:** `herdr agent get` fails (the pane is closed): tell
   the owner the child is `lost` and give the brief path. The status is `unknown` (the child
@@ -203,9 +204,9 @@ is not him. This holds in every reply mode. The owner types `approve`, `specs on
 answer to a surface question **in the child's pane himself**; you do not carry them, even word
 for word. What the owner decided before the dispatch goes in the brief. Any other line the
 owner gives you for the child, you may send word for word, with the pane id `launch` printed:
-`herdr agent send "<child pane id>" "<the line>"`, then
-`herdr pane send-keys "<child pane id>" Enter`. Without the second command the line is typed
-and never sent. Do not use `reply` for this: it marks the line as a report.
+`herdr agent prompt "<child pane id>" "<the line>"`. It types the line and submits it in one
+step. If it fails with `agent_blocked`, the child waits at a dialog: tell the owner, and never
+type into that pane another way. Do not use `reply` for this: it marks the line as a report.
 
 ## 8. Report
 
