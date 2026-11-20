@@ -748,7 +748,7 @@ compare, no sign-off, nothing about it prints. Fill every row with a value, not 
 | **Side by side** | the command that makes one image of the design (or the base render) beside the render, for a row that is not `pass` |
 | **References** | where the design images are, how they are named, and how a worktree and a fresh verify worktree (§4) read them |
 | **Guard capture** | how the implementer renders `<BASE>` for the `G` rows before its first code edit, in its own worktree, and where it keeps those images (outside the worktree); what happens when a state does not exist at `<BASE>` |
-| **Limits** | the RMSE limit of a `V` row and of a `G` row, or `baseline` when none is calibrated: the owner's first sign-off then records each measured value, times 1.05, as that row's limit |
+| **Limits** | the RMSE limit of a `V` row and of a `G` row, or `baseline` when none is calibrated: the owner's first sign-off then records each measured value, times 1.05 (at least 0.0001), as that row's limit |
 | **Max rounds** | a whole number: the most render-compare-fix rounds one loop may run |
 | **Sign-off** | `before verify` (the owner signs off each unit's rows before `/pr-ready` runs) or `none` |
 | **Blind spots** | which changed files no §5 gate sees (so the compare is their only check), and what a render cannot show; the second list goes to the PR's `## For your check` (adw-build §3.5) |

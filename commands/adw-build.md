@@ -827,10 +827,10 @@ sign-off  u3 <unit title> — <n> rows: pass <p> · fail <f> · unscored <u> · 
   V1  <state>  <crop>  RMSE <value>  limit <limit>  <result>  <side-by-side path, or —>
   G1  …
 if this session ends, run /cleanup, then /adw-build <slug>: the unit builds again
-reply: ok → each row that is not pass takes its measured RMSE, times 1.05 and rounded up to 4 decimals, as its limit, then verification starts · anything else is a note: the implementer applies it, and the run asks again
+reply: ok → each row that is not pass takes its measured RMSE, times 1.05, at least 0.0001 and rounded up to 4 decimals, as its limit, then verification starts · anything else is a note: the implementer applies it, and the run asks again
 ```
 
-- `ok` → by SendMessage, the implementer writes the measured RMSE, times 1.05 and rounded up to 4
+- `ok` → by SendMessage, the implementer writes the measured RMSE, times 1.05, at least 0.0001 and rounded up to 4
   decimals, as the `limit` of each row that is not `pass` and not `no image` (the 5% is headroom for
   render noise: the verifier renders again in a fresh worktree), and commits only that change as `docs(spec): visual limits`.
   A `no image` row keeps its limit, and it stays a reported gap. Then §3.4.
@@ -943,8 +943,9 @@ pipeline knows:
   overwrite it. Compare the `V` rows. Do the `G` rows last: after §3.2's mutation check and every
   other step that needs `$VWT` at `$VSHA`, run `git -C "$VWT" checkout --detach "$(git -C "$VWT"
   merge-base "$BASE" "$VSHA")"` (the fork point, the commit the implementer's base render used,
-  not the base's tip), render the states of the `G` rows, copy those images outside `$VWT` under
-  another name, and compare each `G` row's crop of the head copy with its crop of the base copy.
+  not the base's tip), render the states of the `G` rows, copy those images outside `$VWT`, in the directory of §23 Guard capture
+  under another name (a state that does not exist at the fork point: the `G` row is `no image`, as
+  §23 Guard capture says), and compare each `G` row's crop of the head copy with its crop of the base copy.
   Then run `git -C "$VWT" checkout --detach "$VSHA"` again. The verifier opens no image. A `fail`
   row is a red, by the same rule as a red gate, except a row that §3.2a already landed `visual not
   converged`. An `unscored` or `no image` row is reported and is not a red. A report missing the table is a red, by the same
@@ -1017,7 +1018,8 @@ pipeline knows:
     failed merge call. §3.7's owner-word merge writes `merge      owner-merged <merge sha7> ·
     base unmoved`, `· base trial ok at <base sha7>` or `· overlap re-reviewed at <base sha7>`
     instead: it is not an auto-merge, and `scripts/adw_analyze/metrics.py` must not count it as one
-    (its `merged` match is anchored at the start of the row).
+    (its `merged` match is anchored at the start of the row). It stays in the denominator of
+    `outcome.auto_merged_share`: the gate was reached and the owner merged.
 
   `owner-wait` is the decisive one: it is the single bit that distinguishes a 21-hour
   owner gate from a 21-hour stalled pipeline. Git already exposes the *gap* via commit
