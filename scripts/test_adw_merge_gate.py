@@ -273,6 +273,10 @@ class TestSignOff(Gate):
         self.set_body(evidence=EVIDENCE.replace("verified ", "visual     rows 4 · pass 4 · fail 0 · unscored 0 · no image 0 · rounds 5 · sign-off 1a2b3c4\nverified "))
         self.assertPass()
 
+    def test_prose_about_a_pending_sign_off_passes(self):
+        self.set_body(extra="visual: sign-off pending was the state before the owner said ok\n")
+        self.assertPass()
+
     def test_sign_off_none_passes(self):
         self.set_body(evidence=EVIDENCE.replace("verified ", "visual     rows 2 · pass 2 · fail 0 · unscored 0 · no image 0 · rounds 1 · sign-off none\nverified "))
         self.assertPass()

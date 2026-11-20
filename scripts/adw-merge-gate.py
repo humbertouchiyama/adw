@@ -224,7 +224,7 @@ def verified(pr) -> None:
 
 def signoff(pr) -> None:
     """10: the owner signs the design off once per run, before any merge into a base (adw-build §3.2a)."""
-    if re.search(r"^[ \t]*visual[ \t]+.*\bsign-off[ \t]+pending\b", pr["body"], re.M):
+    if re.search(r"^[ \t]*visual[ \t]+rows\b.*\bsign-off[ \t]+pending\b", pr["body"], re.M):
         raise Hold(10, "the design sign-off is pending")
 
 

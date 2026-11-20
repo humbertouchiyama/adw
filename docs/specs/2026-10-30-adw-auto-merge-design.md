@@ -128,6 +128,8 @@ the source it names, never from memory.
 9. **A PR with `Smoke: none — <why>`** has no walk, so 7 and 8 do not apply to it. It passes only when
    the repo has a UI-paths row and the diff touches no path in it. No row means the PR waits. A PR with
    neither cases nor `Smoke: none` waits.
+10. **The design sign-off** (added 2026-11-20, adw-build §3.2a). A PR whose evidence block's `visual`
+   row reads `sign-off pending` waits for the owner's one design sign-off of the run.
 
 **The merge** is `adw-build` §3.7's procedure, three Bash calls with the sha written out. The first
 runs the gate's check again: the base-moved check can take long, and a switch turned `off` or an

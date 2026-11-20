@@ -20,7 +20,7 @@ NOT_MEASURED = [
 ]
 HOLD_CONDITIONS = (("0", "gate error"), ("1", "flag"), ("2", "base"), ("3", "verified head"), ("4", "paths"),
                    ("5", "GitHub"), ("6", "base trial"), ("7", "walk"), ("8", "screenshots"),
-                   ("9", "no Smoke or Screens"), ("call", "merge call"))
+                   ("9", "no Smoke or Screens"), ("10", "design sign-off"), ("call", "merge call"))
 SELF_REPORT = "evidence"
 LOOP = "loop"
 

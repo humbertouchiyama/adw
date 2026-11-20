@@ -244,7 +244,7 @@ def _(sl):
 
 # --- auto-merge: the merge row adw-build §3.7's gate writes on independent and final PRs -----------
 
-MERGE_ROW = re.compile(r"(merged)\b|hold (\d|call)\b")
+MERGE_ROW = re.compile(r"(merged)\b|hold (\d+|call)\b")
 AUTO_LABEL = "adw:auto-merged"
 FALSE_PASS_DAYS = 7
 

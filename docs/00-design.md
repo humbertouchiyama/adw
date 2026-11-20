@@ -595,7 +595,7 @@ shows every row of every unit as before, after and goal images, with the gates a
 and one answer covers the run. The first version asked per unit, before verify, because a design
 change after verify costs a re-verify and a review cycle; it stopped each run at its first visual
 unit, three runs in one day, and the owner chose the cost over the stops (2026-11-20). Sub-PRs merge
-before the sign-off; no PR merges into a base before it. A row
+before the sign-off; no PR that carries a unit's renders merges into a base before it. A row
 passes on its RMSE and never on a model's reading, so the verifier grades every row again at the
 verified head. The loop was run by hand on `idle-hunt-rpg`'s HUD redesign (decision U519 there). No
 ADW unit has run it yet, and no limit is calibrated: the first sign-off records them.
