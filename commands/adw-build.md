@@ -862,7 +862,8 @@ The script's docstring gives the manifest's shape. Fill it this way:
   its PR number (`#98 gates …`), copied verbatim;
 - its `rows` from the covered PR's `## Visual result`, the unit prefix dropped from the id: the
   state, the crop, `design_crop` from the spec's `design` cell (the part after `@`, or empty), the
-  RMSE, the limit, the result, `graded` (the PR and pass that measured it) and the three image paths;
+  RMSE, the limit, the result, `graded` (the PR and pass that measured it) and the three image paths
+  from its `image` line, a `none` copied as `none` (the page says why; it is not a missing image);
 - `prs`: one line for each PR the pack covers, `#<N> <title> · <state> · <its gates row>`;
 - `round`: 1, and one more after each note; `note`: the owner's last note, verbatim, or empty.
 

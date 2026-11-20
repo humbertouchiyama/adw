@@ -15,7 +15,10 @@ three images side by side, before (the fork point), after (the verified head) an
 each row's crop drawn on them, and each row's crop zoomed at one scale. It ends with the one sign-off
 question. A missing image is shown as `no image`, never left out.
 
-Manifest (JSON). Every path is absolute. `before`, `after` and `goal` may be "" (no image):
+Manifest (JSON). Every path is absolute. `before`, `after` and `goal` may be `none`, the verifier's word
+for an image that does not exist (adw-build §3.4: a state new at the fork point is `before none`): the
+page says why, and `none` is not counted as missing. "" or a path this machine does not have is
+`no image`, counted as missing:
 
   {"slug": "<slug>", "title": "<intent title>", "contract": "<sha7>", "round": 1, "note": "",
    "prs": ["#105 final PR · ready · gates green · review clean"],
@@ -39,6 +42,9 @@ import time
 
 CROP = re.compile(r"^\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*$")
 ID = re.compile(r"^[VG]\d+$")
+NONE = "none"  # the image does not exist, by the verifier's word: never a pack-relative path ("img/...")
+WHY = {"before": "new in this run: the fork point has no such screen",
+       "after": "not rendered at the verified head", "goal": "no design image"}
 
 
 class Bad(Exception):
@@ -108,6 +114,8 @@ class Images:
         self.pack, self.done, self.copied, self.missing = pack, {}, 0, 0
 
     def add(self, unit: str, kind: str, src: str) -> str | None:
+        if src.strip().lower() == NONE:
+            return NONE
         if not src:
             self.missing += 1
             return None
@@ -143,22 +151,34 @@ def cls(result: str) -> str:
 e = html.escape
 
 
+def blank(label: str, rel: str | None) -> str:
+    return e(WHY.get(label, "no image")) if rel == NONE else "no image"
+
+
 def shot(label: str, rel: str | None, src: str, boxes: list[dict], note: str = "") -> str:
     cap = "<figcaption><b>%s</b>%s<code>%s</code></figcaption>" % (
-        e(label), (" · " + e(note)) if note else "", e(src or "no path"))
-    if rel is None:
-        return '<figure class="shot"><div class="missing">no image</div>%s</figure>' % cap
+        e(label), (" · " + e(note)) if note else "", e(src or "no path") if rel != NONE else "")
+    if rel is None or rel == NONE:
+        return '<figure class="shot"><div class="missing">%s</div>%s</figure>' % (blank(label, rel), cap)
     return ('<figure class="shot"><a class="frame" href="%s" target="_blank">'
             '<img loading="lazy" src="%s" alt="%s" data-boxes=\'%s\'></a>%s</figure>'
             % (e(rel), e(rel), e(label), e(json.dumps(boxes)), cap))
 
 
 def zoom(label: str, rel: str | None, c: list[int]) -> str:
-    if rel is None:
-        return '<figure class="zoom"><div class="missing">no image</div><figcaption>%s</figcaption></figure>' % e(label)
+    if rel is None or rel == NONE:
+        return ('<figure class="zoom"><div class="missing">%s</div><figcaption>%s</figcaption></figure>'
+                % (blank(label, rel), e(label)))
     return ('<figure class="zoom"><div class="crop" style="aspect-ratio:%d / %d">'
             '<img loading="lazy" src="%s" alt="%s" data-crop="%d,%d,%d,%d"></div><figcaption>%s</figcaption></figure>'
             % (c[2], c[3], e(rel), e(label), c[0], c[1], c[2], c[3], e(label)))
+
+
+def pick(srows: list[dict], kind: str) -> tuple[str | None, str]:
+    """The state's image of one kind: a copied image first, then `none`, then a missing one."""
+    rank = lambda r: 0 if r["_" + kind] not in (None, NONE) else 1 if r["_" + kind] == NONE else 2 if r.get(kind) else 3
+    best = min(srows, key=rank)
+    return (best["_" + kind], best.get(kind, "")) if rank(best) < 3 else (None, "")
 
 
 def unit_html(u: dict, imgs: Images) -> tuple[str, dict]:
@@ -195,10 +215,8 @@ def unit_html(u: dict, imgs: Images) -> tuple[str, dict]:
         box = lambda r, dc=False: {"id": r["id"], "c": r["_dcrop"] if dc else r["_crop"], "r": cls(r["result"]),
                                    "g": r["id"].startswith("G")}
         first = srows[0]
-        before_src = next((r.get("before", "") for r in srows if r.get("before")), "")
-        after_src = next((r.get("after", "") for r in srows if r.get("after")), "")
-        before_rel = next((r["_before"] for r in srows if r["_before"]), None)
-        after_rel = next((r["_after"] for r in srows if r["_after"]), None)
+        before_rel, before_src = pick(srows, "before")
+        after_rel, after_src = pick(srows, "after")
         out.append('<div class="state"><h3>State <code>%s</code></h3><div class="trio">' % e(s))
         out.append(shot("before", before_rel, before_src, [box(r) for r in srows], "fork point"))
         out.append(shot("after", after_rel, after_src, [box(r) for r in srows], "verified head"))

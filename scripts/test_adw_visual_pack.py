@@ -111,6 +111,26 @@ class Pack(unittest.TestCase):
         self.assertIn("· 3 missing", line)
         self.assertIn("no image", self.page())
 
+    def test_none_says_why_and_is_not_missing(self):
+        m = self.manifest()
+        for r in m["units"][0]["rows"][:2]:
+            r["before"] = "none"
+        m["units"][0]["rows"][2]["after"] = "None"
+        code, line = self.run_pack(m)
+        self.assertEqual(code, 0, line)
+        self.assertIn("· 0 missing", line)
+        page = self.page()
+        self.assertIn("new in this run", page)
+        self.assertIn("not rendered at the verified head", page)
+        self.assertNotIn('class="missing">no image<', page)
+
+    def test_a_real_image_wins_over_none_in_one_state(self):
+        m = self.manifest()
+        m["units"][0]["rows"][0]["before"] = "none"
+        code, line = self.run_pack(m)
+        self.assertEqual(code, 0, line)
+        self.assertIn('data-boxes=', self.page().split("fork point")[0].rsplit("<figure", 1)[1])
+
     def test_text_is_escaped(self):
         self.run_pack(self.manifest(note="u4: <b>too low</b>"))
         page = self.page()
