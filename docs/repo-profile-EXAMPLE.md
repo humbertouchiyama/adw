@@ -4,8 +4,8 @@
 > repository ADW was built in: a full-stack TypeScript monorepo (React 19 + Vite, Hono + PostgreSQL
 > 16 + Drizzle, one shared npm workspace). Copy it to `.claude/repo-profile.md` in your repo and
 > replace **every** value. Keep the section numbers: the contract cites them as `repo-profile §N`
-> and the anchors §1–§18 are frozen. §19 to §22 are optional; §20, §21 and §22 are sketched at
-> the end.
+> and the anchors §1–§18 are frozen. §19 to §23 are optional; §20, §21, §22 and §23 are sketched
+> at the end.
 
 Every repo-specific value the shared agent contract needs. One of these lives in each repo that
 runs `/adw-init`, `/adw-build`, `/pr-ready` or `/code-review`; the contract files themselves
@@ -17,7 +17,7 @@ The format is prose and tables, not a parsed config. The reader is an agent, so 
 more than syntax.
 
 **Section anchors are frozen** — the contract files cite `repo-profile §1`…`§18` by number, and the
-optional §19 to §22 where a profile carries them. Do not renumber. Add new sections at the end.
+optional §19 to §23 where a profile carries them. Do not renumber. Add new sections at the end.
 
 | § | Section | Read by |
 |---|---|---|
@@ -25,7 +25,7 @@ optional §19 to §22 where a profile carries them. Do not renumber. Add new sec
 | §2 | Paths | adw-core §1, adw-init Phase 4, adw-build §3.5, pr-ready §2/§5 |
 | §3 | Branches | adw-core §2/§6, adw-build Phase 0, adw-build §3.7 (merge gate), adw-init triage item 9 |
 | §4 | Worktree provisioning | adw-build Phase 2, review-core §1.2, pr-ready §4.3 |
-| §5 | Gates | adw-build §3.2, review-core §4, pr-ready §4.3 |
+| §5 | Gates (and an optional gate script) | adw-build §3.2, review-core §4, pr-ready §4.3, adw-core §8 |
 | §6 | Layer map — which gates a diff obligates | review-core §4, adw-build §3.2 |
 | §7 | Gate files — the tripwire list | pr-ready §4.2 |
 | §8 | Blast-radius paths | review-core §7 |
@@ -35,7 +35,7 @@ optional §19 to §22 where a profile carries them. Do not renumber. Add new sec
 | §12 | Running a single test | adw-core §2, adw-build §3.2 |
 | §13 | Review layers and their standards docs | code-review Phase 2 |
 | §14 | Risk scoring | code-review Phase 3 |
-| §15 | Review emphasis + Blocking severity classes | code-review Phase 4, review-core §9 |
+| §15 | Review emphasis + Blocking severity classes (and an optional lane tier) | code-review Phase 4, review-core §9, adw-core §8, adw-build §3.7 |
 | §16 | Project rule tables | code-review Phase 5.2, 5.3 |
 | §17 | Convention doc routing | code-review Phase 6.2 |
 | §18 | Disposable state | cleanup Phase 3, 5; adw-build Phase 5 (`Provisioned files`) |
@@ -43,6 +43,7 @@ optional §19 to §22 where a profile carries them. Do not renumber. Add new sec
 | §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2/§3.3/§3.4/§3.6 |
 | §21 | App smoke (optional; absent → no smoke) | adw-build §3.5/§3.7/§3.8, adw-core §7 |
 | §22 | Card tracker status names (optional; absent → status is never moved) | adw-core §2/§10, adw-init Phase 0.5, adw-build Phase 0/5 |
+| §23 | Visual verify (optional; absent → no render compare and no design sign-off) | adw-build Phase 1/§3.2a/§3.4/§3.5/§3.6, adw-core §7, adw-init Phase 3/4 |
 
 ---
 
@@ -185,6 +186,14 @@ when both hold:
 - a unit's `verify` command lets an implementer iterate without it.
 
 No gate in this example carries the marker: none runs several minutes per pass here.
+
+### Gate script (optional)
+
+A profile may name one script that runs the gates above. It takes the worktree, `<BASE>` and the
+names of the gates to run (the `#` of each row). It runs each one's command in the worktree, in
+table order, and prints one row per gate, `<gate> <exit code>`, then the output tail of each red
+gate. It exits non-zero when any gate is red. Every gate runner then calls it in place of the
+commands (`review-core.md` §4, adw-core §8). This example names none.
 
 ### The audit gate
 
@@ -497,6 +506,9 @@ upstream block that resolves an omitted field to its current value makes a downs
 `=== undefined ? {} : …` no-op unreachable. That is #751's H2 — ~30 lines apart, both halves
 correct, third occurrence of the class.
 
+**Lane tier** (optional): `sonnet` or `opus`, the `model:` of `/code-review`'s review lanes and of
+`adw-build` §3.7's overlap review (adw-core §8). Absent → `sonnet`. This example names none.
+
 ### Blocking severity classes
 
 A finding is upgraded from `Warning` to `Blocking` when its description names any of:
@@ -719,3 +731,24 @@ or team shows it; the run does not guess. Fill only the tracker rows the repo us
 `started` is where the card goes when `/adw-build` begins. `review` is where it goes when a PR the
 owner must merge is open. `done` is where it goes when the run merged every PR itself (`merge: auto`);
 after a merge by hand the owner moves it.
+
+## §23 — Visual verify (optional)
+
+A profile that keeps this section declares how to render the app's states and how to compare a crop
+of a render with a design image. `/adw-build` §3.2a then runs the scoped compare on every unit whose
+spec has a `## Visual scope` table, and `/adw-init` writes that table for every unit of an intent
+with `designs:`. **Delete the whole section unless the repo has a render command**: absent → no
+compare, no sign-off, nothing about it prints. Fill every row with a value, not with the description:
+
+| | |
+|---|---|
+| **Renders** | one command that renders named states of the app at a worktree's head and writes one image per state; how a state is named (the `state` column of a row); where the images land (add that path to §18); its exit codes; it must finish inside one Bash call (600000 ms) |
+| **Size** | the render size and the design image size, and how an area on one maps to the other: when a crop can use the same `x,y,w,h` on both, and when a row needs `@x,y,w,h` for the design |
+| **Compare** | the command that prints the RMSE of one crop of two images, and its scale (0 to 1, say) |
+| **Side by side** | the command that makes one image of the design (or the base render) beside the render, for a row that is not `pass` |
+| **References** | where the design images are, how they are named, and how a worktree and a fresh verify worktree (§4) read them |
+| **Guard capture** | how the implementer renders `<BASE>` for the `G` rows before its first code edit, in its own worktree, and where it keeps those images (outside the worktree); what happens when a state does not exist at `<BASE>` |
+| **Limits** | the RMSE limit of a `V` row and of a `G` row, or `baseline` when none is calibrated: the owner's first sign-off then records each measured value, times 1.05 (at least 0.0001), as that row's limit |
+| **Max rounds** | a whole number: the most render-compare-fix rounds one loop may run |
+| **Sign-off** | `before verify` (the owner signs off each unit's rows before `/pr-ready` runs) or `none` |
+| **Blind spots** | which changed files no §5 gate sees (so the compare is their only check), and what a render cannot show; the second list goes to the PR's `## For your check` (adw-build §3.5) |

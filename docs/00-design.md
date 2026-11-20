@@ -584,6 +584,25 @@ not runnable`, never as a pass. For the same reason a case passes only when its 
 the PR changed: a case whose screen they draw from another implementation (an iOS SwiftUI twin of a
 changed Compose screen) is `blocked`, and its gap row holds the merge (adw-build §3.8).
 
+**Visual verify (TRIAL, 2026-11-19).** No gate looks at a rendered screen, so a layout or style
+change can pass every gate and still draw the wrong screen. Where `repo-profile §23` names a render
+command and a compare command, a unit whose spec has a `## Visual scope` table renders its states
+and compares only the crops its spec names: `V` rows with the design, `G` rows with a render of its
+base made on the same machine (a difference there is a regression). Nothing else is compared or
+opened, and an image is opened only for a row that does not pass on its number (adw-build §3.2a).
+Where the profile asks for it, the owner signs off the rows before the first verify pass: after
+that pass a design change costs a re-verify and a review cycle, before it one more round. A row
+passes on its RMSE and never on a model's reading, so the verifier grades every row again at the
+verified head. The loop was run by hand on `idle-hunt-rpg`'s HUD redesign (decision U519 there). No
+ADW unit has run it yet, and no limit is calibrated: the first sign-off records them.
+
+**The owner's merge on a moved base (2026-11-19).** A PR the owner merged by hand went onto whatever
+the base had become, and nothing checked the result. Merging the base into the head instead voids
+`ready` and costs a full pass and a review cycle. In an `adw-build` session the owner's word now runs the auto-merge gate's
+base trial first, and the head never moves: a base that touched none of the PR's files gets the
+gates run on the merge result; one that touched some gets those files alone re-reviewed in the merge
+result, and the gates run there too (adw-build §3.7).
+
 ### 4.3 Environment failures abort; they do not consume cycles
 
 `TS6305` (missing `packages/shared/dist`), `TS2305` (worktree resolving to main's dist),
@@ -703,7 +722,7 @@ merge — that nothing checks.
 | State | Meaning | Result |
 |---|---|---|
 | **ready** | gates verified green in a clean checkout **at the exact head**: by a pass after the review loop's last push, or by an earlier pass with no commit after it (§4.5, `/pr-ready` §4.0) | independent/final PR: merged by `adw-build §3.7`'s gate when the intent says `merge: auto` and the gate passes; else open, awaits human merge. Sub-PR: merged into the integration branch (§4.1 carve-out), chain continues |
-| **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), the 16-boundary cap fired (condition 6 — gate-green but unconverged), or the app smoke left a defect its refuter confirmed and no smoke fix cycle fixed (adw-build §3.8) | PR open, labelled, body per §6.1 S4. A blocked sub-PR is merged as a carried block and the final PR lands `blocked` for it; it halts its chain only when it cannot be carried (`adw-build §3.7`) |
+| **blocked** | a finding cleared the escalation bar, the diff touches a gate file, the **review**-cycle cap was reached and `/pr-ready` §3's closure check still found something to apply (§4.8 condition 1), `/pr-ready` §5's grader found a `Blocking` still open that a review lists under `🔧 To fix` (or did not run: `fetch failed`, `NOT RUN`), the 16-boundary cap fired (condition 6 — gate-green but unconverged), or the app smoke left a defect its refuter confirmed and no smoke fix cycle fixed (adw-build §3.8), or a visual row still failed after the last round with no sign-off to accept it (adw-build §3.2a) | PR open, labelled, body per §6.1 S4. A blocked sub-PR is merged as a carried block and the final PR lands `blocked` for it; it halts its chain only when it cannot be carried (`adw-build §3.7`) |
 | **failed** | a §4.8 progress condition fired — **fix**-cycle caps exhausted, repeated error signature, gate regression, diff oscillation, or stall — or an environment fault (including the 4h single-phase clock) | PR open **non-draft**, labelled, body per §6.1 S4 (last red output included). A failed sub-PR halts its chain |
 
 Nothing dies silently in a worktree (30 live today, 2026-07-20). A halted chain reports
@@ -929,8 +948,9 @@ current text):
    can act on, recommended default stated first. Engineering detail lives one level down
    (the spec, a `<details>` fold), never in the decision line.
 4. **The ask rule binds every question**, mid-build and after the run report too (§3.2). A
-   question it would decide is decided and reported in one line. Merges, `base:` and the
-   `default:` after a stop still wait for the owner; a non-default `base:` keeps the approval
+   question it would decide is decided and reported in one line. Merges, `base:`, the
+   `default:` after a stop and, where `repo-profile §23` asks for it, a unit's visual sign-off still
+   wait for the owner; a non-default `base:` keeps the approval
    gate (adw-init Phase 2).
 5. **Depth renders as its word** (`express` / `spec` / `plan` / `design`, or `port`), never as
    `D<N>`.
