@@ -590,8 +590,12 @@ command and a compare command, a unit whose spec has a `## Visual scope` table r
 and compares only the crops its spec names: `V` rows with the design, `G` rows with a render of its
 base made on the same machine (a difference there is a regression). Nothing else is compared or
 opened, and an image is opened only for a row that does not pass on its number (adw-build §3.2a).
-Where the profile asks for it, the owner signs off the rows before the first verify pass: after
-that pass a design change costs a re-verify and a review cycle, before it one more round. A row
+Where the profile asks for it, the owner signs off once, after the last unit is built: one pack
+shows every row of every unit as before, after and goal images, with the gates and the RMSE table,
+and one answer covers the run. The first version asked per unit, before verify, because a design
+change after verify costs a re-verify and a review cycle; it stopped each run at its first visual
+unit, three runs in one day, and the owner chose the cost over the stops (2026-11-20). Sub-PRs merge
+before the sign-off; no PR that carries a unit's renders merges into a base before it. A row
 passes on its RMSE and never on a model's reading, so the verifier grades every row again at the
 verified head. The loop was run by hand on `idle-hunt-rpg`'s HUD redesign (decision U519 there). No
 ADW unit has run it yet, and no limit is calibrated: the first sign-off records them.
@@ -949,8 +953,8 @@ current text):
    (the spec, a `<details>` fold), never in the decision line.
 4. **The ask rule binds every question**, mid-build and after the run report too (§3.2). A
    question it would decide is decided and reported in one line. Merges, `base:`, the
-   `default:` after a stop and, where `repo-profile §23` asks for it, a unit's visual sign-off still
-   wait for the owner; a non-default `base:` keeps the approval
+   `default:` after a stop and, where `repo-profile §23` asks for it, the run's one design sign-off
+   still wait for the owner; a non-default `base:` keeps the approval
    gate (adw-init Phase 2).
 5. **Depth renders as its word** (`express` / `spec` / `plan` / `design`, or `port`), never as
    `D<N>`.

@@ -315,7 +315,9 @@ class AutoMerge(unittest.TestCase):
                pr(23, "[adw c] C", "2026-10-07T10:00:00Z", state="OPEN", block=merge_row("hold 1 — merge: hold · at 3333333")),
                pr(24, "[adw d] D", "2026-10-08T10:00:00Z", state="OPEN", block=merge_row("hold call — denied · at 4444444")),
                pr(25, "[adw e] E", "2026-10-08T10:00:00Z", "2026-10-08T12:00:00Z", block=merge_row("merged 5555555 · base unmoved")),
-               pr(26, "[adw f] F", "2026-09-20T10:00:00Z", state="OPEN", block=merge_row("hold 7 — walk failed · at 6666666"))]
+               pr(26, "[adw f] F", "2026-09-20T10:00:00Z", state="OPEN", block=merge_row("hold 7 — walk failed · at 6666666")),
+               pr(27, "[adw g] G", "2026-10-09T10:00:00Z", state="OPEN",
+                  block=merge_row("hold 10 — the design sign-off is pending · at 7777777"))]
         facts = gate_facts(prs)
         run = Run(until=END, window=(START, END), prior=prior, facts=facts,
                   win={m: compute(m, F.Slice(facts, START, END)) for m in REGISTRY},
@@ -323,6 +325,7 @@ class AutoMerge(unittest.TestCase):
         report = report_md(run, {}, totals(facts))
         self.assertIn("## Auto-merge holds", report)
         self.assertIn("| 1 · flag | 1 | 0 |", report)
+        self.assertIn("| 10 · design sign-off | 1 | 0 |", report)
         self.assertIn("| 7 · walk | 2 | 1 |", report)
         self.assertIn("| call · merge call | 1 | 0 |", report)
         self.assertNotIn("| 2 · base |", report)

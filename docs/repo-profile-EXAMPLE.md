@@ -43,7 +43,7 @@ optional §19 to §23 where a profile carries them. Do not renumber. Add new sec
 | §20 | Visual port loop (optional; absent → no `shape: port`) | adw-core §2/§3/§7, adw-init Phase 1/2/3/4, adw-build Phase 0/§3.1/§3.2/§3.3/§3.4/§3.6 |
 | §21 | App smoke (optional; absent → no smoke) | adw-build §3.5/§3.7/§3.8, adw-core §7 |
 | §22 | Card tracker status names (optional; absent → status is never moved) | adw-core §2/§10, adw-init Phase 0.5, adw-build Phase 0/5 |
-| §23 | Visual verify (optional; absent → no render compare and no design sign-off) | adw-build Phase 1/§3.2a/§3.4/§3.5/§3.6, adw-core §7, adw-init Phase 3/4 |
+| §23 | Visual verify (optional; absent → no render compare and no design sign-off) | adw-build Phase 0/1/§3.2a/§3.4/§3.5/§3.6/§3.7/Phase 4/Phase 5, adw-core §6/§7, adw-init Phase 3/4 |
 
 ---
 
@@ -750,5 +750,5 @@ compare, no sign-off, nothing about it prints. Fill every row with a value, not 
 | **Guard capture** | how the implementer renders `<BASE>` for the `G` rows before its first code edit, in its own worktree, and where it keeps those images (outside the worktree); what happens when a state does not exist at `<BASE>` |
 | **Limits** | the RMSE limit of a `V` row and of a `G` row, or `baseline` when none is calibrated: the owner's first sign-off then records each measured value, times 1.05 (at least 0.0001), as that row's limit |
 | **Max rounds** | a whole number: the most render-compare-fix rounds one loop may run |
-| **Sign-off** | `before verify` (the owner signs off each unit's rows before `/pr-ready` runs) or `none` |
+| **Sign-off** | `end of run` (every unit builds without a stop; after the last one the owner gets one pack, before, after and goal images for every row, and signs off once, before any PR merges into a base; `before verify` is read as `end of run`) or `none` |
 | **Blind spots** | which changed files no §5 gate sees (so the compare is their only check), and what a render cannot show; the second list goes to the PR's `## For your check` (adw-build §3.5) |
