@@ -170,6 +170,11 @@ Four properties hold in every repo, whatever those sections declare:
   (`code-review.md` 7a step 2). `/pr-ready` §4's verifier runs the marked gates on every pass. Each
   other runner of this map runs them too: `adw-build` §3.2 names the one role there that leaves them
   to the pass.
+- **A gate script runs the gates where `repo-profile §5` names one.** The obligation is computed as
+  above (`§6`, the `[slow]` rule). Then every gate runner passes the names of the gates it must run
+  to that script, and relays the table the script prints: one row per gate with its exit code, and
+  the output tail of each red. The agent does not run the gate commands one by one. No script named
+  → the agent runs each `§5` command, as above.
 - **Docs-only is a first-class outcome.** A docs/prose/skill-only PR reports
   `verification: N/A — docs-only` and passes; it must never fabricate a green line for gates that
   never ran. `repo-profile §2` declares which paths are non-code, and `§6` declares which layers do

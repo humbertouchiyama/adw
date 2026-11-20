@@ -266,7 +266,8 @@ this single lane. `light` and `full` both run this lane. **Under `since:` this l
 the tier says**: a delta is small by construction, and three lanes over it is three agents reading
 the same small thing.
 
-Launch 1 Agent (`subagent_type: general-purpose`, `model: sonnet`); wait by `review-core.md` §10
+Launch 1 Agent (`subagent_type: general-purpose`, `model:` the `Lane tier` that `repo-profile §15`
+names, else `sonnet` — adw-core §8); wait by `review-core.md` §10
 (its step 2 write line goes at the end of the brief below; under `since:` the 5.3 agent shares this
 wave, so `<N>` is 2):
 
@@ -328,7 +329,8 @@ because Y" returns Y and reads as confirmation, while the lane's independent wor
 
 #### Step 3 — Dispatch
 
-**Launch 3 Agents in ONE message** (`subagent_type: general-purpose`, `model: sonnet`) so they run
+**Launch 3 Agents in ONE message** (`subagent_type: general-purpose`, `model:` the `Lane tier`
+that `repo-profile §15` names, else `sonnet` — adw-core §8) so they run
 in parallel, then wait for all three by `review-core.md` §10 (one blocking call, re-issued per its step 4) — each brief
 ends with "write your final report to `<OUT>/<lane>.md`", and the wait is one Bash call with
 `timeout: 600000` and its deadline inside the command (§10 step 3, with `-ge 3`). Every brief this

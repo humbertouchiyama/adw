@@ -435,7 +435,13 @@ with the most to discover), so blocking on it is a pure loss every time.
 > record it in the spec under its `QN` id. The spec body
 > states: the problem, the change, acceptance criteria numbered `AC 1`, `AC 2`, … (adw-build §3.5's
 > `Checks` line cites them), and (bugs) root cause with
-> evidence. Reference only plugin skills (`superpowers:*`) or tracked commands.
+> evidence. When `.claude/repo-profile.md` has a §23 and the intent has `designs:`, the spec also
+> carries a `## Visual scope` table in the shape of `/adw-build` §3.2a (read it in
+> `.claude/adw/cache/commands/adw-build.md`): one `V` row for each state and area that the change
+> alters, one `G` row for each area next to the change that must not alter, each crop measured on
+> the design image as `repo-profile §23` Size says (never guessed), and each `limit` from §23
+> Limits. A unit that changes no rendered area writes one line instead: `Visual scope: none —
+> <why>`. A port unit writes neither. Reference only plugin skills (`superpowers:*`) or tracked commands.
 > Code snippets in the spec/plan MUST follow the repo comment rule (`repo-profile §2`): one
 > terse line + spec ref, never a multi-line rationale comment — the implementer copies
 > snippets verbatim, so a violating snippet ships a forbidden pattern and buys a review
@@ -597,6 +603,11 @@ Fix in place on any failure, except where a bullet says it only reports:
   `verify`;
 - **every D2 spec carries a `## Implementation` section** — `grep -c '^## Implementation'`
   returns 1. A D2 spec without it has no build input and goes back to its authoring agent;
+- in a repo whose profile has a §23, **every spec of an intent with `designs:`, except a port
+  unit's and a D0 draft (it has no fan-out), carries one `## Visual scope` table with at least one
+  row, or one `Visual scope: none — <why>` line** (adw-build §3.2a). Each row has an id `V<n>` or `G<n>`, a state, a crop of four
+  whole numbers, a design image (`base` for a `G` row) and a limit (a number or `baseline`). A miss
+  goes back to its authoring agent once; a second miss is one owner question in `needs you`;
 - `wc -l` every **D2/D3** spec and plan, and every port spec (D0/D1 row), against the artifact
   budget table (Phase 3) — the
   guard rail, then the hard stop, and at D3 also spec < plan (ratio). The artifact-vs-diff

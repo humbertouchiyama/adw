@@ -246,7 +246,9 @@ gate file to get green · let a subagent create its own worktree.
   things: a merge outside adw-core §6's consent carve-out, and an escalation the owner alone
   can settle (§3.6 → `blocked`). **In a chain neither one stops the run before the final PR:**
   a sub-PR merge is inside the carve-out and is never asked about, and a `blocked` sub-PR is
-  merged as a carried block and answered on the final PR (adw-core §6, §3.7). **A progress
+  merged as a carried block and answered on the final PR (adw-core §6, §3.7). One more halt
+  exists only where `repo-profile §23` asks for it: §3.2a's design sign-off. It holds its own
+  unit, and the units `after:` it, and nothing else. **A progress
   report is not a halt** — print it and keep
   building; the owner reads the run report at the end. When two or more units are ready to ask something,
   ask once with every question numbered (adw-core's approval-surface shape): on
@@ -373,6 +375,9 @@ implement ⟲ gates → verify → open PR → /code-review ⟲ → re-verify �
      ↑________|                            ↑______|
      max 3 cycles                          max 2 cycles
 ```
+
+A unit whose spec has a `## Visual scope` table runs §3.2a between its gates and verify: render,
+compare and fix, then the owner's sign-off where `repo-profile §23` asks for it.
 
 An independent PR or a final PR then runs §3.8's app smoke on its verified head, after the state
 above is decided, and never on a sub-PR. A defect the smoke's check confirms starts a smoke fix
@@ -539,7 +544,9 @@ carries the same wait line as 3.6's driver brief ("wait for every agent you disp
 checkout's `.claude/adw/cache/commands/`, since the implementer works from its worktree. It ends,
 like every brief this file dispatches, with `review-core.md` §11's brief floor, pasted (adw-core §8). A
 grouped sub-PR takes the tier of its deepest unit. D3 → follow the plan file; D2 → follow
-the spec's `## Implementation` section (adw-core §3); D0/D1 → implement from the spec.
+the spec's `## Implementation` section (adw-core §3); D0/D1 → implement from the spec. A unit whose
+spec has a `## Visual scope` table also gets §3.2a's loop, its table and `repo-profile §23` in the
+brief.
 Units sharing a sub-PR: **one commit each, dependency order**. Keep the SAME implementer across fix cycles via SendMessage — the ORCHESTRATOR
 counts cycles (caps enforced by prose drift; counted caps do not). A fix cycle re-uses that
 implementer at the tier it was dispatched on; never re-dispatch a cycle at a higher tier to
@@ -741,6 +748,106 @@ Three properties hold in every repo, whatever that file declares:
   reviewable as `feat` + `fix-attempt-1..3`, never one blob) → re-run from the failed
   gate. Third cycle exhausted → `failed`.
 
+### 3.2a Visual verify — render, compare, fix, then the owner's sign-off
+
+**No gate in §3.2 looks at a rendered screen.** A layout file, a style sheet or a view can compile,
+pass every test and still draw the wrong screen. This step compares the unit's renders with its
+design before verification starts. It is the loop that `idle-hunt-rpg` ran by hand on its HUD
+redesign (decision U519 there): render, read the numbers, open an image only where a number fails,
+fix, repeat. Most of its cost is the images, so the rules below open an image only for a row that
+needs one. **A TRIAL**: the `visual` evidence row (§3.4) records how many rows passed, failed and
+stayed unscored.
+
+**It runs when all three hold, and only then:**
+
+- `repo-profile §23` exists. Absent → this section does not run, and nothing about it prints.
+- The unit's spec has a `## Visual scope` table with at least one row. `Visual scope: none — <why>`
+  → no compare.
+- The unit is not a port unit: §20's render loop grades a port unit (§3.1).
+
+**The scoped compare.** The spec names only the states and the areas that its change alters, and
+the areas that its change must not alter. One row is one crop of one rendered state:
+
+```
+## Visual scope
+| id | state | crop | design | limit |
+|---|---|---|---|---|
+| V1 | <the state, as repo-profile §23 Renders names its image> | <x>,<y>,<w>,<h> | <design image>[@<x>,<y>,<w>,<h>] | <RMSE, or baseline> |
+| G1 | <the state> | <x>,<y>,<w>,<h> | base | <RMSE, or baseline> |
+```
+
+- A `V` row (compare) is an area that the change alters. Its crop of the render is compared with
+  the same area of the design image. `@<x>,<y>,<w>,<h>` gives that area on the design when it is
+  in a different place there (`repo-profile §23` Size).
+- A `G` row (guard) is an area that the change must not alter. Its crop of the render is compared
+  with the same crop of a render of `<BASE>`, made on the same machine (`repo-profile §23` Guard
+  capture). A difference there is a regression, not a design question.
+- `limit` is a number from `repo-profile §23` Limits, or `baseline` when §23 says that no limit is
+  calibrated.
+- Every other area of every render is out of scope. No agent compares it, and no agent opens it.
+
+`repo-profile §23` Compare gives one RMSE per row. The result is one table row per crop:
+`id · state · crop · RMSE · limit · result`. The result is `pass` (the RMSE is at or below the
+limit), `fail` (above the limit), `unscored` (the limit is `baseline`) or `no image` (the state did
+not render, or for a `G` row its base render did not: a reported gap, never a pass).
+
+**The implementer runs the loop.** Its brief carries `repo-profile §23`, pasted, and the spec's
+table. The rows are the contract: the implementer never edits a crop, a design image or a limit
+(the sign-off below is the one exception).
+
+0. Before the first code edit, while the worktree holds no code change on `<BASE>`, render each
+   state that a `G` row names, and keep those images outside the worktree, as §23 Guard capture
+   says. This is the base render. No other worktree is made for it.
+1. After §3.2's gates are green, render every state that the table names, with §23 Renders.
+2. Compare every row with §23 Compare. Write the result table.
+3. Only for a `fail` or an `unscored` row, make a side-by-side image (§23 Side by side) and open it.
+   Never open a `pass` row. Never open an area that no row names.
+4. Fix every cause that the images show. Go to step 1.
+
+Stop when no row is `fail`, no `V` row is `no image`, and each `unscored` image matches its
+design; or when the loop reaches §23 Max rounds. If the loop changed a file, run §3.2's gates
+again before you return: a red there is an ordinary fix cycle (§3.2), and the loop runs again after
+its fix. Commit. Return the result table, the side-by-side path of each row that is not `pass`, and
+the number of rounds. A round is not a fix cycle and is not a §3 boundary. The mutation check
+(§3.2) uses the unit's `verify` only, never the compare.
+
+**Who judges what.** The implementer is the one agent that judges an image. Every later agent (the
+§3.4 verifier, the §3.6 driver) runs §23's commands and relays the numbers. A row passes on its
+number, never on a model's reading of a screen.
+
+**The owner signs off before verification**, when `repo-profile §23` Sign-off is `before verify`.
+After §3.4, a design change costs a re-verify and a review cycle (`/pr-ready` §6). Before it, the
+change costs one more round. Stamp `T1` just before the print and `T2` on the answer (adw-core
+§7.1), charged to this unit. Print the block, then end the turn: the owner's answer, or the return
+of another unit's agent, wakes the session. Only this unit, and the units `after:` it, wait. When
+two or more units wait at the same time, ask once, with one block for each unit:
+
+```
+sign-off  u3 <unit title> — <n> rows: pass <p> · fail <f> · unscored <u> · no image <i> · rounds <r>
+  V1  <state>  <crop>  RMSE <value>  limit <limit>  <result>  <side-by-side path, or —>
+  G1  …
+reply: ok → each row that is not pass takes its measured RMSE as its limit, then verification starts · anything else is a note: the implementer applies it, and the run asks again
+```
+
+- `ok` → by SendMessage, the implementer writes the measured RMSE as the `limit` of each row that
+  is not `pass` and not `no image`, and commits only that change as `docs(spec): visual limits`.
+  A `no image` row keeps its limit, and it stays a reported gap. Then §3.4.
+- Any other answer is a note. The implementer applies it, then runs the loop and §3.2's gates
+  again, and the run asks again. A note is not a fix cycle.
+
+**With `Sign-off` `none`**, nothing waits. Each `unscored` or `no image` row is reported: the PR
+line carries `· ⚠ visual: <u> unscored, <i> no image`.
+
+**A `fail` row with no `ok` is not converged.** With `Sign-off` `none`, a `fail` row after Max
+rounds makes the unit `blocked`: `visual not converged — <each fail row, with its RMSE and limit>;
+default: look at the images in ## Visual result, then accept those limits, or re-run /adw-init to
+extend this intent with a fix-up unit`. As for a port unit (§3.1), the unit still goes on through
+3.4, 3.5 and 3.6. That red is never fed back as a fix cycle and never classified by §3.3, and the
+unit lands `blocked` with this reason whatever the verifier and the driver return.
+
+The table goes into the PR body (§3.5) and into the `visual` evidence row (§3.4), and §3.4's
+verifier grades every row again at the verified head.
+
 ### 3.3 Environment faults abort; they never consume a cycle
 
 Classify every red BEFORE feeding it back — an implementer holding only red output and
@@ -822,6 +929,15 @@ pipeline knows:
   once in gate mode at `$VSHA`, with its exit code, waited on with §3.1's wait block and §20's Gate
   mode row, both pasted in its brief. A report missing it is a red, by the same rule as a missing
   gate row — except `gate-mode build exceeded <n> min`, which is an environment fault (§3.3).
+- **A unit's visual rows (§3.2a).** The verifier's report must ALSO carry §3.2a's result table at
+  `$VSHA`, one row per row of the spec's `## Visual scope`. Its brief carries `repo-profile §23` and
+  that table, pasted (a final PR: its `V` rows only, Phase 4). In `$VWT`, right after the gates at
+  `$VSHA` and before any step checks out `<BASE>` there, render the states with §23 Renders. Then
+  run `git -C "$VWT" checkout --detach "$BASE"`, render the states of the `G` rows, and compare
+  every row with §23 Compare. The verifier
+  opens no image. A `fail` row is a red, by the same rule as a red gate, except a row that §3.2a
+  already landed `visual not converged`. An `unscored` or `no image` row is reported and is not a
+  red. A report missing the table is a red, by the same rule as a missing gate row.
 - **Where the evidence lands: the PR body, not only a comment.** Copy the per-gate table
   and the mutation row into the PR body at 3.5 (re-pass → edit the body). A review comment
   is the wrong home for the one artifact that has to outlive the run: three PRs across two
@@ -853,6 +969,12 @@ pipeline knows:
   A port unit's block reads `depth D1 · shape port`, its `cycles` row adds `rounds N` (the unit's total across fix cycles), its
   `mutation` row ends `· fast` or `· gate` (the mode that graded discrimination; `gate` means the per-file sweep was skipped), and its `gates`
   field adds `render gate-mode <exit code>`, so the TRIAL (adw-core §3) leaves a record.
+
+  A unit with a `## Visual scope` table (§3.2a) gets one more row, written from the last pass's
+  table and the implementer's rounds, and replaced by each later pass: `visual     rows <n> · pass
+  <p> · fail <f> · unscored <u> · no image <i> · rounds <r> · sign-off <sha7>`. `<sha7>` is the
+  `docs(spec): visual limits` commit of the owner's `ok`; `sign-off none` when `repo-profile §23`
+  Sign-off is `none`.
 
   A re-pass that `/pr-ready` §4.0 reused writes `reverify reused <PASS id>` in place of
   `reverify <N>m` in `phases`, and keeps the reused pass's `gates` and `mutation` rows.
@@ -1031,6 +1153,12 @@ against the base (step 2 and 3 of the merge gate).
   network, what a real AI answer looks like. Each is a `### CHECK-<n>` with its `Checks` line and its
   steps. A CHECK is not a case: §3.8 never reads it, and the owner finds it on the PR after the merge.
   **A CHECK does not excuse a changed screen:** the screen is still listed. A PR with nothing for the owner to check has no such section.
+  Where `repo-profile §23` exists, `## For your check` also holds what its Blind spots row says a
+  render cannot show, for the screens this PR changes.
+- **A unit with a `## Visual scope` table (§3.2a) carries a `## Visual result` section** after
+  `## For your check`: the last pass's result table, one row per crop, then the side-by-side path of
+  each row that is not `pass`, on the machine that made it. A final PR joins its units' tables, each
+  id prefixed with its unit (`u2 V1`).
 - **Before the cases are final, read the code at the PR head** for every field, control and screen a
   step names. A case that names what the code does not have is rewritten. Code that lacks what its
   criterion asks for is a defect: fix it before the walk, back through §3.1. The walk never finds
@@ -1069,7 +1197,9 @@ against the base (step 2 and 3 of the merge gate).
 carries "wait for every agent you dispatch by `review-core.md` §10, never by polling, and end every
 brief you write with `review-core.md` §11's lines" (for a port
 unit also §3.1's wait block and `repo-profile §20`'s Gate mode row, which the driver pastes into the
-verifier's brief for its gate-mode `verify`), and:
+verifier's brief for its gate-mode `verify`; for a unit with a `## Visual scope` table also
+`repo-profile §23` and that table, which the driver pastes into the verifier's brief for its visual
+rows, §3.4), and:
 run `/pr-ready <N> apply` with `BASE`, `PASS=v2` (the next `PASS` id when 3.4 already used `v2`) and `REF` set to 3.4's values, carrying the
 unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and `PRIOR`
 (`/pr-ready` §1) set to this unit's last pass. Its `PASS` id and its 40-character `$VSHA` come
@@ -1081,12 +1211,12 @@ gh pr view <N> --json body --jq .body | grep -m1 -oE '^[[:space:]]*pass[[:space:
 
 `no pass row` → hand the driver no `PRIOR`; its re-pass runs in full. Its rows are copied from the
 PR body: the per-gate table (on a `/pr-ready` §4.2 tripwire hit, both A/B tables under their
-`clean-checkout evidence — NOT verifier-green` header), the mutation row, and a port unit's
-render-grade row. Return
+`clean-checkout evidence — NOT verifier-green` header), the mutation row, a port unit's
+render-grade row, and a unit's visual table (§3.4). Return
 **Layer 2 only, plus the open-findings lines below** (`/pr-ready` §7 — suppress Layer 1 in the
 brief): the `ready|blocked` machine
 line with `verified <sha7>`, the review cycle count and tier, the per-gate table and mutation
-row from the re-pass (or the reused ones, with `/pr-ready` §7's `pass: reused <PASS id> at <sha7>`
+row (and a unit's visual table) from the re-pass (or the reused ones, with `/pr-ready` §7's `pass: reused <PASS id> at <sha7>`
 line), the §5 review-evidence count, the `/pr-ready` §5 open-findings lines
 (`closed:` / `open:`, or `open-findings: none` / `fetch failed` / `NOT RUN`), the §8 cleanup line,
 and on `blocked` the question with its default. The brief also asks the driver one question before
@@ -1319,6 +1449,47 @@ command for the owner to run: `held call: run ! gh pr merge <N> <flag> --match-h
 sha>`. A `gh pr merge` that fails for another reason, or a confirm that does not print `MERGED`, is
 `hold call — <the gh error>`. Never re-shape a denied merge call. Sub-PR denial text is unchanged
 (above).
+
+**The owner's word on a base that moved.** When the owner says "merge" for an independent or final
+PR that has a `verified` row (a `merge: hold` PR, or one the gate held), the head stays the verified
+head. **Never merge or rebase the base into the head branch to bring it up to date:** that commit
+moves the head off its `verified` row and voids `ready` (`/pr-ready` §6), so it costs a full pass
+and a review cycle. Test the merge result instead, without moving the head. "The gate" below is
+the merge gate above, and every Bash call starts with the first line of the gate's step 1:
+
+- **(a)** Run the trial of the gate's step 2, with the `verified` row's sha. `base unmoved` → (e).
+- **(b)** `tree <path> base <sha>` (the base's new commits touch no file that the PR touches) → the
+  gates of the gate's step 3 in that tree, then `discard`. All green → (e). A red → (f).
+- **(c)** `hold 6 overlap: <files>` → only these files need a new review. The trial made no tree,
+  so make the merge result at the trial's path, in one Bash call, with the `verified` sha and the PR
+  number written out (a clean tree left there by an earlier trial: `discard` it first):
+  ```bash
+  T="$R/.claude/worktrees/adw-trial-<slug>-pr<N>"; git -C "$R" fetch -q origin && git -C "$R" worktree add -q --detach "$T" <verified sha> && { git -C "$T" merge --no-edit -q "origin/<INTENT_BASE>" && echo "tree $T base $(git -C "$R" rev-parse "origin/<INTENT_BASE>")" || { git -C "$T" merge --abort; git -C "$R" worktree remove "$T"; echo "conflict"; }; }
+  ```
+  `conflict` → (d). Otherwise run the gates of the gate's step 3 in that tree. Then re-review only
+  the listed files: dispatch one agent, read-only, pinned as adw-core §8 pins a `/code-review` lane,
+  with the tree path, the fork point (`git merge-base <verified sha> <base sha>`), the base sha, the
+  file list, `review-core.md` §11's brief floor, and this question: "Read each listed file whole in
+  the tree, then `git diff <fork> <base sha> -- <file>` and `git diff <fork> <verified sha> --
+  <file>`. Does the merged file still do what each side changed it to do? Return one line per
+  defect: `Blocking or Warning | file:line | consequence | the input that shows it`." Send each
+  `Blocking` to one refuter, `model: opus` (adw-core §8's Clear a `Blocking` row), with
+  `review-core.md` §9's quoted prompt block, its first sentence naming the tree in place of the
+  review worktree, and the claim as `POSITIVE | <file:line> | <consequence>`. Then `discard`. All
+  gates green and no `Blocking` left after the refuter → (e). Otherwise → (f).
+- **(d)** `hold 6 conflict: <files>`, or `conflict` from (c) → no merge. A conflict needs a
+  resolution commit on the head branch, and that commit voids `ready`. Print `not merged #<N> —
+  conflict in <files>; default: resolve it on <head branch>, then /pr-ready <N>`.
+- **(e)** The merge: the second call of the gate's step 4, without its label test (the owner's word
+  is the consent), then its third call, with the `verified` row's sha. Then the confirm of the
+  gate's step 5, without its label. Write the `merge` row as that step does; after (c) it ends
+  `· overlap re-reviewed at <base sha7>`.
+- **(f)** No merge. Print `not merged #<N> — <the red gate, or the Blocking with its file:line>;
+  default: fix it on <head branch>, then /pr-ready <N>`.
+
+No overlap means no new review: each side's files were reviewed on their own PRs, and the gates
+check the merge result. A `discard` that exits 1 leaves the tree for `/cleanup`, as in the gate's
+step 3.
 
 ### 3.8 App smoke — independent and final PRs: walk, check, fix
 
@@ -1697,7 +1868,9 @@ composition — gates, 3.4 verify against `origin/<INTENT_BASE>`, **and 3.6's re
 lands `ready`. Its gates stage leaves the gates `repo-profile §5` marks `[slow]` to its 3.4 verify,
 as §3.2 does on any PR. With `merge: auto`, §3.7's merge gate then merges it once §3.8 is done; with
 `merge: hold`, or a gate that holds, it waits for the one human consent. Its body's `## Screens` and `## For your check` join its
-units' lists (§3.5). After the carried blocks below are listed, it runs §3.8's
+units' lists (§3.5), and its `## Visual result` joins its units' tables. Its 3.4 verify grades
+their `V` rows again (§3.4). It does not grade their `G` rows: each was graded on its own sub-PR,
+and another unit of the chain can alter that area on purpose. No second sign-off is asked. After the carried blocks below are listed, it runs §3.8's
 app smoke on its verified head, with its smoke fix cycles: the one smoke of the chain. A smoke fix
 cycle's commits land on the integration branch from the close worktree, and its pushed head takes
 the rule below for an answer commit that changes code, once per cycle (§3.8 step 5).

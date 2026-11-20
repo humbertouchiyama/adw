@@ -7,8 +7,8 @@ description: "Shared ADW contract — spec headers, naming, depth ladder, packag
 **This file lives in the `adw` repository and is fetched, not copied** (§9). It is repo-agnostic:
 every command, path, branch and gate it needs is declared per-repo in the consuming repo's
 `.claude/repo-profile.md`, cited throughout as `repo-profile §N` against frozen anchors §1–§18,
-plus four optional ones a profile may omit: §19 (code-review lanes), §20 (visual port loop, §3),
-§21 (app smoke, adw-build §3.8) and §22 (card tracker, §10).
+plus five optional ones a profile may omit: §19 (code-review lanes), §20 (visual port loop, §3),
+§21 (app smoke, adw-build §3.8), §22 (card tracker, §10) and §23 (visual verify, adw-build §3.2a).
 Both `/adw-init` and `/adw-build` read that file at their Phase 0 alongside this one — it is not
 auto-included.
 
@@ -393,8 +393,10 @@ merge").
 
 **A merge the owner gave the word for is the same bare call.** When the owner says "merge" for a PR
 into a base, the merge is adw-build §3.7's step 2: one command, alone in its Bash call, the head
-sha written out. A chained line is refused by a permission check even after the word: the owner
-typed six merges by hand for that reason in the same twelve days.
+sha written out. For an independent or final PR with a `verified` row, adw-build §3.7's "owner's
+word on a base that moved" runs first: it tests the merge result and never moves the head. A
+chained line is refused by a permission check even after the word: the owner typed six merges by
+hand for that reason in the same twelve days.
 
 ## 7. Surfaces — the format contract
 
@@ -431,6 +433,7 @@ Five rules (owner feedback, structural after prose failed twice):
    (§6), the `base:` branch (adw-init Phase 0.7; a base other than the default keeps adw-init
    Phase 2's gate), and the `default:` printed after a stop: `blocked`,
    `failed`, or an adw-build §3 progress condition or backstop. That default is the owner's to take.
+   A fourth waits only where `repo-profile §23` asks for it: adw-build §3.2a's design sign-off.
    A run that re-runs itself after its own backstop has defeated the backstop. In 2026-10-02..10-21,
    where the outcome of such a choice was clear, the owner took the recommendation or delegated it 29
    times of 34: "when you recommend to accept, just do it and tell me in the end … if you stop the
@@ -762,8 +765,9 @@ blocked on a human answer. Both surfaces carry the line unconditionally, `0m` in
 
 Take `date +%s` at these points: **T0** run start (before any dispatch) · a **T1/T2**
 pair around every halt that waits on the owner — the approval surface, a re-cut round, a mid-build
-question — T1 immediately before the print, T2 on the answer (a surface printed under adw-init
-Phase 2's skip test waits for nothing and gets no pair) · **T3** at every `⏱ run`
+question, a design sign-off (adw-build §3.2a) — T1 immediately before the print, T2 on the
+answer (a surface printed under adw-init Phase 2's skip test waits for nothing and gets no pair) ·
+**T3** at every `⏱ run`
 print, which on a chained run means twice: once for the handoff's partial, once for the
 run report's total, over one continuing series.
 **Tag every pair with the unit whose PR loop it interrupted** (`—` for a run-level halt
@@ -878,9 +882,9 @@ important the unit is:
 
 | The agent's job | Tier |
 |---|---|
-| **Find** — refute, review, audit, scan, check against a doc, run a fixed checklist | `sonnet` |
+| **Find** — refute, review, audit, scan, check against a doc, run a fixed checklist | `sonnet`. Two kinds of review lane take `repo-profile §15`'s `Lane tier` when it names one: `/code-review`'s lanes (`code-review.md` 4a, 4a-panel) and adw-build §3.7's overlap review |
 | **Clear a `Blocking`** — grade whether an earlier finding still holds at the head (`pr-ready.md` §5), the refutation step of `review-core.md` §9, the check of the app smoke's defect rows (adw-build §3.8) | `opus` — takes precedence over the Find row |
-| **Re-execute and relay** — run gates, report exit codes and output tails, verify, relay the app smoke and its screenshots (adw-build §3.8) | `sonnet` |
+| **Re-execute and relay** — run gates, report exit codes and output tails, verify, relay the app smoke and its screenshots (adw-build §3.8) | `sonnet`. Where `repo-profile §5` names a gate script, the agent runs that script and relays its table (`review-core.md` §4): the script runs the gates, the agent drives it |
 | **Look up** — read a file or a history and answer a bounded question | `haiku` |
 | **Apply a diagnosed finding** — a *separately dispatched* remediation agent, handed findings that already name the defect and the file; the app smoke's fix agent (adw-build §3.8) is one | `sonnet` |
 | **Author** — write a spec, a plan, or production code | **keyed on the unit's `depth:`** — `opus` at D3, `sonnet` at D0–D2 |
@@ -973,7 +977,7 @@ and it names an unverified contract rather than a stale one it cannot do anythin
 failure with no cache at all is **exit 1**, and the run stops.
 
 **What is still per-repo.** `repo-profile.md`, authored in the consuming repo and never fetched.
-Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19, §20, §21 and §22 optional). A contract file that
+Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19, §20, §21, §22 and §23 optional). A contract file that
 needs a value which could differ between two repos is wrong: the value belongs in the profile. The
 failing test is always the same — could this exact sentence be true in a repo with a different
 stack? If not, it names a value, and the value moves.
