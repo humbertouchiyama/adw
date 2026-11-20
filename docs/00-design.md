@@ -598,7 +598,7 @@ ADW unit has run it yet, and no limit is calibrated: the first sign-off records 
 
 **The owner's merge on a moved base (2026-11-19).** A PR the owner merged by hand went onto whatever
 the base had become, and nothing checked the result. Merging the base into the head instead voids
-`ready` and costs a full pass and a review cycle. The owner's word now runs the auto-merge gate's
+`ready` and costs a full pass and a review cycle. In an `adw-build` session the owner's word now runs the auto-merge gate's
 base trial first, and the head never moves: a base that touched none of the PR's files gets the
 gates run on the merge result; one that touched some gets those files alone re-reviewed in the merge
 result, and the gates run there too (adw-build §3.7).
@@ -948,8 +948,9 @@ current text):
    can act on, recommended default stated first. Engineering detail lives one level down
    (the spec, a `<details>` fold), never in the decision line.
 4. **The ask rule binds every question**, mid-build and after the run report too (§3.2). A
-   question it would decide is decided and reported in one line. Merges, `base:` and the
-   `default:` after a stop still wait for the owner; a non-default `base:` keeps the approval
+   question it would decide is decided and reported in one line. Merges, `base:`, the
+   `default:` after a stop and, where `repo-profile §23` asks for it, a unit's visual sign-off still
+   wait for the owner; a non-default `base:` keeps the approval
    gate (adw-init Phase 2).
 5. **Depth renders as its word** (`express` / `spec` / `plan` / `design`, or `port`), never as
    `D<N>`.

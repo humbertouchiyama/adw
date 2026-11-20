@@ -640,7 +640,7 @@ in `§6`; the single-test invocation traps in `§12`; the environment-fault list
 provisioning in `§4`. Read them before the first gate — they are the contract. `<BASE>` is
 `adw/<slug>` for a sub-PR, otherwise the chain's origin base.
 
-**The implementer runs them** — the list, the order, the obligation rule and the `[slow]` rule below go in its brief —
+**The implementer runs them** — the list, the order, the obligation rule, the `[slow]` rule below and, when `repo-profile §5` names a gate script, review-core §4's gate-script rule go in its brief —
 and returns the exit-code vector with the tail of each red. The orchestrator classifies (3.3),
 counts, and feeds back; it does not re-run a gate to check the report. Independence is 3.4's
 job, and it is the point of 3.4: a re-run in this window is neither independent nor cheap
@@ -812,7 +812,7 @@ the number of rounds. A round is not a fix cycle and is not a §3 boundary. The 
 (§3.2) uses the unit's `verify` only, never the compare.
 
 **Who judges what.** The implementer is the one agent that judges an image. Every later agent (the
-§3.4 verifier, the §3.6 driver) runs §23's commands and relays the numbers. A row passes on its
+§3.4 verifier, which the §3.6 driver briefs) runs §23's commands and relays the numbers. A row passes on its
 number, never on a model's reading of a screen.
 
 **The owner signs off before verification**, when `repo-profile §23` Sign-off is `before verify`.
@@ -826,12 +826,18 @@ two or more units wait at the same time, ask once, with one block for each unit:
 sign-off  u3 <unit title> — <n> rows: pass <p> · fail <f> · unscored <u> · no image <i> · rounds <r>
   V1  <state>  <crop>  RMSE <value>  limit <limit>  <result>  <side-by-side path, or —>
   G1  …
-reply: ok → each row that is not pass takes its measured RMSE as its limit, then verification starts · anything else is a note: the implementer applies it, and the run asks again
+if this session ends, run /cleanup, then /adw-build <slug>: the unit builds again
+reply: ok → each row that is not pass takes its measured RMSE, times 1.05 and rounded up to 4 decimals, as its limit, then verification starts · anything else is a note: the implementer applies it, and the run asks again
 ```
 
-- `ok` → by SendMessage, the implementer writes the measured RMSE as the `limit` of each row that
-  is not `pass` and not `no image`, and commits only that change as `docs(spec): visual limits`.
+- `ok` → by SendMessage, the implementer writes the measured RMSE, times 1.05 and rounded up to 4
+  decimals, as the `limit` of each row that is not `pass` and not `no image` (the 5% is headroom for
+  render noise: the verifier renders again in a fresh worktree), and commits only that change as `docs(spec): visual limits`.
   A `no image` row keeps its limit, and it stays a reported gap. Then §3.4.
+- The sign-off waits only in this session: the implementer that receives `ok` is still alive here.
+  If the session ends first, the answer has no receiver, and Phase 0 step 7 refuses a re-run on the
+  unit's registered worktree. The block's last line says so: `if this session ends, run /cleanup,
+  then /adw-build <slug>: the unit builds again`.
 - Any other answer is a note. The implementer applies it, then runs the loop and §3.2's gates
   again, and the run asks again. A note is not a fix cycle.
 
@@ -932,11 +938,16 @@ pipeline knows:
 - **A unit's visual rows (§3.2a).** The verifier's report must ALSO carry §3.2a's result table at
   `$VSHA`, one row per row of the spec's `## Visual scope`. Its brief carries `repo-profile §23` and
   that table, pasted (a final PR: its `V` rows only, Phase 4). In `$VWT`, right after the gates at
-  `$VSHA` and before any step checks out `<BASE>` there, render the states with §23 Renders. Then
-  run `git -C "$VWT" checkout --detach "$BASE"`, render the states of the `G` rows, and compare
-  every row with §23 Compare. The verifier opens no image. A `fail` row is a red, by the same rule
-  as a red gate, except a row that §3.2a already landed `visual not converged`. An `unscored` or
-  `no image` row is reported and is not a red. A report missing the table is a red, by the same
+  `$VSHA`, render the states with §23 Renders and copy each image to a directory outside `$VWT`
+  (§23 Guard capture) at once: Renders writes to one path per state and the next render would
+  overwrite it. Compare the `V` rows. Do the `G` rows last: after §3.2's mutation check and every
+  other step that needs `$VWT` at `$VSHA`, run `git -C "$VWT" checkout --detach "$(git -C "$VWT"
+  merge-base "$BASE" "$VSHA")"` (the fork point, the commit the implementer's base render used,
+  not the base's tip), render the states of the `G` rows, copy those images outside `$VWT` under
+  another name, and compare each `G` row's crop of the head copy with its crop of the base copy.
+  Then run `git -C "$VWT" checkout --detach "$VSHA"` again. The verifier opens no image. A `fail`
+  row is a red, by the same rule as a red gate, except a row that §3.2a already landed `visual not
+  converged`. An `unscored` or `no image` row is reported and is not a red. A report missing the table is a red, by the same
   rule as a missing gate row.
 - **Where the evidence lands: the PR body, not only a comment.** Copy the per-gate table
   and the mutation row into the PR body at 3.5 (re-pass → edit the body). A review comment
@@ -971,10 +982,12 @@ pipeline knows:
   field adds `render gate-mode <exit code>`, so the TRIAL (adw-core §3) leaves a record.
 
   A unit with a `## Visual scope` table (§3.2a) gets one more row, written from the last pass's
-  table and the implementer's rounds, and replaced by each later pass: `visual     rows <n> · pass
+  table and the implementer's rounds (the orchestrator holds them from the implementer's return, and keeps the
+  earlier `visual` row of the body as its record after a compaction), and replaced by each later pass: `visual     rows <n> · pass
   <p> · fail <f> · unscored <u> · no image <i> · rounds <r> · sign-off <sha7>`. `<sha7>` is the
   `docs(spec): visual limits` commit of the owner's `ok`; `sign-off none` when `repo-profile §23`
-  Sign-off is `none`.
+  Sign-off is `none`. A final PR (Phase 4) has no sign-off of its own: its row reads `rounds
+  <sum of the units' rounds> · sign-off none`, and the units' own rows stay in their PR bodies.
 
   A re-pass that `/pr-ready` §4.0 reused writes `reverify reused <PASS id>` in place of
   `reverify <N>m` in `phases`, and keeps the reused pass's `gates` and `mutation` rows.
@@ -1001,7 +1014,10 @@ pipeline knows:
   - `merge      merged <merge sha7> · base unmoved` or `· base trial ok at <base sha7>`, or
     `merge      hold <n> — <reason> · at <head sha7>`: written by §3.7's merge gate on an
     independent or final PR. `<n>` is the gate's condition number 1–9, or `call` for a denied or
-    failed merge call.
+    failed merge call. §3.7's owner-word merge writes `merge      owner-merged <merge sha7> ·
+    base unmoved`, `· base trial ok at <base sha7>` or `· overlap re-reviewed at <base sha7>`
+    instead: it is not an auto-merge, and `scripts/adw_analyze/metrics.py` must not count it as one
+    (its `merged` match is anchored at the start of the row).
 
   `owner-wait` is the decisive one: it is the single bit that distinguishes a 21-hour
   owner gate from a 21-hour stalled pipeline. Git already exposes the *gap* via commit
@@ -1418,7 +1434,7 @@ its next unit. No label is added for a hold.
    dispatch ONE agent, `model: sonnet`, with the tree path, `origin/<INTENT_BASE>` as the base and
    the `repo-profile §5` gates the PR's diff obligates (`repo-profile §6`), including the ones §5
    marks `[slow]`: no pass has checked this tree. It runs each gate in the
-   tree, writes every output under a `mktemp -d` directory outside the tree, edits nothing, and
+   tree (through the gate script, when `repo-profile §5` names one: review-core §4), writes every output under a `mktemp -d` directory outside the tree, edits nothing, and
    returns one line per gate: `<gate> <exit code>`. Any non-zero exit, or a gate with no line →
    `hold 6 gate <name> red`. Then, gates green or red, run step 1's first line, then `python3 "$C"
    discard --checkout "$R" --tree <path>`, in one Bash call. Exit 1 leaves the tree for `/cleanup`;
@@ -1464,10 +1480,14 @@ the merge gate above, and every Bash call starts with the first line of the gate
   so make the merge result at the trial's path, in one Bash call, with the `verified` sha and the PR
   number written out (a clean tree left there by an earlier trial: `discard` it first):
   ```bash
-  T="$R/.claude/worktrees/adw-trial-<slug>-pr<N>"; git -C "$R" fetch -q origin && git -C "$R" worktree add -q --detach "$T" <verified sha> && { git -C "$T" merge --no-edit -q "origin/<INTENT_BASE>" && echo "tree $T base $(git -C "$R" rev-parse "origin/<INTENT_BASE>")" || { git -C "$T" merge --abort; git -C "$R" worktree remove "$T"; echo "conflict"; }; }
+  T="$R/.claude/worktrees/adw-trial-<slug>-pr<N>"; git -C "$R" fetch -q origin && git -C "$R" worktree add -q --detach "$T" <verified sha> && { git -C "$T" merge --no-edit -q "origin/<INTENT_BASE>" && echo "tree $T base $(git -C "$R" rev-parse "origin/<INTENT_BASE>")" || { git -C "$T" merge --abort; git -C "$R" worktree remove "$T"; echo "conflict"; }; } || echo "no tree"
   ```
-  `conflict` → (d). Otherwise run the gates of the gate's step 3 in that tree. Then re-review only
-  the listed files: dispatch one agent, read-only, pinned as adw-core §8 pins a `/code-review` lane,
+  The trial made no tree, so a leftover tree at `$T` that `discard` could not remove (it has
+  uncommitted files) makes `worktree add` fail: the block prints `no tree`, and so does a failed
+  `fetch`. `no tree` → (f), with the reason `no merge-result tree: <the git error>`. Never run the
+  gates or the review in a tree that the block did not print as `tree`. `conflict` → (d). `tree
+  <path> base <sha>` → run the gates of the gate's step 3 in that tree. Then re-review only
+  the listed files: dispatch one agent, read-only, `model:` the `Lane tier` of `repo-profile §15`, else `sonnet` (adw-core §8's Find row),
   with the tree path, the fork point (`git merge-base <verified sha> <base sha>`), the base sha, the
   file list, `review-core.md` §11's brief floor, and this question: "Read each listed file whole in
   the tree, then `git diff <fork> <base sha> -- <file>` and `git diff <fork> <verified sha> --
@@ -1477,13 +1497,17 @@ the merge gate above, and every Bash call starts with the first line of the gate
   `review-core.md` §9's quoted prompt block, its first sentence naming the tree in place of the
   review worktree, and the claim as `POSITIVE | <file:line> | <consequence>`. Then `discard`. All
   gates green and no `Blocking` left after the refuter → (e). Otherwise → (f).
+- **(c2)** Any other trial line (`hold 0 gate error: …`, `hold 6 lock held by <s>`, `hold 2`,
+  `hold 3`, or no line) → no merge. Print `not merged #<N> — <the line>; default: say merge again
+  when the cause is gone, or /pr-ready <N>`. The same holds for those lines at any later call of
+  the gate's steps in (b) and (e).
 - **(d)** `hold 6 conflict: <files>`, or `conflict` from (c) → no merge. A conflict needs a
   resolution commit on the head branch, and that commit voids `ready`. Print `not merged #<N> —
   conflict in <files>; default: resolve it on <head branch>, then /pr-ready <N>`.
 - **(e)** The merge: the second call of the gate's step 4, without its label test (the owner's word
   is the consent), then its third call, with the `verified` row's sha. Then the confirm of the
-  gate's step 5, without its label. Write the `merge` row as that step does; after (c) it ends
-  `· overlap re-reviewed at <base sha7>`.
+  gate's step 5, without its label. Write the `merge` row as that step does, but with `owner-merged`
+  in place of `merged`; after (c) it ends `· overlap re-reviewed at <base sha7>`.
 - **(f)** No merge. Print `not merged #<N> — <the red gate, or the Blocking with its file:line>;
   default: fix it on <head branch>, then /pr-ready <N>`.
 

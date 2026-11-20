@@ -583,7 +583,7 @@ no `verifier-green`. Answer, in this order:
 
 1. **What is this PR?** One clause.
 2. **Is it safe?** What the gates actually said, in words a person can act on.
-3. **What now?** — as a sentence they can **reply with verbatim**. `say "merge" to ship` ·
+3. **What now?** — as a sentence they can **reply with verbatim**. `say "merge" to ship` (a PR with a `verified` row from an `/adw-build` chain: say it to `/adw-build`, whose merge tests a moved base first) ·
    `say "apply and merge"` · `fix <gate> on <branch>, then re-run /pr-ready <N>`.
 
 **Layer 1 is for a human-invoked run. A caller that maps the state takes Layer 2 and §5's open-findings lines** —
