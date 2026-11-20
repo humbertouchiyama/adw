@@ -934,10 +934,10 @@ pipeline knows:
   that table, pasted (a final PR: its `V` rows only, Phase 4). In `$VWT`, right after the gates at
   `$VSHA` and before any step checks out `<BASE>` there, render the states with §23 Renders. Then
   run `git -C "$VWT" checkout --detach "$BASE"`, render the states of the `G` rows, and compare
-  every row with §23 Compare. The verifier
-  opens no image. A `fail` row is a red, by the same rule as a red gate, except a row that §3.2a
-  already landed `visual not converged`. An `unscored` or `no image` row is reported and is not a
-  red. A report missing the table is a red, by the same rule as a missing gate row.
+  every row with §23 Compare. The verifier opens no image. A `fail` row is a red, by the same rule
+  as a red gate, except a row that §3.2a already landed `visual not converged`. An `unscored` or
+  `no image` row is reported and is not a red. A report missing the table is a red, by the same
+  rule as a missing gate row.
 - **Where the evidence lands: the PR body, not only a comment.** Copy the per-gate table
   and the mutation row into the PR body at 3.5 (re-pass → edit the body). A review comment
   is the wrong home for the one artifact that has to outlive the run: three PRs across two
@@ -1472,8 +1472,8 @@ the merge gate above, and every Bash call starts with the first line of the gate
   file list, `review-core.md` §11's brief floor, and this question: "Read each listed file whole in
   the tree, then `git diff <fork> <base sha> -- <file>` and `git diff <fork> <verified sha> --
   <file>`. Does the merged file still do what each side changed it to do? Return one line per
-  defect: `Blocking or Warning | file:line | consequence | the input that shows it`." Send each
-  `Blocking` to one refuter, `model: opus` (adw-core §8's Clear a `Blocking` row), with
+  defect: `Blocking or Warning | file:line | consequence | the input that shows it`." Send all the
+  `Blocking` lines to one refuter, `model: opus` (adw-core §8's Clear a `Blocking` row), with
   `review-core.md` §9's quoted prompt block, its first sentence naming the tree in place of the
   review worktree, and the claim as `POSITIVE | <file:line> | <consequence>`. Then `discard`. All
   gates green and no `Blocking` left after the refuter → (e). Otherwise → (f).
@@ -1870,7 +1870,8 @@ as §3.2 does on any PR. With `merge: auto`, §3.7's merge gate then merges it o
 `merge: hold`, or a gate that holds, it waits for the one human consent. Its body's `## Screens` and `## For your check` join its
 units' lists (§3.5), and its `## Visual result` joins its units' tables. Its 3.4 verify grades
 their `V` rows again (§3.4). It does not grade their `G` rows: each was graded on its own sub-PR,
-and another unit of the chain can alter that area on purpose. No second sign-off is asked. After the carried blocks below are listed, it runs §3.8's
+and another unit of the chain can alter that area on purpose. No second sign-off is asked.
+After the carried blocks below are listed, it runs §3.8's
 app smoke on its verified head, with its smoke fix cycles: the one smoke of the chain. A smoke fix
 cycle's commits land on the integration branch from the close worktree, and its pushed head takes
 the rule below for an answer commit that changes code, once per cycle (§3.8 step 5).
