@@ -379,6 +379,9 @@ whose gate adw-init Phase 2 skipped on such a cut. So:
   `adw:blocked` label and its PR body, is merged into the integration branch, and the chain builds
   on its recommended default. The final PR then lands `blocked`, never `ready`, and lists every
   carried block with its default (adw-build §3.7, Phase 4). The owner answers them all there, once.
+- **The design sign-off waits for the end, too.** Where `repo-profile §23` asks for it, the owner
+  signs off every unit's renders once, after the last unit is built (adw-build §3.2a). Sub-PRs merge
+  before it. No PR merges into a base before it: adw-build §3.7's merge gate holds it (condition 10).
 - **What still stops a chain:** a `failed` sub-PR; a `blocked` sub-PR the next unit cannot build
   on (adw-build §3.7 names three cases: a `depth escalation` or `shape escalation`, whose
   default replaces the unit, a red gate on the pushed head (but a port unit that is `port not converged` is carried), and a driver that returned no
@@ -433,7 +436,8 @@ Five rules (owner feedback, structural after prose failed twice):
    (§6), the `base:` branch (adw-init Phase 0.7; a base other than the default keeps adw-init
    Phase 2's gate), and the `default:` printed after a stop: `blocked`,
    `failed`, or an adw-build §3 progress condition or backstop. That default is the owner's to take.
-   A fourth waits only where `repo-profile §23` asks for it: adw-build §3.2a's design sign-off.
+   A fourth waits only where `repo-profile §23` asks for it: adw-build §3.2a's design sign-off, asked
+   once per run, on the run report, after the last unit is built.
    A run that re-runs itself after its own backstop has defeated the backstop. In 2026-10-02..10-21,
    where the outcome of such a choice was clear, the owner took the recommendation or delegated it 29
    times of 34: "when you recommend to accept, just do it and tell me in the end … if you stop the
@@ -637,11 +641,13 @@ Unanswered items ship with the recommended default, recorded in the spec. A sing
 
 ```
 Next: review + preview + merge PR #NNN (<which>)   ← or, nothing left for the owner: Next: when you test, gh pr list --state merged --label adw:auto-merged
+                                                   ← or, with a pack: Next: sign off the design — open <pack>, then reply ok, or a note naming the unit
 merged   #NNN  <desc> — <units> · walk clean · screens <url> · polish <p> · refuted <r> · ⏱ <N>m   ← merged by adw-build §3.7's gate
 ready    #NNN  <desc> — <units> · gates green · review clean · ⏱ <N>m   ← a PR the gate held ends · held <n>: <reason>
 blocked  #NNN  <unit> — <one sentence>; default: <recommended default> · ⏱ <N>m
 failed   none
 unbuilt  none
+sign-off <pack> — <u> units · <r> rows: pass <p> · fail <f> · unscored <s> · no image <i>   ← only when adw-build §3.2a built the pack
 ⏱ run    machine 2h38m · your gate 20h04m   ← unconditional (§7.1)
 note     contract <short-sha>               ← unconditional, always the first note line
 note     review #NNN — <what ran instead of /code-review>   ← only when a PR skipped it
@@ -671,7 +677,13 @@ comment, and `polish <p>` and `refuted <r>` count the walk's rows that print but
 merge. A `ready` PR the gate held ends `· held <n>: <reason>`, the evidence block's `merge`
 row: the owner merges it, or clears the reason and re-runs. When every PR line is `merged`,
 `Next:` is `Next: when you test, gh pr list --state merged --label adw:auto-merged`.
-Multiple `ready` PRs → the `Next:` line lists them in merge order. `· ⏱ <N>m` is
+Multiple `ready` PRs → the `Next:` line lists them in merge order. **When adw-build §3.2a built the
+design pack, `Next:` is the sign-off, whatever the PR states**: `Next: sign off the design — open
+<pack>, then reply ok, or a note naming the unit`, with `<pack>` the absolute path of its
+`index.html`. The `sign-off` line under the PR lines names the same path and the row counts of the
+whole pack. It is the one design question of the run; the PRs it holds keep their own lines, and a
+carried block keeps its own `default:`. A pack that did not build prints `sign-off pack failed` and
+a `note` line with the script's `pack failed — <why>`. `· ⏱ <N>m` is
 unconditional on every PR line — **net of owner wait**, exactly as §7.1 computes it
 run-wide (`machine = (T3 − T0) − gate`): the per-PR number must not charge the human's
 latency to the unit. It is **reported, never a trigger** — v2.12 replaced the wall-clock
@@ -765,7 +777,7 @@ blocked on a human answer. Both surfaces carry the line unconditionally, `0m` in
 
 Take `date +%s` at these points: **T0** run start (before any dispatch) · a **T1/T2**
 pair around every halt that waits on the owner — the approval surface, a re-cut round, a mid-build
-question, a design sign-off (adw-build §3.2a) — T1 immediately before the print, T2 on the
+question, the design sign-off (adw-build §3.2a: once per pack, run-level) — T1 immediately before the print, T2 on the
 answer (a surface printed under adw-init Phase 2's skip test waits for nothing and gets no pair) ·
 **T3** at every `⏱ run`
 print, which on a chained run means twice: once for the handoff's partial, once for the

@@ -7,6 +7,7 @@
 Every condition is read fresh from GitHub or the profile, never from the run's memory. It prints one line:
 `pass` (exit 0), or `hold <n> <reason>` (exit 1) for the first condition that fails, in this order:
 1 flag (the specs' `merge: auto`, both profiles' `auto-merge default`, no `adw:hold`), 2 base, 3 verified head,
+10 the design sign-off (the evidence block's `visual` row still reads `sign-off pending`, adw-build §3.2a),
 4 paths (merge-protected, money lines), 5 GitHub (mergeable, checks), 7 the walk, 8 the screenshots,
 9 `Smoke: none` / `Screens: none` against the UI paths. Every input fails closed: the merge-protected,
 UI and money rows are read from both the local profile and the base's copy, the stricter wins, and a
@@ -219,6 +220,12 @@ def verified(pr) -> None:
         raise Hold(3, "the evidence block has no verified row")
     if m.group(1) != pr["headRefOid"]:
         raise Hold(3, "verified %s is not the head %s" % (m.group(1)[:7], pr["headRefOid"][:7]))
+
+
+def signoff(pr) -> None:
+    """10: the owner signs the design off once per run, before any merge into a base (adw-build §3.2a)."""
+    if re.search(r"^[ \t]*visual[ \t]+.*\bsign-off[ \t]+pending\b", pr["body"], re.M):
+        raise Hold(10, "the design sign-off is pending")
 
 
 def unquote(p: str) -> str:
@@ -457,6 +464,7 @@ def check(a) -> None:
     profiles = [local, basep]
     base(pr, basep, specs)
     verified(pr)
+    signoff(pr)
     files = read_diff(a)
     names = sorted({p for f in files for p in f["paths"]})
     paths(profiles, files)

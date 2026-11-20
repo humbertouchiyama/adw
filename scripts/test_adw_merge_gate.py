@@ -264,6 +264,20 @@ class TestVerified(Gate):
         self.assertHold(3)
 
 
+class TestSignOff(Gate):
+    def test_sign_off_pending_holds(self):
+        self.set_body(evidence=EVIDENCE.replace("verified ", "visual     rows 4 · pass 1 · fail 0 · unscored 3 · no image 0 · rounds 5 · sign-off pending\nverified "))
+        self.assertHold(10)
+
+    def test_signed_off_passes(self):
+        self.set_body(evidence=EVIDENCE.replace("verified ", "visual     rows 4 · pass 4 · fail 0 · unscored 0 · no image 0 · rounds 5 · sign-off 1a2b3c4\nverified "))
+        self.assertPass()
+
+    def test_sign_off_none_passes(self):
+        self.set_body(evidence=EVIDENCE.replace("verified ", "visual     rows 2 · pass 2 · fail 0 · unscored 0 · no image 0 · rounds 1 · sign-off none\nverified "))
+        self.assertPass()
+
+
 class TestPaths(Gate):
     def test_protected_path_holds(self):
         self.fx["diff"] += diff_file(".claude/repo-profile.md")

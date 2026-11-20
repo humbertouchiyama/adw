@@ -217,7 +217,10 @@ gate file to get green · let a subagent create its own worktree.
    facts, above): do not duplicate it. A `ready` one with a `verified` row equal to its head, or a
    `blocked` one §3.7 can carry, merges by §3.7. Any other — no `verified` row equal to its head,
    `failed`, a `blocked` one §3.7 cannot carry — halts its chain at that unit, and the run-report
-   line says `blocked #N — pre-existing PR from a prior run; merge or close it, then re-run`. A CLOSED-unmerged adw PR is
+   line says `blocked #N — pre-existing PR from a prior run; merge or close it, then re-run`. An open
+   PR whose `visual` evidence row reads `sign-off pending` waits for the owner's design sign-off: the
+   run builds no unit for it, §3.7's gate holds it (condition 10), and Phase 5 builds the pack again
+   and asks (§3.2a). A CLOSED-unmerged adw PR is
    owner-decided: do not rebuild — its chain halts `blocked` at that unit (run report: `closed
    by owner — reopen or re-cut, then re-run`) unless the unit's spec changed after the
    close. A pre-existing unit branch with no PR and NO registered worktree is stale
@@ -246,9 +249,9 @@ gate file to get green · let a subagent create its own worktree.
   things: a merge outside adw-core §6's consent carve-out, and an escalation the owner alone
   can settle (§3.6 → `blocked`). **In a chain neither one stops the run before the final PR:**
   a sub-PR merge is inside the carve-out and is never asked about, and a `blocked` sub-PR is
-  merged as a carried block and answered on the final PR (adw-core §6, §3.7). One more halt
-  exists only where `repo-profile §23` asks for it: §3.2a's design sign-off. It holds its own
-  unit, and the units `after:` it, and nothing else. **A progress
+  merged as a carried block and answered on the final PR (adw-core §6, §3.7). §3.2a's design
+  sign-off is not a halt either: where `repo-profile §23` asks for it, the owner answers it once, on
+  the run report, after the last unit is built. **A progress
   report is not a halt** — print it and keep
   building; the owner reads the run report at the end. When two or more units are ready to ask something,
   ask once with every question numbered (adw-core's approval-surface shape): on
@@ -377,7 +380,8 @@ implement ⟲ gates → verify → open PR → /code-review ⟲ → re-verify �
 ```
 
 A unit whose spec has a `## Visual scope` table runs §3.2a between its gates and verify: render,
-compare and fix, then the owner's sign-off where `repo-profile §23` asks for it.
+compare and fix. The owner's sign-off, where `repo-profile §23` asks for it, comes once, after the
+last unit (§3.2a).
 
 An independent PR or a final PR then runs §3.8's app smoke on its verified head, after the state
 above is decided, and never on a sub-PR. A defect the smoke's check confirms starts a smoke fix
@@ -748,7 +752,7 @@ Three properties hold in every repo, whatever that file declares:
   reviewable as `feat` + `fix-attempt-1..3`, never one blob) → re-run from the failed
   gate. Third cycle exhausted → `failed`.
 
-### 3.2a Visual verify — render, compare, fix, then the owner's sign-off
+### 3.2a Visual verify — render, compare, fix; the owner signs off once, after the last unit
 
 **No gate in §3.2 looks at a rendered screen.** A layout file, a style sheet or a view can compile,
 pass every test and still draw the wrong screen. This step compares the unit's renders with its
@@ -792,8 +796,8 @@ limit), `fail` (above the limit), `unscored` (the limit is `baseline`) or `no im
 not render, or for a `G` row its base render did not: a reported gap, never a pass).
 
 **The implementer runs the loop.** Its brief carries `repo-profile §23`, pasted, and the spec's
-table. The rows are the contract: the implementer never edits a crop, a design image or a limit
-(the sign-off below is the one exception).
+table. The rows are the contract: no agent edits a crop, a design image or a limit. The one
+exception is the limits commit of the owner's `ok` (below).
 
 0. Before the first code edit, while the worktree holds no code change on `<BASE>`, render each
    state that a `G` row names, and keep those images outside the worktree, as §23 Guard capture
@@ -815,41 +819,97 @@ the number of rounds. A round is not a fix cycle and is not a §3 boundary. The 
 §3.4 verifier, which the §3.6 driver briefs) runs §23's commands and relays the numbers. A row passes on its
 number, never on a model's reading of a screen.
 
-**The owner signs off before verification**, when `repo-profile §23` Sign-off is `before verify`.
-After §3.4, a design change costs a re-verify and a review cycle (`/pr-ready` §6). Before it, the
-change costs one more round. Stamp `T1` just before the print and `T2` on the answer (adw-core
-§7.1), charged to this unit. Print the block, then end the turn: the owner's answer, or the return
-of another unit's agent, wakes the session. Only this unit, and the units `after:` it, wait. When
-two or more units wait at the same time, ask once, with one block for each unit:
+**The owner signs off once, after the last unit**, when `repo-profile §23` Sign-off is `end of run`.
+A profile that still says `before verify` runs as `end of run`. The per-unit sign-off is retired:
+it stopped each run at its first visual unit, so the owner was pulled back after every unit (three
+runs of `idle-hunt-rpg`, 2026-11-20). Now nothing waits while the units build. Each unit runs this
+loop, §3.4, §3.6 and §3.7 like any unit, and a chain merges its sub-PRs into `adw/<slug>`. What
+waits is every merge into a base: an independent PR and a chain's final PR hold until the owner's
+`ok` (§3.7's merge gate, condition 10). Nothing reaches the intent's base before the owner signs off.
 
+- **A `fail` row after Max rounds waits for the sign-off.** The unit is not `blocked` for it. §3.4's
+  verifier reports the row and does not count it as a red (§3.4). The pack shows it, and `ok` takes
+  its measured RMSE as its limit.
+- **The pack covers each PR that merges into a base**: an independent PR, and a chain's final PR. The
+  §3.4 verifier of such a PR renders every state that its units' tables name, at the verified head
+  and at the fork point, and keeps the images in the pack directory (§3.4). A sub-PR's verifier does
+  not: the final PR's renders show what the chain ships.
+- **The pack is built after the last unit**: every unit of the run has reached a §3.7 state, and a
+  chain's final PR has run Phase 4's loop and §3.8. Phase 5 builds it before the run report, and the
+  run report asks the one question (adw-core §7). A run with no such PR (a chain that halted before
+  its final PR) asks nothing: its report carries `note visual sign-off not asked — <why>`, and the
+  re-run asks it.
+
+**The pack.** The directory is `<main checkout>/.claude/adw/visual/<slug>/`, outside every worktree,
+so Phase 5's cleanup does not remove it. Write a manifest from the PR bodies, never from memory: the
+`## Visual result` section (§3.5) of each PR the pack covers, and the evidence block of each unit's
+own PR (its sub-PR in a chain). Write it as `manifest.json` in the pack directory, then build the
+page, in one Bash call:
+
+```bash
+R="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"   # the main checkout
+K="$R/.claude/adw/visual/<slug>"; S="$R/.claude/adw/cache/scripts/adw-visual-pack.py"; test -f "$S" || S="$(git rev-parse --show-toplevel)/scripts/adw-visual-pack.py"
+python3 "$S" --pack "$K" --manifest "$K/manifest.json"
 ```
-sign-off  u3 <unit title> — <n> rows: pass <p> · fail <f> · unscored <u> · no image <i> · rounds <r>
-  V1  <state>  <crop>  RMSE <value>  limit <limit>  <result>  <side-by-side path, or —>
-  G1  …
-if this session ends, run /cleanup, then /adw-build <slug>: the unit builds again
-reply: ok → each row that is not pass takes its measured RMSE, times 1.05, at least 0.0001 and rounded up to 4 decimals, as its limit, then verification starts · anything else is a note: the implementer applies it, and the run asks again
-```
 
-- `ok` → by SendMessage, the implementer writes the measured RMSE, times 1.05, at least 0.0001 and rounded up to 4
-  decimals, as the `limit` of each row that is not `pass` and not `no image` (the 5% is headroom for
-  render noise: the verifier renders again in a fresh worktree), and commits only that change as `docs(spec): visual limits`.
-  A `no image` row keeps its limit, and it stays a reported gap. Then §3.4.
-- The sign-off waits only in this session: the implementer that receives `ok` is still alive here.
-  If the session ends first, the answer has no receiver, and Phase 0 step 7 refuses a re-run on the
-  unit's registered worktree. The block's last line says so: `if this session ends, run /cleanup,
-  then /adw-build <slug>: the unit builds again`.
-- Any other answer is a note. The implementer applies it, then runs the loop and §3.2's gates
-  again, and the run asks again. A note is not a fix cycle.
+The script's docstring gives the manifest's shape. Fill it this way:
 
-**With `Sign-off` `none`**, nothing waits. Each `unscored` or `no image` row is reported: the PR
-line carries `· ⚠ visual: <u> unscored, <i> no image`.
+- one `units` entry for each unit with a `## Visual scope` table, in unit order: its `title` from its
+  spec; a `summary` of one or two plain sentences that say what the user now sees; and `checks`, the
+  `gates`, `mutation`, `cycles` and `visual` rows of its own PR's evidence block, each prefixed with
+  its PR number (`#98 gates …`), copied verbatim;
+- its `rows` from the covered PR's `## Visual result`, the unit prefix dropped from the id: the
+  state, the crop, `design_crop` from the spec's `design` cell (the part after `@`, or empty), the
+  RMSE, the limit, the result, `graded` (the PR and pass that measured it) and the three image paths;
+- `prs`: one line for each PR the pack covers, `#<N> <title> · <state> · <its gates row>`;
+- `round`: 1, and one more after each note; `note`: the owner's last note, verbatim, or empty.
+
+The script prints `pack <path> · <u> units · <r> rows · <i> images · <m> missing`; `pack failed —
+<why>` names the field to fix. Fix it and run the script again. Then put one line first in the
+`## Visual result` of each PR the pack covers, one `gh pr edit` each: `pack <path> — on the machine
+that made it`. A pack that does not build is not asked about: the run report carries the failed
+line as a `note`, and its sign-off line reads `sign-off pack failed`.
+
+**The question is on the run report** (adw-core §7): its `sign-off` line names the pack and the row
+counts, and its `Next:` asks for the one answer. Stamp `T1` just before the report and `T2` on the
+answer (adw-core §7.1, run-level). The answer is for the whole run:
+
+- **`ok`** → the run writes the new limits. For each PR the pack covers, in its worktree (a chain's
+  close worktree, or the unit worktree of an independent PR; Phase 5 removed it, so re-create it as
+  Phase 5 says), each row that is not `pass` and not `no image` takes the RMSE the pack shows for it,
+  times 1.05, at least 0.0001 and rounded up to 4 decimals, as the `limit` in its spec's `## Visual
+  scope` (the 5% is headroom for render noise: the verifier renders again). A `no image` row keeps its
+  limit, and it stays a reported gap. Commit only that change, one commit per branch, as
+  `docs(spec): visual limits`, and push. That commit is docs-only: the PR needs §3.4's verify alone
+  (`/pr-ready` §4 and §5 at the new head, with the next `PASS` id, and no review cycle), which writes
+  its `visual` row with `sign-off <sha7>` and its `verified` row. Then §3.7 for that PR: the merge
+  gate, or the owner's merge. Then print the run report again.
+- **Any other answer is a note.** It names the units it is for (`u4: …`); a note that names no unit
+  is for every unit in the pack. For each named unit, one at a time, dispatch one implementer
+  (`model:` by the unit's depth, adw-core §8) in the worktree of the PR the pack covers for it,
+  re-created as above. Its brief carries the note, the unit's spec and table, `repo-profile §23` and
+  this section. It applies the note, then runs this loop on the unit's `V` rows only (the worktree
+  holds the unit's code, so it cannot render the base for a `G` row; the §3.4 verifier renders it)
+  and §3.2's gates, and commits as `fix(design): <the note, in a few words>`. A note is not a fix cycle, and `fix(design):` counts in no cycle counter.
+  A commit that changes code voids `ready`: the PR runs §3.4 and §3.6 again, with fresh review-cycle
+  counters, and §3.8 again where it applies. Then build the pack again (`round` plus one, `note` the
+  owner's words) and print the run report again: it asks again.
+
+**The sign-off does not need this session.** Every fact it reads is durable: the `visual` row's
+`sign-off pending`, each PR's `## Visual result` and the pack on disk. A new `/adw-build <slug>`
+finds the covered PRs open (Phase 0 step 7), builds the pack again from their bodies, and its run
+report asks again.
+
+**With `Sign-off` `none`**, nothing waits and no pack is built. Each `unscored` or `no image` row is
+reported: the PR line carries `· ⚠ visual: <u> unscored, <i> no image`.
 
 **A `fail` row with no `ok` is not converged.** With `Sign-off` `none`, a `fail` row after Max
 rounds makes the unit `blocked`: `visual not converged — <each fail row, with its RMSE and limit>;
 default: look at the images in ## Visual result, then accept those limits, or re-run /adw-init to
 extend this intent with a fix-up unit`. As for a port unit (§3.1), the unit still goes on through
 3.4, 3.5 and 3.6. That red is never fed back as a fix cycle and never classified by §3.3, and the
-unit lands `blocked` with this reason whatever the verifier and the driver return.
+unit lands `blocked` with this reason whatever the verifier and the driver return. With `end of
+run`, the row waits for the sign-off instead (above).
 
 The table goes into the PR body (§3.5) and into the `visual` evidence row (§3.4), and §3.4's
 verifier grades every row again at the verified head.
@@ -937,7 +997,8 @@ pipeline knows:
   gate row — except `gate-mode build exceeded <n> min`, which is an environment fault (§3.3).
 - **A unit's visual rows (§3.2a).** The verifier's report must ALSO carry §3.2a's result table at
   `$VSHA`, one row per row of the spec's `## Visual scope`. Its brief carries `repo-profile §23` and
-  that table, pasted (a final PR: its `V` rows only, Phase 4). In `$VWT`, right after the gates at
+  that table, pasted (a final PR: its `V` rows only, Phase 4; with Sign-off `end of run`, every row,
+  for the pack's images below). In `$VWT`, right after the gates at
   `$VSHA`, render the states with §23 Renders and copy each image to a directory outside `$VWT`
   (§23 Guard capture) at once: Renders writes to one path per state and the next render would
   overwrite it. Compare the `V` rows. Do the `G` rows last: after §3.2's mutation check and every
@@ -948,8 +1009,25 @@ pipeline knows:
   §23 Guard capture says), and compare each `G` row's crop of the head copy with its crop of the base copy.
   Then run `git -C "$VWT" checkout --detach "$VSHA"` again. The verifier opens no image. A `fail`
   row is a red, by the same rule as a red gate, except a row that §3.2a already landed `visual not
-  converged`. An `unscored` or `no image` row is reported and is not a red. A report missing the table is a red, by the same
+  converged`, and, under `repo-profile §23` Sign-off `end of run`, a row that was already `fail` in
+  the unit's last result table (§3.2a: it waits for the sign-off; the brief carries that table). An
+  `unscored` or `no image` row is reported and is not a red. A report missing the table is a red, by the same
   rule as a missing gate row.
+
+  **The pack's images (Sign-off `end of run`, on an independent PR or a final PR only).** This
+  verifier also renders, at the fork point, the state of every row it did not render there yet (a
+  final PR: the states of its units' `G` rows too, for the images only; it still grades its `V` rows
+  only), and it copies every image it rendered, at `$VSHA` and at the fork point, into the pack, not
+  into a scratch directory. Make the two directories in one Bash call, before the first render (the
+  `.gitignore` keeps the pack out of `git status`):
+
+  ```bash
+  K="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.claude/adw/visual/<slug>"; P="$K/renders/<REF>-<PASS>"; mkdir -p "$P/head" "$P/base" && printf '*\n' > "$K/.gitignore" && echo "$P"
+  ```
+
+  It returns, after its table, one line for each row of every unit's table: `image <id> · before
+  <path or none> · after <path or none> · goal <design image path, or base>`, each path absolute
+  (a state that does not exist at the fork point is `before none`).
 - **Where the evidence lands: the PR body, not only a comment.** Copy the per-gate table
   and the mutation row into the PR body at 3.5 (re-pass → edit the body). A review comment
   is the wrong home for the one artifact that has to outlive the run: three PRs across two
@@ -985,10 +1063,12 @@ pipeline knows:
   A unit with a `## Visual scope` table (§3.2a) gets one more row, written from the last pass's
   table and the implementer's rounds (the orchestrator holds them from the implementer's return, and keeps the
   earlier `visual` row of the body as its record after a compaction), and replaced by each later pass: `visual     rows <n> · pass
-  <p> · fail <f> · unscored <u> · no image <i> · rounds <r> · sign-off <sha7>`. `<sha7>` is the
-  `docs(spec): visual limits` commit of the owner's `ok`; `sign-off none` when `repo-profile §23`
-  Sign-off is `none`. A final PR (Phase 4) has no sign-off of its own: its row reads `rounds
-  <sum of the units' rounds> · sign-off none`, and the units' own rows stay in their PR bodies.
+  <p> · fail <f> · unscored <u> · no image <i> · rounds <r> · sign-off <state>`. `<state>` is `none`
+  when `repo-profile §23` Sign-off is `none`. With `end of run` (§3.2a) it is `pending` on a PR the
+  pack covers (an independent PR, a final PR) until the owner's `ok`, then the `<sha7>` of its
+  `docs(spec): visual limits` commit; and `final` on a sub-PR, whose sign-off is its final PR's. §3.7's
+  merge gate holds a PR whose row reads `sign-off pending` (condition 10). A final PR's row reads
+  `rounds <sum of the units' rounds>`, and the units' own rows stay in their PR bodies.
 
   A re-pass that `/pr-ready` §4.0 reused writes `reverify reused <PASS id>` in place of
   `reverify <N>m` in `phases`, and keeps the reused pass's `gates` and `mutation` rows.
@@ -1014,7 +1094,7 @@ pipeline knows:
     gate and its sub-PR procedure compare the head against it.
   - `merge      merged <merge sha7> · base unmoved` or `· base trial ok at <base sha7>`, or
     `merge      hold <n> — <reason> · at <head sha7>`: written by §3.7's merge gate on an
-    independent or final PR. `<n>` is the gate's condition number 1–9, or `call` for a denied or
+    independent or final PR. `<n>` is the gate's condition number 1–10, or `call` for a denied or
     failed merge call. §3.7's owner-word merge writes `merge      owner-merged <merge sha7> ·
     base unmoved`, `· base trial ok at <base sha7>` or `· overlap re-reviewed at <base sha7>`
     instead: it is not an auto-merge, and `scripts/adw_analyze/metrics.py` must not count it as one
@@ -1174,9 +1254,13 @@ against the base (step 2 and 3 of the merge gate).
   Where `repo-profile §23` exists, `## For your check` also holds what its Blind spots row says a
   render cannot show, for the screens this PR changes.
 - **A unit with a `## Visual scope` table (§3.2a) carries a `## Visual result` section** after
-  `## For your check`: the last pass's result table, one row per crop, then the side-by-side path of
-  each row that is not `pass`, on the machine that made it. A final PR joins its units' tables, each
-  id prefixed with its unit (`u2 V1`).
+  `## For your check`: the last pass's result table, one row per crop, `| id | state | crop | RMSE |
+  limit | result | graded on |`, where `graded on` is the PR and pass that measured the row (`#98 v2`).
+  With `repo-profile §23` Sign-off `none`, the side-by-side path of each row that is not `pass`
+  follows, on the machine that made it. With `end of run`, on a PR the pack covers (§3.2a), the
+  verifier's `image` lines (§3.4) follow, verbatim, and the pack's path heads the section once the
+  pack is built. A final PR joins its units' tables, each id prefixed with its unit (`u2 V1`): its
+  `V` rows from its own verify, and its units' `G` rows from their sub-PRs, `graded on` that sub-PR.
 - **Before the cases are final, read the code at the PR head** for every field, control and screen a
   step names. A case that names what the code does not have is rewritten. Code that lacks what its
   criterion asks for is a defect: fix it before the walk, back through §3.1. The walk never finds
@@ -1216,8 +1300,8 @@ carries "wait for every agent you dispatch by `review-core.md` §10, never by po
 brief you write with `review-core.md` §11's lines" (for a port
 unit also §3.1's wait block and `repo-profile §20`'s Gate mode row, which the driver pastes into the
 verifier's brief for its gate-mode `verify`; for a unit with a `## Visual scope` table also
-`repo-profile §23` and that table, which the driver pastes into the verifier's brief for its visual
-rows, §3.4), and:
+`repo-profile §23`, that table and the unit's last result table, which the driver pastes into the
+verifier's brief for its visual rows, and the pack's image step on a PR the pack covers, §3.4), and:
 run `/pr-ready <N> apply` with `BASE`, `PASS=v2` (the next `PASS` id when 3.4 already used `v2`) and `REF` set to 3.4's values, carrying the
 unit's `verify` command and 3.2's mutation obligation for the §4 re-pass inside it, and `PRIOR`
 (`/pr-ready` §1) set to this unit's last pass. Its `PASS` id and its 40-character `$VSHA` come
@@ -1234,7 +1318,7 @@ render-grade row, and a unit's visual table (§3.4). Return
 **Layer 2 only, plus the open-findings lines below** (`/pr-ready` §7 — suppress Layer 1 in the
 brief): the `ready|blocked` machine
 line with `verified <sha7>`, the review cycle count and tier, the per-gate table and mutation
-row (and a unit's visual table) from the re-pass (or the reused ones, with `/pr-ready` §7's `pass: reused <PASS id> at <sha7>`
+row (and a unit's visual table, with its `image` lines) from the re-pass (or the reused ones, with `/pr-ready` §7's `pass: reused <PASS id> at <sha7>`
 line), the §5 review-evidence count, the `/pr-ready` §5 open-findings lines
 (`closed:` / `open:`, or `open-findings: none` / `fetch failed` / `NOT RUN`), the §8 cleanup line,
 and on `blocked` the question with its default. The brief also asks the driver one question before
@@ -1351,7 +1435,7 @@ consent — and adds:
 
 | State | Action |
 |---|---|
-| **ready** | write the `verified` row (§3.4) from `$VSHA`. Independent/final PR: after §3.8 and its screenshot relay, the merge gate below; it merges on `pass`, else the PR stays open and the human reviews, previews, merges. Sub-PR: merge it now, without asking (adw-core §6) — the merge procedure below, with the `verified` row as the head |
+| **ready** | write the `verified` row (§3.4) from `$VSHA`. Independent/final PR: after §3.8 and its screenshot relay, the merge gate below; it merges on `pass`, else the PR stays open and the human reviews, previews, merges. A PR that waits for §3.2a's sign-off holds `10` until the owner's `ok`. Sub-PR: merge it now, without asking (adw-core §6) — the merge procedure below, with the `verified` row as the head |
 | **blocked** | label `adw:blocked`, PR body, and the `verified` row (§3.4) when the driver returned `verified <sha7>`. Independent/final PR: leave open. Sub-PR → **carried**: merge it by the procedure below and build the next unit on its recommended default; the final PR answers for it (Phase 4). Sub-PR that cannot be carried (below) → chain halts; the halting PR's body lists every unbuilt unit of its chain |
 | **failed** | label `adw:failed`, PR body with the last red gate output, non-draft. Sub-PR → chain halts, same bookkeeping |
 
@@ -1896,7 +1980,10 @@ as §3.2 does on any PR. With `merge: auto`, §3.7's merge gate then merges it o
 `merge: hold`, or a gate that holds, it waits for the one human consent. Its body's `## Screens` and `## For your check` join its
 units' lists (§3.5), and its `## Visual result` joins its units' tables. Its 3.4 verify grades
 their `V` rows again (§3.4). It does not grade their `G` rows: each was graded on its own sub-PR,
-and another unit of the chain can alter that area on purpose. No second sign-off is asked.
+and another unit of the chain can alter that area on purpose. With `repo-profile §23` Sign-off
+`end of run`, its verify also renders the states of every row for the pack (§3.4), and the owner's
+design sign-off (§3.2a) is asked after its loop and §3.8, on the run report, beside the carried
+blocks.
 After the carried blocks below are listed, it runs §3.8's
 app smoke on its verified head, with its smoke fix cycles: the one smoke of the chain. A smoke fix
 cycle's commits land on the integration branch from the close worktree, and its pushed head takes
@@ -1911,8 +1998,8 @@ gh pr list --state merged --base adw/<slug> --label adw:blocked --json number,ti
 A non-empty list → the final PR is `blocked`, never `ready`, whatever its own loop returned.
 Add `adw:blocked` to it, and put one line per carried sub-PR at the top of its body and on its
 run-report line: `carried #<n> <unit> — <the one-sentence reason>; default: <default>`. This is
-the chain's one stop: the owner answers every carried block and gives the merge consent in the
-same place. A `blocked` final PR never meets §3.7's merge gate, whatever the flag: a carried block
+the chain's one stop: the owner answers every carried block, signs off the design (§3.2a) and gives
+the merge consent in the same place. A `blocked` final PR never meets §3.7's merge gate, whatever the flag: a carried block
 always waits for the owner. When the owner answers a carried block, apply the answer on the integration branch
 as its own commit (a default the owner accepts needs none), from the close worktree: Phase 5
 removed it when it was clean, so re-create it first, as Phase 5 says. An answer commit that changes
@@ -2032,7 +2119,8 @@ The cleanup runs here, before the owner tests, on purpose: the wait for the owne
 is the longest idle time of a run, often a night, and other runs fill the disk during it. Work after
 the report that needs a worktree the script removed re-creates it first, then provisions it
 (`repo-profile §4`). That work is Phase 4's answer commit on a final PR, the §3.8 smoke fix cycle
-that follows it, and a fix the owner asks for after testing a PR. One Bash call:
+that follows it, §3.2a's work on the owner's sign-off answer, and a fix the owner asks for after
+testing a PR. One Bash call:
 `git fetch origin && git branch -f <branch> origin/<branch> && git worktree add "<path>" <branch>`.
 If `git branch -f` refuses because another checkout holds the branch (the owner's, to test it), run
 `git worktree add --detach "<path>" origin/<branch>` instead and push with `git push origin HEAD:<branch>`.
@@ -2042,6 +2130,12 @@ reported the PR's new state, run the cleanup call above again with the same flag
 last line and each `kept` line as `note` lines at the end of that report, not as a second run report: it removes the re-created worktree and the verify and review
 worktrees the fix made.
 
+**Then the design pack (§3.2a)**, when `repo-profile §23` Sign-off is `end of run` and a PR of this
+run that the pack covers has a `visual` row that reads `sign-off pending`: build it as §3.2a says,
+and link it from those PRs' bodies. The run report then asks the sign-off (adw-core §7). It is built
+after the cleanup on purpose: its images are in the pack directory, which the cleanup does not
+touch, and the report is the owner's longest wait.
+
 **Card first (adw-core §10).** When the headers carry `card:`, run §10's connection read again (do not
 rely on Phase 0's result: the context may have been compacted since). When the tracker is on, move the
 card to `repo-profile §22` `done` when every PR of the run is `merged`, else to `review` if at least one
@@ -2050,5 +2144,5 @@ PR is `ready` or (some PR `merged` and another `blocked`), and post or skip the 
 report only for an off tracker or a failed call.
 
 Print the **run report exactly** (adw-core §7): one line per PR, merged → ready → blocked → failed →
-unbuilt; `Next:` names the merge order, or, when every PR merged, `Next: when you test, gh pr list
+unbuilt; `Next:` asks the design sign-off when the pack was built (§3.2a), else names the merge order, or, when every PR merged, `Next: when you test, gh pr list
 --state merged --label adw:auto-merged`. The report is the whole message — nothing else is printed, except that second cleanup's `note` lines.
