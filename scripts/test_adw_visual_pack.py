@@ -98,11 +98,108 @@ class Pack(unittest.TestCase):
         self.assertIn('data-crop="0,2,4,2"', self.page())
 
     def test_guard_row_has_no_goal_image(self):
-        self.run_pack(self.manifest())
+        m = self.manifest()
+        m["units"][0]["rows"][2]["rmse"] = "0.0040"
+        self.run_pack(m)
         page = self.page()
         self.assertIn("it must look the same as Before", page)
-        self.assertIn("Same as Before", page)
         self.assertIn("Not measured: it should look the same as before", page)
+        hud = self.card(page, "s2")
+        self.assertNotIn('data-k="goal"', hud)
+
+    def card(self, page: str, sid: str) -> str:
+        return page.split('<article class="screen" id="%s"' % sid)[1].split("</article>")[0]
+
+    def test_changed_areas_come_first(self):
+        m = self.manifest()
+        m["units"][0]["rows"][2]["rmse"] = "0.0040"
+        self.run_pack(m)
+        page = self.page()
+        shops, hud = self.card(page, "s1"), self.card(page, "s2")
+        top = shops.split('<details class="full">')[0]
+        self.assertEqual(top.count('class="area"'), 2)  # V1 and V2, above the full screens
+        v1 = top.split('<i class="tag v">V1</i>')[1].split('class="area"')[0]
+        self.assertLess(v1.index("<figcaption>After"), v1.index("<figcaption>Design"))
+        self.assertIn('data-crop="0,0,4,2"', v1)
+        g1 = hud.split('<details class="full">')[0].split('<i class="tag g">G1</i>')[1]
+        self.assertLess(g1.index("<figcaption>Before"), g1.index("<figcaption>After"))
+        self.assertNotIn("<figcaption>Design", g1)
+        full = shops.split('<details class="full">')[1].split("</details>")[0]
+        for k in ("before", "after", "goal"):
+            self.assertIn('data-k="%s"' % k, full)
+
+    def test_full_screens_box_every_area_by_kind(self):
+        m = self.manifest()
+        m["units"][0]["rows"][2]["rmse"] = "0.0040"
+        self.run_pack(m)
+        page = self.page()
+        full = self.card(page, "s1").split('<details class="full">')[1]
+        before = full.split('data-k="before"')[1].split("</figure>")[0]
+        self.assertIn('<span class="box v" data-box="0,0,4,2" hidden>', before)
+        self.assertIn('<span class="box v" data-box="0,2,4,2" hidden>', before)
+        goal = full.split('data-k="goal"')[1].split("</figure>")[0]
+        self.assertIn('data-box="0,3,4,2"', goal)  # the design crop, on the design
+        self.assertNotIn('data-box="0,2,4,2"', goal)
+        hud = self.card(page, "s2").split('<details class="full">')[1]
+        self.assertIn('<span class="box g" data-box="0,4,4,2" hidden><span class="ids"><i class="tag g">G1</i>', hud)
+        self.assertIn("b.style.left=(c[0]/W*100)+'%'", page)  # percent of the natural size
+
+    def test_one_box_for_rows_that_share_an_area(self):
+        m = self.manifest()
+        m["units"][0]["rows"][1]["crop"] = "0,0,4,2"
+        self.run_pack(m)
+        before = self.card(self.page(), "s1").split('data-k="before"')[1].split("</figure>")[0]
+        self.assertEqual(before.count('class="box'), 1)
+        self.assertIn('<i class="tag v">V1</i><i class="tag v">V2</i>', before)
+
+    def test_check_line_from_rows_else_summary(self):
+        self.run_pack(self.manifest())
+        self.assertIn('<p class="look"><b>Check:</b> Gold title bar &amp; tabs.</p>', self.card(self.page(), "s1"))
+        m = self.manifest()
+        m["units"][0]["rows"][0]["check"] = "The title reads MERCADOR"
+        self.run_pack(m)
+        self.assertIn('<b>Check:</b> The title reads MERCADOR</p>', self.card(self.page(), "s1"))
+        m["units"][0]["rows"][1]["check"] = "The tabs sit under the title"
+        self.run_pack(m)
+        self.assertIn("<b>Check:</b> V1: The title reads MERCADOR · V2: The tabs sit under the title</p>", self.page())
+
+    def test_check_must_be_a_string(self):
+        m = self.manifest()
+        m["units"][0]["rows"][0]["check"] = ["no"]
+        code, line = self.run_pack(m)
+        self.assertEqual(code, 1)
+        self.assertIn("V1: check is not a string", line)
+
+    def test_unchanged_guard_screens_fold_into_one_line(self):
+        self.run_pack(self.manifest())  # G1 measured 0.0000
+        page = self.page()
+        unit = page.split('<section class="unit"')[1].split("</section>")[0]
+        self.assertNotIn('id="s2"', unit)
+        same = page.split('<section class="same" id="same">')[1].split("</section>")[0]
+        self.assertIn("<b>1 screen unchanged</b>", same)
+        self.assertIn('<details class="one"><summary>u4 · Hud · Main</summary><article class="screen" id="s2"', same)
+        self.assertIn("Unchanged: the same as before", same)
+        self.assertIn('<a href="#same">1 screen unchanged</a>', page.split('<section class="unit"')[0])
+        self.assertIn('name="s2" value="wrong"', same)  # its card still feeds the one answer
+
+    def test_guard_screen_with_any_difference_stays_in_full(self):
+        for rmse, result in (("0.0061", "unscored"), ("", "no image"), ("0", "fail")):
+            m = self.manifest()
+            m["units"][0]["rows"][2].update(rmse=rmse, result=result)
+            self.run_pack(m)
+            page = self.page()
+            self.assertNotIn('id="same"', page, rmse)
+            self.assertIn('id="s2"', page.split('<section class="unit"')[1].split("</section>")[0])
+
+    def test_unit_with_only_unchanged_screens_points_to_the_fold(self):
+        m = self.manifest()
+        m["units"].append({"unit": "u5", "title": "Hud only", "summary": "Nothing moves.",
+                           "rows": [dict(m["units"][0]["rows"][2])]})
+        self.run_pack(m)
+        page = self.page()
+        u5 = page.split('<section class="unit" id="u5">')[1].split("</section>")[0]
+        self.assertIn("Every screen of this unit is unchanged", u5)
+        self.assertIn("<b>2 screens unchanged</b>", page)
 
     def test_missing_image_is_shown_and_counted(self):
         m = self.manifest()
@@ -200,7 +297,7 @@ class Pack(unittest.TestCase):
 
     def test_numbers_are_folded_away(self):
         self.run_pack(self.manifest())
-        self.assertIn("<details><summary>Numbers and zoomed areas</summary>", self.page())
+        self.assertIn("<details><summary>Numbers</summary><div class=\"scroll\"><table>", self.page())
 
     def test_rebuild_replaces_the_page(self):
         self.run_pack(self.manifest())
