@@ -774,10 +774,10 @@ the areas that its change must not alter. One row is one crop of one rendered st
 
 ```
 ## Visual scope
-| id | state | crop | design | limit |
-|---|---|---|---|---|
-| V1 | <the state, as repo-profile §23 Renders names its image> | <x>,<y>,<w>,<h> | <design image>[@<x>,<y>,<w>,<h>] | <RMSE, or baseline> |
-| G1 | <the state> | <x>,<y>,<w>,<h> | base | <RMSE, or baseline> |
+| id | state | crop | design | limit | check |
+|---|---|---|---|---|---|
+| V1 | <the state, as repo-profile §23 Renders names its image> | <x>,<y>,<w>,<h> | <design image>[@<x>,<y>,<w>,<h>] | <RMSE, or baseline> | <what the owner sees there> |
+| G1 | <the state> | <x>,<y>,<w>,<h> | base | <RMSE, or baseline> | <what the owner sees there> |
 ```
 
 - A `V` row (compare) is an area that the change alters. Its crop of the render is compared with
@@ -788,6 +788,11 @@ the areas that its change must not alter. One row is one crop of one rendered st
   capture). A difference there is a regression, not a design question.
 - `limit` is a number from `repo-profile §23` Limits, or `baseline` when §23 says that no limit is
   calibrated.
+- `check` (optional) is one plain sentence that says what the owner should see in that area
+  (`The title reads MERCADOR`). Only the sign-off pack reads it; no compare does. A table without
+  the column, or every row of a screen with the cell empty, is valid: the pack then shows the unit's
+  summary for that screen. One `check` on a screen shows alone, so fill it on every row of a screen
+  that has several. Write no `|` in it: it splits the table cell.
 - Every other area of every render is out of scope. No agent compares it, and no agent opens it.
 
 `repo-profile §23` Compare gives one RMSE per row. The result is one table row per crop:
@@ -861,8 +866,8 @@ The script's docstring gives the manifest's shape. Fill it this way:
   `gates`, `mutation`, `cycles` and `visual` rows of its own PR's evidence block, each prefixed with
   its PR number (`#98 gates …`), copied verbatim;
 - its `rows` from the covered PR's `## Visual result`, the unit prefix dropped from the id: the
-  state, the crop, `design_crop` from the spec's `design` cell (the part after `@`, or empty), the
-  RMSE, the limit, the result, `graded` (the PR and pass that measured it) and the three image paths
+  state, the crop, `design_crop` from the spec's `design` cell (the part after `@`, or empty),
+  `check` from the spec's `check` cell (or empty), the RMSE, the limit, the result, `graded` (the PR and pass that measured it) and the three image paths
   from its `image` line, a `none` copied as `none` (the page says why; it is not a missing image);
 - `screens` (optional): a plain title for each `state`, as `"<state>": "<plain title>"`,
   written for a person who has not seen the test names; a state with no entry gets its test name in words;
@@ -872,7 +877,7 @@ The script's docstring gives the manifest's shape. Fill it this way:
 The script prints `pack <path> · <u> units · <r> rows · <i> images · <m> missing`; `pack failed —
 <why>` names the field to fix. Fix it and run the script again. When `<m>` counts images that the
 PR bodies name but this machine does not have (the pack was made on another machine, or its folder
-was deleted), the `sign-off` line says so (adw-core §7): the owner can answer from the "Numbers and zoomed areas" fold of each screen, or
+was deleted), the `sign-off` line says so (adw-core §7): the owner can answer from the "Numbers" fold of each screen, or
 ask for the covered PR's §3.4 verify again on this machine, which renders them. Then put one line first in the
 `## Visual result` of each PR the pack covers, one `gh pr edit` each: `pack <path> — on the machine
 that made it`. A pack that does not build is not asked about: the run report carries the failed

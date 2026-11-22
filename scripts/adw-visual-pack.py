@@ -10,13 +10,18 @@ again after each note the owner sends. It copies every image the manifest names 
 unreadable or a field is wrong (it prints `pack failed — <why>` and writes nothing); 2 on a bad flag.
 
 The page is for a person who does not read test ids or numbers. It opens with one banner in words (which
-screens differ from the design). For each unit it shows its title and plain summary, then one block per screen
-(a `state`): a plain title, one verdict in words (`Matches the design`, `Differs from the design`, ...), the
-Before, After and Design images side by side and full size, buttons that show where two of them differ (a
-difference blend: black is the same), and a `Looks right` / `Needs changes` choice with a note. The ids, crops,
-RMSE numbers, limits, zoomed areas, PR lines and gate checks sit in folds, so they stay available but out of
-the way. The bottom of the page builds the one answer to copy (`ok`, or one `<unit>: <screen>: <note>` line
-for each screen marked `Needs changes`). A missing image is shown as `No image to show`, never left out.
+screens differ from the design). For each unit it shows its title and plain summary, then one card per screen
+(a `state`): a plain title, one verdict in words (`Matches the design`, `Differs from the design`, ...), one
+line that says what to check (the rows' `check`, else the unit's summary), and then the changed areas first:
+the zoomed crop of every row, After next to Design for a `V` row, Before next to After for a `G` row. The
+full Before, After and Design screenshots sit in a fold below the crops, each with a box around every row's
+area, labelled with its id (`V` pink, `G` blue), and buttons that show where two of them differ (a difference
+blend: black is the same). Then a `Looks right` / `Needs changes` choice with a note. A screen whose rows are
+all `G` rows that measured 0 difference gets no card of its own: all such screens fold into one line at the
+end, `N screens unchanged`, that lists them and opens their cards. The ids, crops, RMSE numbers, limits, PR
+lines and gate checks sit in folds, so they stay available but out of the way. The bottom of the page builds
+the one answer to copy (`ok`, or one `<unit>: <screen>: <note>` line for each screen marked `Needs changes`).
+A missing image is shown as `No image to show`, never left out.
 
 Manifest (JSON). Every path is absolute. `before`, `after` and `goal` may be `none`, the verifier's word
 for an image that does not exist (adw-build §3.4: a state new at the fork point is `before none`): the
@@ -30,7 +35,8 @@ page says why, and `none` is not counted as missing. "" or a path this machine d
               "checks": ["<evidence row, verbatim>", ...],
               "rows": [{"id": "V1", "state": "<state>", "crop": "x,y,w,h", "design_crop": "",
                         "rmse": "0.1735", "limit": "baseline", "result": "unscored", "graded": "#105 v2",
-                        "before": "<path>", "after": "<path>", "goal": "<design path; '' for a G row>"}]}]}
+                        "before": "<path>", "after": "<path>", "goal": "<design path; '' for a G row>",
+                        "check": "<optional: what the owner should see there, e.g. The title reads MERCADOR>"}]}]}
 """
 from __future__ import annotations
 
@@ -103,7 +109,7 @@ def load(path: str) -> dict:
             need(r, "result", rw)
             r["_crop"] = crop(r.get("crop", ""), rw)
             r["_dcrop"] = crop(r["design_crop"], rw) if str(r.get("design_crop", "")).strip() else r["_crop"]
-            for k in ("before", "after", "goal", "rmse", "limit", "graded", "design_crop"):
+            for k in ("before", "after", "goal", "rmse", "limit", "graded", "design_crop", "check"):
                 if not isinstance(r.get(k, ""), str):
                     raise Bad("%s: %s is not a string" % (rw, k))
         if not isinstance(u.get("checks", []), list):
@@ -187,120 +193,201 @@ def screen_title(state: str, names: dict) -> str:
     return " · ".join(w for w in (words(p) for p in state.split("/") if p) if w) or state
 
 
-def shot(label: str, rel: str | None, kind: str, why: str) -> str:
+MAXH = 420  # the tallest a zoomed crop is drawn, in CSS px
+
+
+def kind(r: dict) -> str:
+    return "g" if r["id"].startswith("G") else "v"
+
+
+def boxes(rows: list[dict], key: str) -> str:
+    """One box per distinct area of `rows` on a full screenshot, labelled with the ids of the rows that share it
+    (a `V` box at its top left, a `G` box at its bottom left, so the two kinds do not cover each other's ids).
+    The script sets each box in percent of the image's natural size, so it scales with the image."""
+    areas: dict[tuple, list[dict]] = {}
+    for r in rows:
+        areas.setdefault(tuple(r[key]), []).append(r)
+    return "".join('<span class="box %s" data-box="%d,%d,%d,%d" hidden><span class="ids">%s</span></span>'
+                   % (kind(rs[0]), a[0], a[1], a[2], a[3],
+                      "".join('<i class="tag %s">%s</i>' % (kind(r), e(r["id"])) for r in rs))
+                   for a, rs in areas.items())
+
+
+def shot(label: str, rel: str | None, k: str, why: str, marks: str = "") -> str:
     if rel is None or rel == NONE:
         text = why if rel == NONE else "No image to show"
         return '<figure class="shot"><figcaption><b>%s</b></figcaption><div class="missing">%s</div></figure>' % (
             e(label), e(text))
     return ('<figure class="shot"><figcaption><b>%s</b></figcaption><a class="frame" href="%s" target="_blank">'
-            '<img loading="lazy" src="%s" alt="%s" data-k="%s"></a></figure>' % (e(label), e(rel), e(rel), e(label), kind))
+            '<img loading="lazy" src="%s" alt="%s" data-k="%s">%s</a></figure>' % (e(label), e(rel), e(rel), e(label), k, marks))
 
 
 def zoom(label: str, rel: str | None, c: list[int], why: str) -> str:
     if rel is None or rel == NONE:
         return ('<figure class="zoom"><div class="missing">%s</div><figcaption>%s</figcaption></figure>'
                 % (e(why if rel == NONE else "No image to show"), e(label)))
-    return ('<figure class="zoom"><div class="crop" style="aspect-ratio:%d / %d">'
+    cap = max(1, round(min(2 * c[2], MAXH * c[2] / c[3])))  # at most twice its size, at most MAXH tall
+    return ('<figure class="zoom"><div class="crop" style="aspect-ratio:%d / %d;max-width:%dpx">'
             '<img loading="lazy" src="%s" alt="%s" data-crop="%d,%d,%d,%d"></div><figcaption>%s</figcaption></figure>'
-            % (c[2], c[3], e(rel), e(label), c[0], c[1], c[2], c[3], e(label)))
+            % (c[2], c[3], cap, e(rel), e(label), c[0], c[1], c[2], c[3], e(label)))
 
 
-def pick(srows: list[dict], kind: str) -> str | None:
+def pick(srows: list[dict], which: str) -> str | None:
     """The state's image of one kind: a copied image first, then `none`, then a missing one."""
-    rank = lambda r: 0 if r["_" + kind] not in (None, NONE) else 1 if r["_" + kind] == NONE else 2
+    rank = lambda r: 0 if r["_" + which] not in (None, NONE) else 1 if r["_" + which] == NONE else 2
     best = min(srows, key=rank)
-    return best["_" + kind] if rank(best) < 2 else None
+    return best["_" + which] if rank(best) < 2 else None
 
 
-def screens_html(u: dict, imgs: Images, names: dict, counter: list[int]) -> tuple[str, dict]:
-    uid = safe(u["unit"])
+def look(srows: list[dict], summary: str) -> str:
+    """What the owner should check on this screen: the rows' `check` lines, else the unit's summary."""
+    said: list[tuple[str, str]] = []
+    for r in srows:
+        c = str(r.get("check", "")).strip()
+        if c and c not in [t for _, t in said]:
+            said.append((r["id"], c))
+    if not said:
+        return summary
+    if len(said) == 1:
+        return said[0][1]
+    return " · ".join("%s: %s" % (i, t) for i, t in said)
+
+
+def unchanged(srows: list[dict]) -> bool:
+    """Every row is a `G` row that measured 0 difference, with both images present: the screen is the same as before."""
+    def zero(t: str) -> bool:
+        try:
+            return float(t) == 0
+        except ValueError:
+            return False
+    return all(r["id"].startswith("G") and cls(r["result"]) in ("pass", "unscored") and zero(str(r.get("rmse", "")))
+               and r.get("_before") is not None and r.get("_after") is not None for r in srows)
+
+
+def card(u: dict, srows: list[dict], sid: str, title: str, same: bool) -> tuple[str, str]:
+    """One screen: verdict, what to check, the zoomed areas, then the full screens and the numbers in folds."""
+    if same:
+        badge, say = "good", "Unchanged: the same as before"
+    else:
+        worst = min(srows, key=lambda r: SEVERITY[cls(r["result"])])
+        badge, say = BADGE[cls(worst["result"])], verdict(worst)
+    before, after = pick(srows, "before"), pick(srows, "after")
+    goals: list[tuple[str, str | None]] = []
+    for r in srows:
+        if r["id"].startswith("V") and r.get("goal", "") not in [g[0] for g in goals]:
+            goals.append((r.get("goal", ""), r["_goal"]))
+    out = ['<article class="screen" id="%s" data-unit="%s" data-title="%s">' % (sid, e(u["unit"]), e(title)),
+           '<header><h3>%s</h3><span class="badge %s">%s</span></header>' % (e(title), badge, e(say)),
+           '<p class="look"><b>Check:</b> %s</p>' % e(look(srows, u["summary"])), '<div class="areas">']
+    for r in srows:
+        guard, c = r["id"].startswith("G"), r["_crop"]
+        out.append('<div class="area"><p><i class="tag %s">%s</i> %s</p><div class="pair%s">' % (
+            kind(r), e(r["id"]), "Must not change" if guard else "Must match the design",
+            " wide" if c[2] >= 1.5 * c[3] else ""))
+        if guard:
+            out.append(zoom("Before", r["_before"], c, "New screen: there was nothing here before"))
+            out.append(zoom("After", r["_after"], c, "Not shown after the change"))
+        else:
+            out.append(zoom("After", r["_after"], c, "Not shown after the change"))
+            out.append(zoom("Design", r["_goal"], r["_dcrop"], "No design image"))
+        out.append("</div></div>")
+    out.append("</div>")
+    out.append('<details class="full"><summary>Full screens, with these areas boxed</summary>'
+               '<p class="legend"><i class="tag v">V</i> must match the design &nbsp; <i class="tag g">G</i> must not change</p>'
+               '<div class="views">')
+    every = boxes(srows, "_crop")
+    out.append(shot("Before", before, "before", "New screen: there was nothing here before", every))
+    out.append(shot("After", after, "after", "Not shown after the change", every))
+    if goals:
+        for i, (src, rel) in enumerate(goals):
+            mine = [r for r in srows if r["id"].startswith("V") and r.get("goal", "") == src]
+            out.append(shot("Design" if len(goals) == 1 else "Design %d" % (i + 1), rel, "goal" if i == 0 else "goal%d" % (i + 1),
+                            "No design image", boxes(mine, "_dcrop")))
+    else:
+        out.append('<figure class="shot"><figcaption><b>Design</b></figcaption><div class="missing">'
+                   'No design for this screen: it must look the same as Before</div></figure>')
+    out.append("</div>")
+    pairs = []
+    if before not in (None, NONE) and after not in (None, NONE):
+        pairs.append(("Before vs After", "before", "after"))
+    if goals and after not in (None, NONE) and goals[0][1] not in (None, NONE):
+        pairs.append(("After vs Design", "after", "goal"))
+    if pairs:
+        out.append('<div class="cmp"><span>Show the differences:</span>%s<button type="button" class="cmpbtn" '
+                   'data-a="off" data-b="off">Hide</button><span class="cmpnote"></span><div class="stage" hidden></div></div>'
+                   % "".join('<button type="button" class="cmpbtn" data-a="%s" data-b="%s">%s</button>' % (a, b, t)
+                             for t, a, b in pairs))
+    out.append("</details>")
+    out.append('<div class="verdict"><label><input type="radio" name="%s" value="right"> Looks right</label>'
+               '<label><input type="radio" name="%s" value="wrong"> Needs changes</label>'
+               '<input type="text" class="why" placeholder="What is wrong? (optional)" aria-label="What is wrong"></div>'
+               % (sid, sid))
+    out.append('<details><summary>Numbers</summary><div class="scroll"><table><thead><tr><th>Check</th>'
+               "<th>Area (x, y, width, height)</th><th>Difference score</th><th>Allowed</th><th>Result</th>"
+               "<th>Measured on</th></tr></thead><tbody>")
+    for r in srows:
+        what = "Must not change" if r["id"].startswith("G") else "Design"
+        out.append('<tr><td>%s <small>%s</small></td><td><code>%s</code>%s</td><td>%s</td><td>%s</td>'
+                   '<td><span class="badge %s">%s</span></td><td>%s</td></tr>'
+                   % (e(what), e(r["id"]), e(r["crop"]),
+                      (' <small>design at <code>%s</code></small>' % e(r["design_crop"])) if str(r.get("design_crop", "")).strip() else "",
+                      e(r.get("rmse", "") or "—"), e(r.get("limit", "") or "—"), BADGE[cls(r["result"])],
+                      e(verdict(r)), e(r.get("graded", "") or "—")))
+    out.append("</tbody></table></div>")
+    out.append('<p class="hint">Lower difference score means closer. "baseline" means no limit was set yet.</p>')
+    out.append("</details></article>")
+    return "\n".join(out), badge
+
+
+def screens_html(u: dict, imgs: Images, names: dict, counter: list[int]) -> tuple[str, dict, list]:
+    """The unit's section, its counts, and its unchanged screens (folded at the end of the page, not here)."""
     stats = {"fail": [], "gap": 0, "good": 0, "screens": 0}
     rows = u["rows"]
     for r in rows:
         r["_before"] = imgs.add(u["unit"], "before", r.get("before", ""))
         r["_after"] = imgs.add(u["unit"], "after", r.get("after", ""))
         r["_goal"] = imgs.add(u["unit"], "goal", r.get("goal", "")) if r["id"].startswith("V") else None
-    out = ['<section class="unit" id="%s">' % e(uid),
+    out = ['<section class="unit" id="%s">' % e(safe(u["unit"])),
            '<h2>%s <small>%s</small></h2>' % (e(u["title"]), e(u["unit"])),
            '<p class="summary">%s</p>' % e(u["summary"])]
     states: list[str] = []
     for r in rows:
         if r["state"] not in states:
             states.append(r["state"])
+    folded = []
     for s in states:
         srows = [r for r in rows if r["state"] == s]
         counter[0] += 1
         sid = "s%d" % counter[0]
         title = screen_title(s, names)
-        worst = min(srows, key=lambda r: SEVERITY[cls(r["result"])])
-        kind = BADGE[cls(worst["result"])]
-        say = verdict(worst)
+        same = unchanged(srows)
+        body, badge = card(u, srows, sid, title, same)
         stats["screens"] += 1
-        if kind == "bad":
+        if badge == "bad":
             stats["fail"].append((sid, title))
-        elif kind == "gap":
+        elif badge == "gap":
             stats["gap"] += 1
         else:
             stats["good"] += 1
-        before, after = pick(srows, "before"), pick(srows, "after")
-        goals: list[tuple[str, str | None]] = []
-        for r in srows:
-            if r["id"].startswith("V") and r.get("goal", "") not in [g[0] for g in goals]:
-                goals.append((r.get("goal", ""), r["_goal"]))
-        out.append('<article class="screen" id="%s" data-unit="%s" data-title="%s">' % (sid, e(u["unit"]), e(title)))
-        out.append('<header><h3>%s</h3><span class="badge %s">%s</span></header>' % (e(title), kind, e(say)))
-        out.append('<div class="views">')
-        out.append(shot("Before", before, "before", "New screen: there was nothing here before"))
-        out.append(shot("After", after, "after", "Not shown after the change"))
-        if goals:
-            for i, (_, rel) in enumerate(goals):
-                out.append(shot("Design" if len(goals) == 1 else "Design %d" % (i + 1), rel, "goal" if i == 0 else "goal%d" % (i + 1),
-                                "No design image"))
+        if same:
+            folded.append((u["unit"], title, body))
         else:
-            out.append('<figure class="shot"><figcaption><b>Design</b></figcaption><div class="missing">'
-                       'No design for this screen: it must look the same as Before</div></figure>')
-        out.append("</div>")
-        pairs = []
-        if before not in (None, NONE) and after not in (None, NONE):
-            pairs.append(("Before vs After", "before", "after"))
-        if goals and after not in (None, NONE) and goals[0][1] not in (None, NONE):
-            pairs.append(("After vs Design", "after", "goal"))
-        if pairs:
-            out.append('<div class="cmp"><span>Show the differences:</span>%s<button type="button" class="cmpbtn" '
-                       'data-a="off" data-b="off">Hide</button><span class="cmpnote"></span><div class="stage" hidden></div></div>'
-                       % "".join('<button type="button" class="cmpbtn" data-a="%s" data-b="%s">%s</button>' % (a, b, t)
-                                 for t, a, b in pairs))
-        out.append('<div class="verdict"><label><input type="radio" name="%s" value="right"> Looks right</label>'
-                   '<label><input type="radio" name="%s" value="wrong"> Needs changes</label>'
-                   '<input type="text" class="why" placeholder="What is wrong? (optional)" aria-label="What is wrong"></div>'
-                   % (sid, sid))
-        out.append('<details><summary>Numbers and zoomed areas</summary><table><thead><tr><th>Check</th>'
-                   "<th>Area (x, y, width, height)</th><th>Difference score</th><th>Allowed</th><th>Result</th>"
-                   "<th>Measured on</th></tr></thead><tbody>")
-        for r in srows:
-            what = "Must not change" if r["id"].startswith("G") else "Design"
-            out.append('<tr><td>%s <small>%s</small></td><td><code>%s</code>%s</td><td>%s</td><td>%s</td>'
-                       '<td><span class="badge %s">%s</span></td><td>%s</td></tr>'
-                       % (e(what), e(r["id"]), e(r["crop"]),
-                          (' <small>design at <code>%s</code></small>' % e(r["design_crop"])) if str(r.get("design_crop", "")).strip() else "",
-                          e(r.get("rmse", "") or "—"), e(r.get("limit", "") or "—"), BADGE[cls(r["result"])],
-                          e(verdict(r)), e(r.get("graded", "") or "—")))
-        out.append("</tbody></table>")
-        out.append('<p class="hint">Lower difference score means closer. "baseline" means no limit was set yet.</p>')
-        for r in srows:
-            guard = r["id"].startswith("G")
-            out.append('<div class="row"><p>%s <small>%s</small></p><div class="trio">' % (
-                e("Must not change" if guard else "Design"), e(r["id"])))
-            out.append(zoom("Before", r["_before"], r["_crop"], "New screen: there was nothing here before"))
-            out.append(zoom("After", r["_after"], r["_crop"], "Not shown after the change"))
-            if guard:
-                out.append('<figure class="zoom"><div class="missing">Same as Before</div><figcaption>Design</figcaption></figure>')
-            else:
-                out.append(zoom("Design", r["_goal"], r["_dcrop"], "No design image"))
-            out.append("</div></div>")
-        out.append("</details></article>")
+            out.append(body)
+    if folded and len(folded) == len(states):
+        out.append('<p class="hint">Every screen of this unit is unchanged: see <a href="#same">the unchanged screens</a> at the end.</p>')
     out.append("</section>")
-    return "\n".join(out), stats
+    return "\n".join(out), stats, folded
+
+
+def same_html(folded: list) -> str:
+    """One line for every unchanged screen; it opens a list, and each item opens that screen's card."""
+    if not folded:
+        return ""
+    n = len(folded)
+    return ('<section class="same" id="same"><details><summary><b>%d screen%s unchanged</b> '
+            '<small>every area that must not change measured 0 difference</small></summary>%s</details></section>'
+            % (n, "" if n == 1 else "s", "".join('<details class="one"><summary>%s · %s</summary>%s</details>'
+                                                 % (e(unit), e(title), body) for unit, title, body in folded)))
 
 
 CSS = """
@@ -320,11 +407,9 @@ h3{font-size:18px;margin:0}code{font:12px ui-monospace,Menlo,monospace}small{col
 .screen{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:12px 16px;margin:14px 0}
 .screen header{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:8px}
 .views{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:start}
-.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-@media (max-width:700px){.trio{grid-template-columns:1fr}}
 figure{margin:0}figcaption{font-size:13px;color:var(--mut);margin:0 0 4px}figcaption b{color:var(--fg);font-size:14px}
 .zoom figcaption{margin:4px 0 0}
-.frame{display:inline-block;max-width:100%;border:1px solid var(--line);background:var(--bg)}
+.frame{position:relative;display:inline-block;max-width:100%;overflow:hidden;border:1px solid var(--line);background:var(--bg)}
 .shot img{display:block;max-width:100%;width:auto;height:auto;max-height:min(70vh,620px)}
 .missing{display:flex;align-items:center;justify-content:center;min-height:120px;border:1px dashed var(--line);
 color:var(--mut);font-size:14px;padding:8px;text-align:center}
@@ -339,8 +424,21 @@ color:var(--fg);cursor:pointer}.cmp button.on{border-color:var(--oth);color:var(
 border-radius:6px;background:var(--bg);color:var(--fg)}
 details{margin-top:6px}summary{cursor:pointer;color:var(--mut);font-size:14px}
 table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)}
-.row{margin:12px 0}.row p{margin:4px 0;font-size:14px}.crop{position:relative;overflow:hidden;border:1px solid var(--line);background:var(--bg)}
+.crop{position:relative;overflow:hidden;border:1px solid var(--line);background:var(--bg)}
 .crop img{position:absolute;max-width:none;height:auto}
+.look{margin:2px 0 12px;font-size:17px}.areas{display:grid;gap:14px}.area p{margin:0 0 6px;font-size:14px}
+.pair{display:grid;gap:10px;align-items:start;grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr))}
+.pair.wide{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.tag{display:inline-block;font:600 12px/1.4 ui-monospace,Menlo,monospace;font-style:normal;padding:0 5px;border-radius:3px;color:#fff}
+.tag.v{background:#c2185b}.tag.g{background:#0277bd}
+.box{position:absolute;border:2px solid #ff3d9a;box-shadow:0 0 0 1px rgba(0,0,0,.6),inset 0 0 0 1px rgba(0,0,0,.6);pointer-events:none}
+.box.g{border-color:#29b6f6}.box .ids{position:absolute;left:-2px;top:-2px;display:flex;gap:2px}
+.box.g .ids{top:auto;bottom:-2px}
+.box .tag{font-size:10px;padding:0 3px;border-radius:0}
+details.full{margin:14px 0 0}.legend{font-size:13px;color:var(--mut);margin:6px 0 8px}.scroll{overflow-x:auto}
+.same{margin:28px 0}.same>details>summary{font-size:16px;color:var(--fg)}.same .one{margin:10px 0 0}
+.same .one>summary{color:var(--fg)}
+@media (max-width:480px){main{padding:12px}.screen{padding:10px 12px}}
 .tech{margin:24px 0}.tech li{margin:2px 0;font-size:13px}.note{border-left:4px solid var(--gap);padding:8px 12px;background:var(--card)}
 .ask{margin:40px 0 24px;padding:16px;border:2px solid var(--fg);background:var(--card);border-radius:8px}.ask h2{border:0;margin:0 0 8px;padding:0}
 .ask textarea{display:block;width:100%;min-height:90px;font:14px ui-monospace,Menlo,monospace;padding:8px;border:1px solid var(--line);
@@ -353,6 +451,10 @@ function zoom(i){var w=i.naturalWidth,c=i.dataset.crop.split(',').map(Number);if
 i.style.width=(w/c[2]*100)+'%';i.style.left=(-c[0]/c[2]*100)+'%';i.style.top=(-c[1]/c[3]*100)+'%';}
 function on(sel,f){document.querySelectorAll(sel).forEach(function(i){if(i.complete&&i.naturalWidth)f(i);else i.addEventListener('load',function(){f(i);});});}
 on('img[data-crop]',zoom);
+function box(i){var W=i.naturalWidth,H=i.naturalHeight;if(!W)return;
+i.parentNode.querySelectorAll('.box').forEach(function(b){var c=b.dataset.box.split(',').map(Number);
+b.style.left=(c[0]/W*100)+'%';b.style.top=(c[1]/H*100)+'%';b.style.width=(c[2]/W*100)+'%';b.style.height=(c[3]/H*100)+'%';b.hidden=false;});}
+on('.frame img',box);
 document.querySelectorAll('.screen').forEach(function(sc){
 var imgs={};sc.querySelectorAll('.views img[data-k]').forEach(function(i){imgs[i.dataset.k]=i;});
 var stage=sc.querySelector('.stage');if(!stage)return;var note=sc.querySelector('.cmpnote');
@@ -387,15 +489,16 @@ those parts and sends you a new pack. A note about the whole run, with no screen
 
 
 def verdict_banner(total: dict) -> str:
-    n = total["screens"]
+    n, k = total["screens"], total["same"]
+    same = ('<p class="hint"><a href="#same">%d screen%s unchanged</a>, folded at the end.</p>' % (k, "" if k == 1 else "s")) if k else ""
     if total["fail"]:
         links = "".join('<li><a href="#%s">%s</a></li>' % (sid, e(t)) for sid, t in total["fail"])
-        return ('<div class="banner bad"><b>%d of %d screens differ from the design or changed when they must not.</b> Look at these first:<ul>%s</ul></div>'
-                % (len(total["fail"]), n, links))
+        return ('<div class="banner bad"><b>%d of %d screens differ from the design or changed when they must not.</b> Look at these first:<ul>%s</ul>%s</div>'
+                % (len(total["fail"]), n, links, same))
     if total["gap"]:
         return ('<div class="banner"><b>Nothing measured as wrong, but %d of %d screens could not be measured.</b> '
-                "Judge those by eye.</div>" % (total["gap"], n))
-    return '<div class="banner good"><b>Nothing measured as wrong.</b> All %d screens match.</div>' % n
+                "Judge those by eye.%s</div>" % (total["gap"], n, same))
+    return '<div class="banner good"><b>Nothing measured as wrong.</b> All %d screens match.%s</div>' % (n, same)
 
 
 def build(pack: str, m: dict) -> tuple[str, dict]:
@@ -405,21 +508,24 @@ def build(pack: str, m: dict) -> tuple[str, dict]:
     imgs = Images(pack)
     names = m.get("screens") if isinstance(m.get("screens"), dict) else {}
     total = {"fail": [], "gap": 0, "good": 0, "screens": 0}
-    parts, nrows, counter = [], 0, [0]
+    parts, nrows, counter, folded = [], 0, [0], []
     for u in m["units"]:
-        body, s = screens_html(u, imgs, names, counter)
+        body, s, f = screens_html(u, imgs, names, counter)
         parts.append(body)
+        folded += f
         nrows += len(u["rows"])
         total["fail"] += s["fail"]
         for k in ("gap", "good", "screens"):
             total[k] += s[k]
+    total["same"] = len(folded)
     title = m.get("title") or m["slug"]
     head = ["<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             "<title>%s · design sign-off</title><style>%s</style></head><body><main>" % (e(title), CSS),
             "<h1>%s</h1>" % e(title),
-            "<p>Check each screen: <b>Before</b> (old), <b>After</b> (new) and <b>Design</b> (the goal). "
-            "Then give one answer at the bottom.</p>", verdict_banner(total)]
+            "<p>Each screen shows its changed areas first: <b>After</b> (new) next to <b>Design</b> (the goal), or "
+            "<b>Before</b> (old) next to <b>After</b> where nothing may change. Then give one answer at the bottom.</p>",
+            verdict_banner(total)]
     if str(m.get("note", "")).strip():
         head.append('<p class="note"><b>Your last note</b>: %s</p>' % e(m["note"]))
     tech = ["<details class=\"tech\"><summary>Technical details (PRs, checks, versions)</summary>",
@@ -435,7 +541,7 @@ def build(pack: str, m: dict) -> tuple[str, dict]:
             tech.append("<h4>%s · how it was checked</h4><ul>%s</ul>" % (
                 e(u["unit"]), "".join("<li><code>%s</code></li>" % e(c) for c in checks)))
     tech.append("</details>")
-    page = "\n".join(head + parts + ["\n".join(tech), ASK, "<script>%s</script></main></body></html>" % JS])
+    page = "\n".join(head + parts + [same_html(folded), "\n".join(tech), ASK, "<script>%s</script></main></body></html>" % JS])
     out = os.path.join(pack, "index.html")
     tmp = out + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
