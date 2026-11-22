@@ -211,6 +211,14 @@ class Pack(unittest.TestCase):
         self.assertIn("· 3 missing", line)
         self.assertIn("No image to show", self.page())
 
+    def test_zero_guard_with_missing_image_is_not_folded(self):
+        m = self.manifest()
+        self.run_pack(m)
+        self.assertIn('id="same"', self.page())
+        m["units"][0]["rows"][2]["after"] = os.path.join(self.d, "gone.png")
+        self.run_pack(m)
+        self.assertNotIn('id="same"', self.page())
+
     def test_none_says_why_and_is_not_missing(self):
         m = self.manifest()
         for r in m["units"][0]["rows"][:2]:

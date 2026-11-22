@@ -790,7 +790,9 @@ the areas that its change must not alter. One row is one crop of one rendered st
   calibrated.
 - `check` (optional) is one plain sentence that says what the owner should see in that area
   (`The title reads MERCADOR`). Only the sign-off pack reads it; no compare does. A table without
-  the column, or a row with the cell empty, is valid: the pack then shows the unit's summary.
+  the column, or every row of a screen with the cell empty, is valid: the pack then shows the unit's
+  summary for that screen. One `check` on a screen shows alone, so fill it on every row of a screen
+  that has several. Write no `|` in it: it splits the table cell.
 - Every other area of every render is out of scope. No agent compares it, and no agent opens it.
 
 `repo-profile §23` Compare gives one RMSE per row. The result is one table row per crop:

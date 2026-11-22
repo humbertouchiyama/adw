@@ -441,7 +441,7 @@ with the most to discover), so blocking on it is a pure loss every time.
 > alters, one `G` row for each area next to the change that must not alter, each crop measured on
 > the design image as `repo-profile §23` Size says (never guessed), each `limit` from §23
 > Limits, and in `check` one plain sentence of what the owner should see in that area
-> (`The title reads MERCADOR`), which the sign-off pack shows above the zoomed area. A unit that changes no rendered area writes one line instead: `Visual scope: none —
+> (`The title reads MERCADOR`), which the sign-off pack shows above the zoomed areas. A unit that changes no rendered area writes one line instead: `Visual scope: none —
 > <why>`. A port unit writes neither. Reference only plugin skills (`superpowers:*`) or tracked commands.
 > Code snippets in the spec/plan MUST follow the repo comment rule (`repo-profile §2`): one
 > terse line + spec ref, never a multi-line rationale comment — the implementer copies

@@ -254,14 +254,14 @@ def look(srows: list[dict], summary: str) -> str:
 
 
 def unchanged(srows: list[dict]) -> bool:
-    """Every row is a `G` row that measured 0 difference: the screen is the same as before."""
+    """Every row is a `G` row that measured 0 difference, with both images present: the screen is the same as before."""
     def zero(t: str) -> bool:
         try:
             return float(t) == 0
         except ValueError:
             return False
     return all(r["id"].startswith("G") and cls(r["result"]) in ("pass", "unscored") and zero(str(r.get("rmse", "")))
-               for r in srows)
+               and r.get("_before") is not None and r.get("_after") is not None for r in srows)
 
 
 def card(u: dict, srows: list[dict], sid: str, title: str, same: bool) -> tuple[str, str]:
