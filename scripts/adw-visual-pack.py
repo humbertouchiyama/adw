@@ -380,17 +380,17 @@ this.textContent='Copied';var b=this;setTimeout(function(){b.textContent='Copy a
 ASK = """<section class="ask"><h2>Your answer</h2>
 <p>Mark each screen above, then copy this answer and send it in the terminal.</p>
 <textarea id="answer" readonly aria-label="Your answer"></textarea><button type="button" id="copy">Copy answer</button>
-<ul><li><b>ok</b> means you accept everything as it looks now. A screen marked <i>Differs</i> or <i>Not measured</i> then
-becomes the new normal for that screen.</li>
+<ul><li><b>ok</b> means you accept everything as it looks now. A screen marked <i>Differs</i>, <i>Changed, but it must not change</i>
+or <i>Not measured</i> then becomes the new normal for that screen.</li>
 <li><b>Anything else</b> is a note. It names the part it is about (<code>u4: the title bar sits too low</code>). The run fixes
-those parts and sends you a new pack.</li></ul></section>"""
+those parts and sends you a new pack. A note about the whole run, with no screen, you type in the terminal; this box cannot hold it.</li></ul></section>"""
 
 
 def verdict_banner(total: dict) -> str:
     n = total["screens"]
     if total["fail"]:
         links = "".join('<li><a href="#%s">%s</a></li>' % (sid, e(t)) for sid, t in total["fail"])
-        return ('<div class="banner bad"><b>%d of %d screens differ from the design.</b> Look at these first:<ul>%s</ul></div>'
+        return ('<div class="banner bad"><b>%d of %d screens differ from the design or changed when they must not.</b> Look at these first:<ul>%s</ul></div>'
                 % (len(total["fail"]), n, links))
     if total["gap"]:
         return ('<div class="banner"><b>Nothing measured as wrong, but %d of %d screens could not be measured.</b> '

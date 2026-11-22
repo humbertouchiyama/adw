@@ -648,7 +648,7 @@ ready    #NNN  <desc> — <units> · gates green · review clean · ⏱ <N>m   �
 blocked  #NNN  <unit> — <one sentence>; default: <recommended default> · ⏱ <N>m
 failed   none
 unbuilt  none
-sign-off <pack> — <u> units · <r> rows: pass <p> · fail <f> · unscored <s> · no image <i>   ← only while a PR waits at sign-off pending (adw-build §3.2a); ends · <m> images missing when the script counted any
+sign-off <pack> — <u> units · <r> rows: pass <p> · fail <f> · unscored <s> · no image <i>   ← only while a PR waits at sign-off pending (adw-build §3.2a); the page banner counts screens (one per state), this line counts rows; ends · <m> images missing when the script counted any
 ⏱ run    machine 2h38m · your gate 20h04m   ← unconditional (§7.1)
 note     contract <short-sha>               ← unconditional, always the first note line
 note     review #NNN — <what ran instead of /code-review>   ← only when a PR skipped it

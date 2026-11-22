@@ -864,7 +864,7 @@ The script's docstring gives the manifest's shape. Fill it this way:
   state, the crop, `design_crop` from the spec's `design` cell (the part after `@`, or empty), the
   RMSE, the limit, the result, `graded` (the PR and pass that measured it) and the three image paths
   from its `image` line, a `none` copied as `none` (the page says why; it is not a missing image);
-- `screens` (optional): a plain title for each `state`, such as `"ShopsPortTests/Main": "Merchant, Buy tab"`,
+- `screens` (optional): a plain title for each `state`, as `"<state>": "<plain title>"`,
   written for a person who has not seen the test names; a state with no entry gets its test name in words;
 - `prs`: one line for each PR the pack covers, `#<N> <title> · <state> · <its gates row>`;
 - `round`: 1, and one more after each note; `note`: the owner's last note, verbatim, or empty.
@@ -872,7 +872,7 @@ The script's docstring gives the manifest's shape. Fill it this way:
 The script prints `pack <path> · <u> units · <r> rows · <i> images · <m> missing`; `pack failed —
 <why>` names the field to fix. Fix it and run the script again. When `<m>` counts images that the
 PR bodies name but this machine does not have (the pack was made on another machine, or its folder
-was deleted), the `sign-off` line says so (adw-core §7): the owner can answer from the RMSE table, or
+was deleted), the `sign-off` line says so (adw-core §7): the owner can answer from the "Numbers and zoomed areas" fold of each screen, or
 ask for the covered PR's §3.4 verify again on this machine, which renders them. Then put one line first in the
 `## Visual result` of each PR the pack covers, one `gh pr edit` each: `pack <path> — on the machine
 that made it`. A pack that does not build is not asked about: the run report carries the failed
@@ -900,7 +900,7 @@ not a design note, and `ok` beside them is still `ok`:
 - **Any other answer is a note.** It names the units it is for (`u4: …`); a note that names no unit
   is for every unit in the pack. For each named unit, one at a time, dispatch one implementer
   (`model:` by the unit's depth, adw-core §8) in the worktree of the PR the pack covers for it,
-  re-created as above. Its brief carries the note, the unit's spec and table, `repo-profile §23` and
+  re-created as above. Its brief carries the note, the manifest's `screens` map (a note line names a screen by its title there), the unit's spec and table, `repo-profile §23` and
   this section. It applies the note, then runs this loop on the unit's `V` rows only (the worktree
   holds the unit's code, so it cannot render the base for a `G` row; the §3.4 verifier renders it)
   and §3.2's gates, and commits as `fix(design): <the note, in a few words>`. A note is not a fix cycle, and `fix(design):` counts in no cycle counter.
