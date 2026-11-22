@@ -591,8 +591,8 @@ and compares only the crops its spec names: `V` rows with the design, `G` rows w
 base made on the same machine (a difference there is a regression). Nothing else is compared or
 opened, and an image is opened only for a row that does not pass on its number (adw-build §3.2a).
 Where the profile asks for it, the owner signs off once, after the last unit is built: one pack
-shows every row of every unit as before, after and goal images, with the gates and the RMSE table,
-and one answer covers the run. The first version asked per unit, before verify, because a design
+shows every screen of every unit as before, after and design images in plain words, with a view of where they
+differ, and the gates and the RMSE numbers folded away; one answer covers the run. The first version asked per unit, before verify, because a design
 change after verify costs a re-verify and a review cycle; it stopped each run at its first visual
 unit, three runs in one day, and the owner chose the cost over the stops (2026-11-20). Sub-PRs merge
 before the sign-off; no PR that carries a unit's renders merges into a base before it. A row

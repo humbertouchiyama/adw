@@ -864,6 +864,8 @@ The script's docstring gives the manifest's shape. Fill it this way:
   state, the crop, `design_crop` from the spec's `design` cell (the part after `@`, or empty), the
   RMSE, the limit, the result, `graded` (the PR and pass that measured it) and the three image paths
   from its `image` line, a `none` copied as `none` (the page says why; it is not a missing image);
+- `screens` (optional): a plain title for each `state`, such as `"ShopsPortTests/Main": "Merchant, Buy tab"`,
+  written for a person who has not seen the test names; a state with no entry gets its test name in words;
 - `prs`: one line for each PR the pack covers, `#<N> <title> · <state> · <its gates row>`;
 - `round`: 1, and one more after each note; `note`: the owner's last note, verbatim, or empty.
 
