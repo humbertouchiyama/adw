@@ -81,9 +81,11 @@ class Pack(unittest.TestCase):
         copied = [os.path.join(r, f) for r, _, fs in os.walk(os.path.join(self.out, "img")) for f in fs]
         self.assertEqual(len(copied), 5)
         page = self.page()
-        for want in ("before", "after", "goal", "V1", "V2", "G1", "Shops/Main", "Hud/Main", "0.1735", "#105 v2",
-                     "Sign-off: one answer for the whole run", "docs(spec): visual limits"):
+        for want in ("Before", "After", "Design", "Shops · Main", "Hud · Main", "0.1735", "#105 v2", "Your answer"):
             self.assertIn(want, page)
+        for gone in ("docs(spec): visual limits", "RMSE", "fork point", "verified head"):
+            self.assertNotIn(gone, page)
+        self.assertNotIn(self.base, page)  # no absolute path in the page
 
     def test_writes_a_self_ignoring_gitignore(self):
         self.run_pack(self.manifest())
@@ -98,8 +100,9 @@ class Pack(unittest.TestCase):
     def test_guard_row_has_no_goal_image(self):
         self.run_pack(self.manifest())
         page = self.page()
-        self.assertIn("guard rows only", page)
-        self.assertIn("= before", page)
+        self.assertIn("it must look the same as Before", page)
+        self.assertIn("Same as Before", page)
+        self.assertIn("Not measured: it should look the same as before", page)
 
     def test_missing_image_is_shown_and_counted(self):
         m = self.manifest()
@@ -109,7 +112,7 @@ class Pack(unittest.TestCase):
         code, line = self.run_pack(m)
         self.assertEqual(code, 0, line)
         self.assertIn("· 3 missing", line)
-        self.assertIn("no image", self.page())
+        self.assertIn("No image to show", self.page())
 
     def test_none_says_why_and_is_not_missing(self):
         m = self.manifest()
@@ -120,16 +123,17 @@ class Pack(unittest.TestCase):
         self.assertEqual(code, 0, line)
         self.assertIn("· 0 missing", line)
         page = self.page()
-        self.assertIn("new in this run", page)
-        self.assertIn("not rendered at the verified head", page)
-        self.assertNotIn('class="missing">no image<', page)
+        self.assertIn("New screen: there was nothing here before", page)
+        self.assertIn("Not shown after the change", page)
+        self.assertNotIn("No image to show", page)
 
     def test_a_real_image_wins_over_none_in_one_state(self):
         m = self.manifest()
         m["units"][0]["rows"][0]["before"] = "none"
         code, line = self.run_pack(m)
         self.assertEqual(code, 0, line)
-        self.assertIn('data-boxes=', self.page().split("fork point")[0].rsplit("<figure", 1)[1])
+        before = self.page().split('<figcaption><b>Before</b>')[1].split("</figure>")[0]
+        self.assertIn('data-k="before"', before)
 
     def test_text_is_escaped(self):
         self.run_pack(self.manifest(note="u4: <b>too low</b>"))
@@ -165,6 +169,38 @@ class Pack(unittest.TestCase):
         code, line = self.run_pack("{not json")
         self.assertEqual(code, 1)
         self.assertTrue(line.startswith("pack failed — manifest"), line)
+
+    def test_plain_verdicts_and_banner(self):
+        m = self.manifest()
+        m["units"][0]["rows"][1]["result"] = "fail"
+        self.run_pack(m)
+        page = self.page()
+        self.assertIn("Differs from the design", page)
+        self.assertIn("1 of 2 screens differ from the design", page)
+        self.assertIn('href="#s1"', page)
+        m["units"][0]["rows"][1]["result"] = "pass"
+        self.run_pack(m)
+        self.assertIn("could not be measured", self.page())
+
+    def test_screens_map_names_a_screen(self):
+        self.run_pack(self.manifest(screens={"Shops/Main": "Merchant, Buy tab"}))
+        page = self.page()
+        self.assertIn("Merchant, Buy tab", page)
+        self.assertIn('data-unit="u4" data-title="Merchant, Buy tab"', page)
+
+    def test_diff_buttons_only_when_both_images_exist(self):
+        m = self.manifest()
+        self.run_pack(m)
+        self.assertIn("Before vs After", self.page())
+        self.assertIn("After vs Design", self.page())
+        for r in m["units"][0]["rows"]:
+            r["before"] = "none"
+        self.run_pack(m)
+        self.assertNotIn("Before vs After", self.page())
+
+    def test_numbers_are_folded_away(self):
+        self.run_pack(self.manifest())
+        self.assertIn("<details><summary>Numbers and zoomed areas</summary>", self.page())
 
     def test_rebuild_replaces_the_page(self):
         self.run_pack(self.manifest())
