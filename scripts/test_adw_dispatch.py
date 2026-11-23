@@ -129,8 +129,11 @@ class Launch(Base):
         self.assertIn(["agent", "rename", "w1:pNEW", "fix-sse"], calls)
         run = [c for c in calls if c[:2] == ["pane", "run"]][0]
         self.assertEqual(run[2], "w1:pNEW")
+        # --name titles the Claude session: without it Claude titles it from the brief, and
+        # that title is what the pane border and the /resume picker show.
         self.assertEqual(
-            run[3], f"claude --model sonnet 'Read {self.brief} in full, then execute it.'")
+            run[3],
+            f"claude --model sonnet --name fix-sse 'Read {self.brief} in full, then execute it.'")
 
     def test_relative_brief_and_repo_reach_the_child_as_absolute_paths(self):
         # The child starts in the repo, not in the caller's cwd: `Read briefs/<x>.md` left one
