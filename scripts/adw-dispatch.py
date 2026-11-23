@@ -174,7 +174,10 @@ def cmd_launch(a):
         time.sleep(0.5)
     time.sleep(3)  # the prompt is drawn after the first output (zsh plugins load late)
     prompt = f"Read {a.brief} in full, then execute it."
-    line = f"{a.launcher} --model {shlex.quote(a.model)} {shlex.quote(prompt)}"
+    # --name titles the Claude session (prompt box, /resume, terminal title). Without it Claude
+    # titles the session from the brief, and that title is what the pane border shows.
+    line = (f"{a.launcher} --model {shlex.quote(a.model)} --name {shlex.quote(a.name)} "
+            f"{shlex.quote(prompt)}")
     ok, _, raw = herdr("pane", "run", pane, line)
     if not ok:
         fail(f"pane run: {raw}", close=pane)

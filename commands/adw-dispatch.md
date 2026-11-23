@@ -162,8 +162,9 @@ python3 "$DISPATCH" launch --name "$NAME" --repo-path "<target repo root>" \
 ```
 
 Add `--direction down` only when the owner asked for it. Add `--launcher <cmd>` only when he
-named one. The launcher is always run as `<cmd> --model <tier> "<prompt>"`: one that does not
-take `--model` does not start, and the launch exits 3.
+named one. The launcher is always run as `<cmd> --model <tier> --name <name> "<prompt>"`, so
+the child's session carries the dispatch name: one that does not take `--model` and `--name`
+does not start, and the launch exits 3.
 
 The script opens the pane **beside your pane, by pane id**. It never uses the focused pane: the
 owner has usually switched workspace by the time you run it. Do not replace it with
