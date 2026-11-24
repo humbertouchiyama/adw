@@ -1611,8 +1611,10 @@ After `synced`, the head is no longer the `verified` row, and the merge brought 
 runs §3.4 and §3.6 again at the pushed head, with the next `PASS` id and fresh review-cycle and
 boundary counters (`/pr-ready` §6), as §3.8 step 5 does after a smoke fix. Every gate run on that
 head includes §24's Check gate, obligated or not. A fix cycle on that head first brings the unit's
-worktree to it: `git -C "<unit worktree>" fetch -q origin && git -C "<unit worktree>" merge --ff-only
-origin/<head branch>`, which must print no error (the worktree holds an ancestor of the sync). A `blocked` sub-PR stays `blocked`, with its
+worktree to it, in one Bash call: `git -C "<unit worktree>" fetch -q origin && git -C "<unit worktree>"
+merge --ff-only origin/<head branch> && [ "$(git -C "<unit worktree>" rev-parse HEAD)" = "$(git -C
+"<unit worktree>" rev-parse origin/<head branch>)" ]`. A non-zero exit starts no cycle: the chain
+halts `blocked`, `registry sync — the unit worktree is not at the synced head`. A `blocked` sub-PR stays `blocked`, with its
 earlier reason, whatever the re-pass returns, and is carried or halts by the rules above. A PR gets
 at most two syncs: count them before each one with `git log --format=%s origin/adw/<slug>..origin/<head
 branch> | grep -c '^chore(registry): sync' || true`, and at `2` the chain halts as on a `stop`.
