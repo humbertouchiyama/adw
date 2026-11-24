@@ -319,7 +319,7 @@ The orchestrator composes the pass's prompt from this text:
 
 1. no question is `ask`;
 2. no **blocking** `⚠` line would print on the approval surface. Exactly three lines block, matched
-   by their fixed text: `⚠ orchestrator on <tier>` (adw-core §8: above sonnet, or `unknown` tier),
+   by their fixed text (the tier line by its prefix): `⚠ orchestrator on <tier>` (adw-core §8: above sonnet, or `unknown` tier),
    `⚠ spec criteria covered by no unit: <list>` with anything but `none` after the colon, and
    `⚠ no trustworthy gate sees <uN>` (a unit with no gate at all). Every other `⚠` line (a trap, a
    shared file, a partial gate gap such as "SwiftUI is compile only", a scope note) still prints and

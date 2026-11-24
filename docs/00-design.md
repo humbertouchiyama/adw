@@ -191,8 +191,8 @@ decide pass and, since 2026-10-22, every later question of the run (§6.1 rule 4
 the unit cut, a **depth** per unit, and a **packaging** per unit (§3.5). Nothing expensive
 runs before approval — the per-unit front-end (§3.3) can cost more than the implementation,
 and burning it on a mis-cut is the failure this gate exists to prevent. The gate waits only when
-something on it needs the human: a question still `ask`, a `⚠` line other than `spec criteria
-covered by no unit: none`, a `base:` other than the default, or an extension of a live intent. Otherwise
+something on it needs the human: a question still `ask`, a blocking `⚠` line (the tier line, a `spec criteria
+covered by no unit` list other than `none`, or a unit no trustworthy gate sees; other `⚠` notes print and do not block), a `base:` other than the default, or an extension of a live intent. Otherwise
 the surface prints, the intent the human started is the approval, and the run goes on (adw-init Phase 2).
 Over 58 intents with an approval surface in 30 days, 88% were built on the proposed cut unchanged, and the
 owner's wait was about two thirds of run time.
