@@ -475,7 +475,7 @@ cut     chain A ── adw/<intent-slug>: u1 → u3 · independent: u4 · u5 · 
 ⚠ spec criteria covered by no unit: <list | none>   ← ALWAYS prints, `none` included
 ⚠ orchestrator on <tier> — 60–91% of run cost is this window; restart with claude --model sonnet   ← only when above sonnet (§8)
 ⚠ <one line each: gate-visibility gap (design §2.2 rollout rule), shared-file hazard,
-   uncharted territory>                    ← these print only when they exist; only a unit no trustworthy gate sees blocks the gate skip (adw-init Phase 2)
+   uncharted territory>                    ← these print only when they exist. A no-gate unit prints exactly `⚠ no trustworthy gate sees <uN>`; that line, a non-`none` coverage line and the tier line block the gate skip, no other `⚠` does (adw-init Phase 2)
 
 approve → cut + build · decide → you settle the open questions, then build · specs only → stop after specs ·
 detail · re-cut "<instruction>" · regroup "u3→sub-PR 1" · depth "u4→spec" · shape "u4→port" · merge auto · merge hold · reopen Q3   ← `merge auto` only when the base is not the production branch (§2 merge:); `decide` only when `needs you` is not `none`; `shape` only when repo-profile has a complete §20 (§2); `reopen` only when a `decided` line prints
