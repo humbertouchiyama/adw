@@ -934,7 +934,7 @@ not a design note, and `ok` beside them is still `ok`:
 - **Any other answer is a note.** It names the units it is for (`u4: …`); a note that names no unit
   is for every unit in the pack. For each named unit, one at a time, dispatch one implementer
   (`model:` by the unit's depth, adw-core §8) in the worktree of the PR the pack covers for it,
-  re-created as above. Its brief carries the note, the manifest's `screens` map (a note line names a screen by its title there), the unit's spec and table, `repo-profile §23`, where the profile has §24 §3.1's Registry files rule written out, and
+  re-created as above. Its brief carries the note, the manifest's `screens` map (a note line names a screen by its title there), the unit's spec and table, `repo-profile §23`, §3.1's Registry files rule written out (where the profile has §24), and
   this section. It applies the note, then runs this loop on the unit's `V` rows only (the worktree
   holds the unit's code, so it cannot render the base for a `G` row; the §3.4 verifier renders it)
   and §3.2's gates, and commits as `fix(design): <the note, in a few words>`. A note is not a fix cycle, and `fix(design):` counts in no cycle counter.
@@ -1604,7 +1604,7 @@ committed the merge) or `stop <reason>` (it aborted the merge):
    ```
    `stop` at any step → `git -C "<main checkout>" worktree remove "<tree>" || echo "kept <tree>"`
    when a tree was printed, and the chain halts `blocked`: `registry sync — <reason>; default: merge
-   adw/<slug> into <head branch>, settle the conflict, then /pr-ready <PR number>`. A `kept` line
+   adw/<slug> into <head branch>, settle the conflict, then /pr-ready <PR number>, then re-run /adw-build <slug>`. A `kept` line
    goes on a run-report `note` line for `/cleanup`.
 
 After `synced`, the head is no longer the `verified` row, and the merge brought code into it: the PR

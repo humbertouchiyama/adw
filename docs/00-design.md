@@ -332,7 +332,7 @@ Packaging is proposed at the §3.2 gate and approved with the cut. Two shapes:
   one PR targeting `develop` at the end.
 
 **Units MUST share a sub-PR (or PR) when any of these hold:**
-- they touch the same file or function (a registry path alone does not count, §3.5 below) — #742's two "behaviours" both take hunks from
+- they touch the same file or function (a registry path alone does not count, see the registry paragraph below) — #742's two "behaviours" both take hunks from
   `handleDeleteEvolution` (`@@ -1375`, `@@ -1389`, `@@ -1407`);
 - they share a root cause — #745's items 3/4/5 span `lazyRetry.ts` / `main.tsx` / `sw.js`;
   **split, each is individually incorrect** (the service worker keeps poisoning the cache),
