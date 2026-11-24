@@ -347,6 +347,12 @@ Packaging is proposed at the §3.2 gate and approved with the cut. Two shapes:
 and independently revertible** — no shared files, no ordering hazard, no consumption of
 another unit's output.
 
+**A shared registry file is not a shared file (2026-11-24).** Manifests and ratchet counts that a
+command can merge (`repo-profile §24`) no longer force grouping or an `after:` edge: units that
+share only those build in parallel, and the merge settles the file. Units that share new code (a
+symbol, helper, wording or field) become one unit rather than a chain, or a producer unit and
+consumers that fan out after it. Rule: adw-core §4.1 and §4.2. Why: `docs/specs/2026-11-24-adw-parallel-cut-rule-design.md`.
+
 **Separate develop-targeting PRs are earned by independence, never chosen by default.**
 Each costs, measurably: +1 review, +1 `npm run preview`, +1 merge consent (for a `merge: hold`
 intent). The owner's

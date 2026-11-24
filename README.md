@@ -38,7 +38,7 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 Nothing in `commands/` **reads** a repo-specific value. Every value that could differ between two
 repositories — paths, branch names, gate commands, trap domains, review emphasis — lives in a
 `repo-profile.md` **in the consuming repo**, cited from the contract as `repo-profile §N` against
-frozen anchors §1–§18 (plus optional §19, §20, §21, §22 and §23). The test for whether a value belongs here is simple: could this sentence be
+frozen anchors §1–§18 (plus optional §19, §20, §21, §22, §23 and §24). The test for whether a value belongs here is simple: could this sentence be
 true in a repo with a different stack? If not, it names a value, and the value belongs in the
 profile.
 
@@ -67,9 +67,9 @@ had to be rehomed into its `audit.sh` and `repo-profile §16` before the stub co
 Then write `.claude/repo-profile.md`. Start from `docs/repo-profile-EXAMPLE.md` and replace every
 value; the section numbers are anchors and must not be renumbered. A contract file that cites a
 section your profile does not answer will stop the run, which is the intended failure. The
-optional §19, §20, §21, §22 and §23 are the exception: a profile may omit them, and `code-review.md` (§19),
-`adw-core.md` §2 (§20), `adw-build.md` §3.8 (§21), `adw-core.md` §10 (§22) and `adw-build.md` §3.2a (§23)
-say what the absence does.
+optional §19, §20, §21, §22, §23 and §24 are the exception: a profile may omit them, and `code-review.md` (§19),
+`adw-core.md` §2 (§20), `adw-build.md` §3.8 (§21), `adw-core.md` §10 (§22), `adw-build.md` §3.2a (§23)
+and `adw-core.md` §4.1 (§24) say what the absence does.
 
 ### The loader is a copy, and copies drift
 

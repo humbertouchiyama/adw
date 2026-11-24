@@ -7,8 +7,9 @@ description: "Shared ADW contract — spec headers, naming, depth ladder, packag
 **This file lives in the `adw` repository and is fetched, not copied** (§9). It is repo-agnostic:
 every command, path, branch and gate it needs is declared per-repo in the consuming repo's
 `.claude/repo-profile.md`, cited throughout as `repo-profile §N` against frozen anchors §1–§18,
-plus five optional ones a profile may omit: §19 (code-review lanes), §20 (visual port loop, §3),
-§21 (app smoke, adw-build §3.8), §22 (card tracker, §10) and §23 (visual verify, adw-build §3.2a).
+plus six optional ones a profile may omit: §19 (code-review lanes), §20 (visual port loop, §3),
+§21 (app smoke, adw-build §3.8), §22 (card tracker, §10), §23 (visual verify, adw-build §3.2a) and
+§24 (registry files, §4.1).
 Both `/adw-init` and `/adw-build` read that file at their Phase 0 alongside this one — it is not
 auto-included.
 
@@ -79,6 +80,11 @@ new slug (adw-init Phase 0.5).
   inside a MERGED or open-PR unit's scope becomes its own unit citing the original.
   An amend rewrites a spec the owner ALREADY approved, so it prints as its own approval-surface `cut`
   line marked `[amend — <delta>]` (§7) — never folded in silently.
+- **A unit's scope is what overlaps it semantically (§4.1), never a registry path alone.** A new
+  issue that shares only registry paths with a prior unit is not inside that unit's scope: it is a
+  new unit with no `after:` on it, and it builds beside that unit's open PR. adw-build §3.7's
+  registry sync is not an amend either: it changes no spec, and it runs only at a merge the run
+  may already make (§6).
 - **A flat single-unit intent extends without moving its spec** — new units go in
   `<date>-<slug>/NN-*.md` at the intent's birth date, and the flat `<date>-<slug>.md`
   stays put as that first unit's spec; `/adw-build` parses both into one manifest. Only
@@ -120,7 +126,9 @@ Rules:
   on `repo-profile §5`'s allowlist, and `repo-profile §12`'s single-test traps bind the form.
   The implementer does not run a gate `repo-profile §5` marks `[slow]` (adw-build §3.2), so write
   `verify` to check the unit's behaviour without that gate: it is what the implementer iterates on.
-- `after` names only units of the same intent; the graph must be acyclic.
+- `after` names only units of the same intent; the graph must be acyclic. It names a unit whose
+  output this unit uses, or a migration order. A registry overlap alone is never an `after:` edge
+  (§4.1).
 - **`base:` is optional** (so is `shape:`, below) — the branch the whole intent forks from and its
   PRs target. Omitted = `repo-profile §3`'s default base. Intent-wide: every spec of one intent
   carries the same value or none (`/adw-build` refuses a mixed set), and the branch must exist on
@@ -289,19 +297,64 @@ and **chain** (dependent units share integration branch `adw/<intent-slug>`; one
 PR).
 
 Units MUST share a sub-PR (or PR) when any holds:
-- they touch the same file or function;
+- they touch the same file or function, a registry path (§4.1) excepted;
 - they share a root cause;
 - one's correctness depends on the other landing in the same merge.
 
 Units MAY be independent when each is independently correct, independently mergeable, and
-independently revertible — no shared files, no ordering hazard, **no consumption of another
-unit's output** (disjoint file lists do NOT prove independence).
+independently revertible — no shared files (registry paths excepted, §4.1), no ordering hazard,
+**no consumption of another unit's output** (disjoint file lists do NOT prove independence).
 
 One exception: a port unit never shares a PR or sub-PR (§3 Port shape); it chains instead.
 
 Default when it could go either way: **group**. A separate base-targeting PR is earned,
 never chosen — each costs the owner +1 review, +1 local preview, and, for a `merge: hold`
 intent, +1 merge consent (a `merge: auto` intent's PR merges behind adw-build §3.7's gate).
+
+### 4.1 Overlap — registry or semantic
+
+Two units **overlap** when their file lists share a path, or when one unit's change uses a name the
+other's change creates or changes. A **registry path** is a path that `repo-profile §24` lists: a
+manifest, ratchet or count file whose rows and counts a tool keeps in step with the sources, and
+whose merge conflicts that profile's Regenerate command settles. A profile with no §24 has no
+registry paths, and every overlap is semantic. Classify every overlapping pair before packaging:
+
+| Overlap | Test | Cut and `after:` | Build |
+|---|---|---|---|
+| **registry** | every shared path is a registry path, and neither unit uses a name the other creates or changes | the overlap adds no `after:` edge and no reason to share a PR (§4's other rules still apply). Units that would be two independent PRs go on one chain level instead (two independent PRs whose registry files conflict wait for the owner at the second merge, adw-build §3.7) | in parallel. The merge that meets the overlap settles it: a sub-PR by adw-build §3.7's registry sync, a chain's close by adw-build Phase 4, an independent PR at adw-build §3.7's merge gate when the files merge without a conflict |
+| **semantic** | anything else: a shared path that is not a registry path, or one unit uses a symbol, helper, wording (a user-facing string) or projection field that the other creates or changes | **one unit, not a chain** (two units that edit one existing file may still share a PR or sub-PR, as above). Past §4.2's size guard: a producer unit that creates the shared thing, and consumer units that each take `after: [<producer>]` and no `after:` on each other | the producer first; its consumers as siblings on the next chain level, in parallel (adw-build Phase 1) |
+
+**Telling them apart from a file list.** (1) Intersect the two units' file lists: at triage, the
+files each unit is expected to change; after the fan-out, the paths in the spec's `## Implementation`
+table or the plan. (2) Drop every path one of §24's globs matches. (3) Nothing left, and no name that
+one unit's change creates or changes appears in the other's → registry. Anything left, or such a
+name → semantic. **When unsure, it is semantic**: a unit with no file list yet, a name that could be
+either, one row of a registry file that both units may change. That costs parallelism, never a
+broken merge. A registry overlap that was semantic after all surfaces at the merge, where
+Regenerate refuses a conflict it does not own (one row changed on both sides) and the merge stops
+as any conflicting merge does (adw-build §3.7 and Phase 4).
+
+**Extend mode (§1.1).** A semantic overlap with an UNBUILT unit amends that unit: one unit. With an
+OPEN-PR unit, whose PR is never amended, the new unit is its consumer: `after: [<that unit>]`. With a
+MERGED unit, the new unit cites it; the merged code is on the base. A registry overlap with any of
+them is a new unit with no `after:` on it.
+
+### 4.2 Size guard — a merged unit stays verifiable
+
+A unit cut as one under §4.1 stays one while both hold:
+
+- it is expected to change at most **8 production files** (§3 counts them). adw-build §3.2's
+  per-file mutation sweep checks at most 8, so past 8 some file loses its own red-on-revert check;
+- its spec stays under its depth's **hard stop** (adw-init Phase 3, artifact budget).
+
+Past the file bound, triage splits the unit at a seam. Past the hard stop, the author's one `needs
+you` split question (adw-init Phase 3) proposes that split as its default. **A seam is one new thing — a symbol, a helper, a
+wording, a projection field — whose definition and tests sit on one side and only its uses on the
+other.** The definition side is the producer unit. Each set of uses with files of its own is a
+consumer unit, `after: [<producer>]`. A cut at a seam leaves no path in two units except registry
+paths. No seam (the parts edit the same functions) → the unit stays whole, and its size is reported
+as for any unit (adw-init Phase 4). §3's criteria judge a merged unit whole: parts that were D1 each
+make a D2 unit once together they pass 4 production files.
 
 ## 5. Chain conventions (contract, not style)
 
@@ -386,8 +439,9 @@ whose gate adw-init Phase 2 skipped on such a cut. So:
 - **What still stops a chain:** a `failed` sub-PR; a `blocked` sub-PR the next unit cannot build
   on (adw-build §3.7 names three cases: a `depth escalation` or `shape escalation`, whose
   default replaces the unit, a red gate on the pushed head (but a port unit that is `port not converged` is carried), and a driver that returned no
-  `verified <sha7>`); a sub-PR whose head is not its `verified` row (adw-build §3.7); and a
-  merge-time assertion mismatch (adw-build §3.7). Each of these is a line on the run report, not a question.
+  `verified <sha7>`); a sub-PR whose head is not its `verified` row (adw-build §3.7); a
+  registry sync that stops (adw-build §3.7); and a merge-time assertion mismatch (adw-build
+  §3.7). Each of these is a line on the run report, not a question.
 
 Thirteen sub-PR merge questions reached the owner in twelve days of runs (2026-09-20 to 10-01):
 eight for a `blocked` sub-PR, two from a no-merge line a dispatching session wrote into a brief,

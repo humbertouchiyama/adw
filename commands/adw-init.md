@@ -205,7 +205,13 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    (adw-core §3 Port shape) — an exception to item 1's vertical cut;
 > 3. packaging per adw-core §4, with `after` edges — remember: a unit that reads another
 >    unit's output is NOT independent, no matter how disjoint the file lists look. A port unit
->    never shares a PR or sub-PR (adw-core §3);
+>    never shares a PR or sub-PR (adw-core §3). List each unit's expected files, with its count of
+>    production files. Classify every overlapping pair as registry or semantic by adw-core §4.1's
+>    three steps (registry paths are `.claude/repo-profile.md` §24's; none there → every overlap is
+>    semantic; unsure → semantic). A registry overlap adds no `after` edge and is no reason to
+>    share a PR; two units it would leave as independent PRs go on one chain level. Units that
+>    share new code are ONE unit, not a chain; past adw-core §4.2's size guard, split it at its
+>    seam: a producer unit, and consumer units that each take `after: [<producer>]`;
 > 4. a `verify` COMMAND per unit (adw-core §2 rules — never a prose sentence);
 > 5. spec criteria covered by no unit — mandatory, print `none` explicitly if none;
 > 6. **three separate lists, split by you, not by the renderer** — questions, hazards, fyi.
@@ -214,7 +220,8 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    clause; check the repo before you list one — a question the code answers is not one, and
 >    a question about how to build it is never one. The ask rule: <Phase 0.7's ask rule, pasted>; a
 >    "confirm X before …" item is a question, never a hazard and never fyi. A **hazard**
->    is anything the owner might act on without being asked: files shared between units,
+>    is anything the owner might act on without being asked: files shared between units (a
+>    registry overlap is fyi, not a hazard: it is settled at the merge),
 >    scope=future / fan-out hazards, gate-visibility gaps, uncharted territory — these
 >    become `⚠` lines and are the ONE thing that always prints, because the approval
 >    surface is brief by default and `approve` builds (adw-core §7). Everything else is
@@ -258,9 +265,12 @@ the triage re-diagnoses shipped code and mints blind neighbours:
 > `amend: uNN` with the delta (that unit's spec gets revised — one fewer PR);
 > (c) inside an OPEN-PR unit's scope → new unit with `after: [uNN]`; that PR is the
 > owner's and is never amended by this run; (d) genuinely new → new unit.
+> A unit's scope is its semantic overlap (adw-core §4.1): an issue that shares only registry
+> paths with a prior unit is (d), with no `after` on that unit.
 > Also report any semantic dependency between a new unit and an unbuilt/open prior unit —
-> shared file, shared query, one's design assuming the other's absence. That class is
-> invisible to every gate and is the whole reason extension beats a fresh slug.
+> shared file (a registry path alone is not one), shared query, one's design assuming the
+> other's absence. That class is invisible to every gate and is the whole reason extension
+> beats a fresh slug.
 
 **Follow-up mode appends this to the prompt** (a `--followup` that passed Input's checks), with the merged intent's
 spec paths from `git ls-tree -r --name-only origin/<default base> -- <specs-dir> <legacy-specs-dir> |
@@ -532,7 +542,10 @@ target to fill:
 
 Clearing a guard rail by a margin is reported, not paid for, and nothing load-bearing is
 ever cut to reach it. At a **hard stop** the unit is mis-cut rather than merely dense: report
-it as ONE `needs you` split question instead of writing past it. Count the artifact you will
+it as ONE `needs you` split question instead of writing past it. Its default is a split at a
+seam (adw-core §4.2): one new symbol, helper, wording or field, a producer unit that holds its
+definition and tests, and consumer units that hold only its uses; name the seam in the question.
+Count the artifact you will
 COMMIT, not a draft — critical-pass revisions land after the count. Check the ratio and your
 `wc -l` **once**, last, on the final text; re-counting while you draft is the tell that the
 number has become the target this paragraph just said it is not. Write the artifact, then
