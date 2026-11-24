@@ -4,8 +4,7 @@
 > repository ADW was built in: a full-stack TypeScript monorepo (React 19 + Vite, Hono + PostgreSQL
 > 16 + Drizzle, one shared npm workspace). Copy it to `.claude/repo-profile.md` in your repo and
 > replace **every** value. Keep the section numbers: the contract cites them as `repo-profile §N`
-> and the anchors §1–§18 are frozen. §19 to §23 are optional; §20, §21, §22 and §23 are sketched
-> at the end.
+> and the anchors §1–§18 are frozen. §19 to §24 are optional; §20 to §24 are sketched at the end.
 
 Every repo-specific value the shared agent contract needs. One of these lives in each repo that
 runs `/adw-init`, `/adw-build`, `/pr-ready` or `/code-review`; the contract files themselves
@@ -17,7 +16,7 @@ The format is prose and tables, not a parsed config. The reader is an agent, so 
 more than syntax.
 
 **Section anchors are frozen** — the contract files cite `repo-profile §1`…`§18` by number, and the
-optional §19 to §23 where a profile carries them. Do not renumber. Add new sections at the end.
+optional §19 to §24 where a profile carries them. Do not renumber. Add new sections at the end.
 
 | § | Section | Read by |
 |---|---|---|
@@ -44,6 +43,7 @@ optional §19 to §23 where a profile carries them. Do not renumber. Add new sec
 | §21 | App smoke (optional; absent → no smoke) | adw-build §3.5/§3.7/§3.8, adw-core §7 |
 | §22 | Card tracker status names (optional; absent → status is never moved) | adw-core §2/§10, adw-init Phase 0.5, adw-build Phase 0/5 |
 | §23 | Visual verify (optional; absent → no render compare and no design sign-off) | adw-build Phase 0/1/§3.2a/§3.4/§3.5/§3.6/§3.7/Phase 4/Phase 5, adw-core §6/§7, adw-init Phase 3/4 |
+| §24 | Registry files (optional; absent → every shared file is shared code) | adw-core §1.1/§4/§4.1, adw-init Phase 1, adw-build Phase 1/§3.1/§3.7/Phase 4 |
 
 ---
 
@@ -752,3 +752,25 @@ compare, no sign-off, nothing about it prints. Fill every row with a value, not 
 | **Max rounds** | a whole number: the most render-compare-fix rounds one loop may run |
 | **Sign-off** | `end of run` (every unit builds without a stop; after the last one the owner gets one pack, before, after and goal images for every row, and signs off once, before any PR merges into a base; `before verify` is read as `end of run`) or `none` |
 | **Blind spots** | which changed files no §5 gate sees (so the compare is their only check), and what a render cannot show; the second list goes to the PR's `## For your check` (adw-build §3.5) |
+
+## §24 — Registry files (optional)
+
+A profile that keeps this section lists the files that several units change at once and that a
+command can merge for them: manifests (one row per tracked thing) and the counts or ratchet
+ceilings derived from those rows. adw-core §4.1 then lets units that share only these files build
+in parallel, and `/adw-build` settles their merge with the command below (adw-build §3.1, §3.7,
+Phase 4). **Delete the whole section unless the repo has such files and that command**: absent →
+every shared file is shared code, as before. Fill every row with a value, not with the description:
+
+| | |
+|---|---|
+| **Paths** | the registry files, as git pathspec globs, each quoted where the contract pastes it (`'config/audit/*-parity.tsv'`). A file qualifies only when every line of it is a row or a count that Regenerate owns. A file that also holds code qualifies only if Regenerate refuses every conflict outside its count lines. A §7 gate file never qualifies: a unit that changes one is `blocked` (`pr-ready` §4.2) |
+| **Regenerate** | one command, run from a tree's root, that rewrites every count from the rows. In a tree where a `git merge` stopped, it first settles each conflicted registry file row by row: for each row key, the side that changed it from the merge base (git's index stages 1, 2 and 3); the same key changed on both sides → exit non-zero. **A ceiling only goes down:** it writes the lowest of the recount and every value the file holds (both sides of a merge), never a higher one, so a unit that adds a row stays red under the Check gate. It reads and writes registry paths only: no build, no test, no network, done inside one Bash call. Its exit codes |
+| **Check** | the §5 gate that goes red when a registry file disagrees with its sources: a count above or below its rows, a row with nothing behind it. `/adw-build` runs it on every tree a registry resolution or a registry overlap produced, obligated or not |
+
+Example shape, from a Kotlin mobile repo: a parity test reads `config/audit/<host>-parity.tsv`, one
+row per screen element with a status, and checks that each host's `baselineMax` in a Kotlin file
+equals its count of `baseline` rows. Paths lists the TSVs and that Kotlin file; Regenerate is a
+script that merges TSV rows by key and lowers each `baselineMax` to its recount; Check is the JVM
+unit-test gate that runs the parity test. A repo can also drop the stored ceiling and have the test
+compare its count with the base's: then only the TSVs are registry paths.
