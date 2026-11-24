@@ -332,7 +332,7 @@ Packaging is proposed at the §3.2 gate and approved with the cut. Two shapes:
   one PR targeting `develop` at the end.
 
 **Units MUST share a sub-PR (or PR) when any of these hold:**
-- they touch the same file or function — #742's two "behaviours" both take hunks from
+- they touch the same file or function (a registry path alone does not count, §3.5 below) — #742's two "behaviours" both take hunks from
   `handleDeleteEvolution` (`@@ -1375`, `@@ -1389`, `@@ -1407`);
 - they share a root cause — #745's items 3/4/5 span `lazyRetry.ts` / `main.tsx` / `sw.js`;
   **split, each is individually incorrect** (the service worker keeps poisoning the cache),
@@ -502,7 +502,8 @@ rebase over parallel commits); sequential merge into the integration branch cann
 work. The integration branch is synced with `origin/develop` before the final PR opens
 (≤5 commits → rebase, >5 → merge, per CLAUDE.md §8). A conflicting sync is not resolved
 unattended — conflict resolution is judgement work of exactly the class §4.3 aborts on;
-the chain halts `blocked`, reported per the bookkeeping rules below.
+the one exception is a conflict in registry paths alone (adw-core §4.1), which the contract's
+resolution settles mechanically; any other conflict halts the chain `blocked`, reported per the bookkeeping rules below.
 
 **Chain bookkeeping** — the conventions a builder needs, stated once:
 

@@ -310,7 +310,7 @@ gate file to get green · let a subagent create its own worktree.
   cross-unit gate flake.
 
   **The orchestrator is the lock.** Where `repo-profile §10` says a gate shares state between
-  worktrees, at most one gate-running agent is in flight at a time **across the whole run** —
+  worktrees (and only there; the last sentence of this paragraph says what holds otherwise), at most one gate-running agent is in flight at a time **across the whole run** —
   independent units and chain siblings alike — and this session orders them by dispatch. Every
   implementer brief written while another unit of the run is in flight says `implement, commit,
   then return before you run any gate`, and there the unit's `verify` counts as a gate too (it
@@ -934,7 +934,7 @@ not a design note, and `ok` beside them is still `ok`:
 - **Any other answer is a note.** It names the units it is for (`u4: …`); a note that names no unit
   is for every unit in the pack. For each named unit, one at a time, dispatch one implementer
   (`model:` by the unit's depth, adw-core §8) in the worktree of the PR the pack covers for it,
-  re-created as above. Its brief carries the note, the manifest's `screens` map (a note line names a screen by its title there), the unit's spec and table, `repo-profile §23` and
+  re-created as above. Its brief carries the note, the manifest's `screens` map (a note line names a screen by its title there), the unit's spec and table, `repo-profile §23`, where the profile has §24 §3.1's Registry files rule written out, and
   this section. It applies the note, then runs this loop on the unit's `V` rows only (the worktree
   holds the unit's code, so it cannot render the base for a `G` row; the §3.4 verifier renders it)
   and §3.2's gates, and commits as `fix(design): <the note, in a few words>`. A note is not a fix cycle, and `fix(design):` counts in no cycle counter.
@@ -1604,7 +1604,7 @@ committed the merge) or `stop <reason>` (it aborted the merge):
    ```
    `stop` at any step → `git -C "<main checkout>" worktree remove "<tree>" || echo "kept <tree>"`
    when a tree was printed, and the chain halts `blocked`: `registry sync — <reason>; default: merge
-   adw/<slug> into <head branch>, settle the conflict, then re-run /adw-build <slug>`. A `kept` line
+   adw/<slug> into <head branch>, settle the conflict, then /pr-ready <PR number>`. A `kept` line
    goes on a run-report `note` line for `/cleanup`.
 
 After `synced`, the head is no longer the `verified` row, and the merge brought code into it: the PR
@@ -1652,8 +1652,8 @@ its next unit. No label is added for a hold.
    prints only `registry` lines → a registry overlap: make the merge-result tree with the block in
    (c) of "The owner's word on a base that moved" (below). Its `tree <path> base <sha>` → step 3 in
    that tree, and the row will end `· registry overlap ok at <base sha7>` instead of `· base trial
-   ok`; its `conflict` or `no tree` → write the row as `hold 6 — overlap: <files> (registry
-   conflict)` and stop. Any other `hold 6 …` → write the row and stop. `tree <path> base <sha>` →
+   ok`; its `conflict` → write the row as `hold 6 — overlap: <files> (registry conflict)` and
+   stop; its `no tree` → (f) of that section, with the reason it gives there. Any other `hold 6 …` → write the row and stop. `tree <path> base <sha>` →
    step 3 in that tree.
 3. **Gates in the trial tree.** On a repo whose §21 has a Lock row, take the lock first with the
    row's take command for `<slug>`, and release it with the row's release command when the gates
@@ -2028,7 +2028,8 @@ not red). One cycle:
    `subagent_type: general-purpose`. Its brief carries the worktree path and the head branch,
    written out; `<BASE>` (§3.2); each `valid` row with its three links; the gate list, order and
    obligation rule §3.2 puts in an implementer's brief, without its `[slow]` skip; every `known baseline red` line (§3.3); for
-   a port unit, §3.1's wait block and `repo-profile §20`'s Gate mode row; and `review-core.md` §11's
+   a port unit, §3.1's wait block and `repo-profile §20`'s Gate mode row; where the profile has §24,
+   §3.1's Registry files rule, written out; and `review-core.md` §11's
    brief floor. The agent fixes the app, never the spec and never the case, and edits no gate file.
    One commit per row: `smoke-fix-<c>: <row id> <what>`. Then it runs every gate §3.2 obligates for
    `git diff --name-only <BASE>...HEAD`, including the ones `repo-profile §5` marks `[slow]` (§3.2's
@@ -2119,7 +2120,8 @@ merge --abort`), then run `git -C "<close worktree>" merge --no-commit --no-ff -
 origin/<INTENT_BASE>` in one Bash call, with the close worktree's path written out, then §3.7's
 registry resolution with `<tree>` = that path and `<B>` = `<INTENT_BASE>`. `resolved` → `git -C
 "<close worktree>" push origin adw/<slug>`, and go on as after a clean sync: the final PR's full
-loop below verifies and reviews the result, and its composition read sees the resolution. `stop` →
+loop below verifies and reviews the result, runs §24's Check gate whether or not §3.2 obligates it,
+and its composition read sees the resolution. `stop` →
 the resolution aborted its merge, and the paragraph below applies.
 
 A conflicting sync is **judgement work, never resolved unattended**: abort the sync

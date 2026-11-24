@@ -1045,7 +1045,7 @@ and it names an unverified contract rather than a stale one it cannot do anythin
 failure with no cache at all is **exit 1**, and the run stops.
 
 **What is still per-repo.** `repo-profile.md`, authored in the consuming repo and never fetched.
-Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19, §20, §21, §22 and §23 optional). A contract file that
+Every file above cites it as `repo-profile §N` with frozen anchors §1–§18 (§19, §20, §21, §22, §23 and §24 optional). A contract file that
 needs a value which could differ between two repos is wrong: the value belongs in the profile. The
 failing test is always the same — could this exact sentence be true in a repo with a different
 stack? If not, it names a value, and the value moves.
