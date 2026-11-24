@@ -107,18 +107,25 @@ Gitignored build output a path check must skip: `packages/shared/dist` and frien
 | **auto-merge default** | `on` |
 | **merge-protected paths** | `.claude/**` `.github/workflows/**` `firebase.json` `.firebaserc` `api/drizzle.config.ts` |
 | **UI paths** | `src/**` `packages/shared/**` `index.html` `public/**` |
+| **test sources** | `**/*.test.ts` `**/*.test.tsx` `**/__tests__/**` |
 
 `develop` is never merged into anything, so "the base branch is still unmerged" never expires for it
 (adw-core §1.1 liveness).
 
-The last three rows are read by `adw-build §3.7`'s merge gate, at merge time, so each cell holds the
+The last four rows are read by `adw-build §3.7`'s merge gate, at merge time, so each cell holds the
 value alone: no note in the cell. **auto-merge default** is `on` or `off`; `off` is the kill switch
 and also stops runs already in flight, and a profile with no row reads as `off`. **merge-protected
 paths**: a PR whose diff touches one never merges without the owner; with no row, no PR auto-merges.
 The gate reads these rows, and the `money` row, from the base's copy of the profile too, and the
 stricter wins. **UI paths**: a `Smoke: none`
-PR whose diff touches one waits for the owner; with no row, every `Smoke: none` PR waits. Both hold
-globs in backticks, space-separated: a double star crosses `/`, a single star does not.
+PR whose diff touches one waits for the owner; with no row, every `Smoke: none` PR waits. **test
+sources**: files that never ship (test files, test source sets). A money word on an added line of one
+does not hold the PR, so an assertion such as `expect(x).toBe(formatMoney(100))` is no money change.
+Only that: a test source is still checked against the other rows, and the money row still matches its
+path. Both copies of the profile must name the file; with no row, every money line holds. Name test
+code only: a glob that also matches shipped code lets that code's money lines through. A Kotlin
+repo names its source sets (`composeApp/src/*Test/**`), not a filename suffix. The three path rows
+hold globs in backticks, space-separated: a double star crosses `/`, a single star does not.
 
 ## §4 — Worktree provisioning — before any gate
 
@@ -401,7 +408,9 @@ both sides: one path prefix, then greps over the diff's added/changed lines.
 | live sync | `pg_notify\|fetchEventSource\|useSSE` |
 
 Deliberately coarse proxies — a false hit costs a bounce to D2, the cheap direction. Tune from run
-evidence, never toward judgment calls.
+evidence, never toward judgment calls. The **money** row is also condition 4 of the merge gate
+(`adw-build §3.7`), where a false hit costs the owner a merge by hand: `cents` above also matches
+`accents`, and that held three past PRs of this repo whose lines named no money.
 
 **`api/` and `packages/` were prefixes here until 2026-09-09 and are not any more** — the general
 rule and the measurement are adw-core §3. `transactions` and `live sync` are the `api/` risks the

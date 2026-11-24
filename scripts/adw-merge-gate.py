@@ -8,7 +8,7 @@ Every condition is read fresh from GitHub or the profile, never from the run's m
 `pass` (exit 0), or `hold <n> <reason>` (exit 1) for the first condition that fails, in this order:
 1 flag (the specs' `merge: auto`, both profiles' `auto-merge default`, no `adw:hold`), 2 base, 3 verified head,
 10 the design sign-off (the evidence block's `visual` row still reads `sign-off pending`, adw-build §3.2a),
-4 paths (merge-protected, money lines), 5 GitHub (mergeable, checks), 7 the walk, 8 the screenshots,
+4 paths (merge-protected, money lines outside the test sources), 5 GitHub (mergeable, checks), 7 the walk, 8 the screenshots,
 9 `Smoke: none` / `Screens: none` against the UI paths. Every input fails closed: the merge-protected,
 UI and money rows are read from both the local profile and the base's copy, the stricter wins, and a
 missing merge-protected row holds; paths come from the full diff (both sides of a rename); `merge:` and
@@ -129,6 +129,8 @@ class Profile:
         self.protected = [glob_re(g) for g in ticks(s3.get("merge-protected paths", ""))]
         ui = s3.get("ui paths")
         self.ui = [glob_re(g) for g in ticks(ui)] if ui is not None and ticks(ui) else None
+        # §3 test sources: their added lines are no money lines. No row, or no glob in it, exempts nothing.
+        self.tests = [glob_re(g) for g in ticks(s3.get("test sources", ""))]
         self.production = (ticks(s3.get("production branch", "")) or [None])[0]
         self.default_base = (ticks(s3.get("default base", "")) or [None])[0]
         self.excluded = [glob_re(g) for g in re.findall(r"':!([^']+)'", self.sections.get("2", {}).get("artifact exclusion pathspec", ""))]
@@ -312,6 +314,11 @@ def paths(profiles: list[Profile], files: list[dict]) -> None:
     for f in files:
         path = f["path"]
         if path is not None and all(matches(prof.excluded, path) for prof in profiles):
+            continue
+        # A test source never ships, so a money word in it (an assertion, a test name) changes no money:
+        # AXCMedApp #807 and #768 held for one. Every path of the file (both sides of a move) must be a test
+        # source in every profile (the stricter wins); a money file name above still holds.
+        if f["paths"] and all(matches(prof.tests, p) for prof in profiles for p in f["paths"]):
             continue
         for line in f["added"]:
             for prof in profiles:

@@ -356,6 +356,78 @@ class TestPaths(Gate):
         self.assertHold(4)
 
 
+TEST_ROW = "| **test sources** | `**/*.test.ts` `**/__tests__/**` |\n"
+
+
+class TestTestSources(Gate):
+    """A money word on an added line of a test source is not a money change (AXCMedApp #807, #768): the
+    test sources row exempts those lines, and nothing else."""
+
+    def with_row(self, local=True, base=True):
+        protected = "| **merge-protected paths** |"
+        if local:
+            self.local = self.local.replace(protected, TEST_ROW + protected)
+        if base:
+            self.fx["contents"][".claude/repo-profile.md?ref=develop"] = profile().replace(protected, TEST_ROW + protected)
+
+    def test_money_line_in_a_test_file_passes(self):
+        self.with_row()
+        self.fx["diff"] += diff_file("src/lib/total.test.ts", added="expect(total()).toBe(formatMoney(1234));")
+        self.assertPass()
+
+    def test_money_line_in_a_test_dir_passes(self):
+        self.with_row()
+        self.fx["diff"] += diff_file("api/billing/__tests__/charge.ts", added="const cents = 990;")
+        self.assertPass()
+
+    def test_money_line_in_a_test_file_holds_with_no_test_sources_row(self):
+        self.fx["diff"] += diff_file("src/lib/total.test.ts", added="expect(total()).toBe(formatMoney(1234));")
+        self.assertHold(4)
+
+    def test_money_line_in_a_test_file_holds_when_the_base_profile_has_no_row(self):
+        self.with_row(base=False)
+        self.fx["diff"] += diff_file("src/lib/total.test.ts", added="expect(total()).toBe(formatMoney(1234));")
+        self.assertHold(4)
+
+    def test_money_line_in_a_test_file_holds_when_the_local_profile_has_no_row(self):
+        self.with_row(local=False)
+        self.fx["diff"] += diff_file("src/lib/total.test.ts", added="expect(total()).toBe(formatMoney(1234));")
+        self.assertHold(4)
+
+    def test_a_test_sources_row_with_no_glob_exempts_nothing(self):
+        self.with_row()
+        self.local = self.local.replace("`**/*.test.ts` `**/__tests__/**`", "test files")
+        self.fx["contents"][".claude/repo-profile.md?ref=develop"] = self.local
+        self.fx["diff"] += diff_file("src/lib/total.test.ts", added="expect(total()).toBe(formatMoney(1234));")
+        self.assertHold(4)
+
+    def test_money_line_in_production_beside_a_test_still_holds(self):
+        self.with_row()
+        self.fx["diff"] += diff_file("src/lib/total.test.ts", added="expect(total()).toBe(formatMoney(1234));")
+        self.fx["diff"] += diff_file("src/lib/total.ts", added="return formatMoney(sum);")
+        out = self.assertHold(4)
+        self.assertIn("src/lib/total.ts adds a money line", out)
+
+    def test_a_test_file_the_money_row_names_still_holds(self):
+        self.with_row()
+        self.fx["diff"] += diff_file("src/lib/__tests__/money.ts", added="export const x = 1;")
+        out = self.assertHold(4)
+        self.assertIn("money file", out)
+
+    def test_a_move_from_production_into_a_test_source_still_holds(self):
+        self.with_row()
+        self.fx["diff"] += ("diff --git a/src/pay.ts b/src/__tests__/pay.ts\nsimilarity index 90%\n"
+                            "rename from src/pay.ts\nrename to src/__tests__/pay.ts\n"
+                            "--- a/src/pay.ts\n+++ b/src/__tests__/pay.ts\n@@ -1 +1 @@\n-x\n+return cents * 2\n")
+        self.assertHold(4)
+
+    def test_a_protected_test_file_still_holds(self):
+        self.with_row()
+        self.fx["diff"] += diff_file(".claude/__tests__/gate.test.ts", added="x")
+        out = self.assertHold(4)
+        self.assertIn("merge-protected", out)
+
+
 class TestGitHub(Gate):
     def test_unknown_mergeable_bounded(self):
         self.fx["mergeable_seq"] = ["UNKNOWN"] * 5

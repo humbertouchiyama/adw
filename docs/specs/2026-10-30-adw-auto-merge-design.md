@@ -106,7 +106,10 @@ the source it names, never from memory.
    changed lines, outside the repo's artifact exclusion pathspec (§8, C9). A path the money row names
    (a money file) counts as a money change. Paths come from the full diff, both sides of a rename.
    These rows are read from the base's copy of the profile as well as the local one, and the
-   stricter wins; a profile with no `merge-protected paths` row means the PR waits.
+   stricter wins; a profile with no `merge-protected paths` row means the PR waits. A file that both
+   copies name in their `test sources` row (`repo-profile` §3) adds no money line: a test assertion
+   or a test name ships no money (added 2026-11-24, AXCMedApp #807 and #768). Its path still counts,
+   and a file moved out of production into a test source still holds.
 5. **GitHub.** `gh pr view --json mergeable,mergeStateStatus` says mergeable, and `gh pr checks` shows
    no failed check, read as `repo-profile` §9 says. `UNKNOWN` is re-queried with the bound
    `code-review` step 6 uses. Still `UNKNOWN` means the PR waits.
