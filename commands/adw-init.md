@@ -222,7 +222,7 @@ session's most expensive tier (run-1 spent 10.5 min of top-tier triage on a one-
 >    read-ins, boundary calls. When a line could be a hazard or fyi, it is a hazard;
 > 7. gate coverage — for each unit, name the trustworthy gate that can see its
 >    correctness (integration test, e2e spec, tsc/grep proof); a unit with none gets a
->    `⚠` line (design §2.2: rollout is scoped by gate coverage — the approval surface is
+>    `⚠ no trustworthy gate sees <uN>` line, exactly that text (a unit with only a partial gate, for example compile-only, gets a differently worded `⚠` line instead) (design §2.2: rollout is scoped by gate coverage — the approval surface is
 >    where the human decides that targeting, and they cannot decide it from a line the
 >    brief surface hides);
 > 8. depth rationale — one line per unit (`why-<word>`, the §3 depth word), naming which
@@ -318,9 +318,12 @@ The orchestrator composes the pass's prompt from this text:
 `--followup` or not, at any unit count and any depth. The gate is skipped when all four hold:
 
 1. no question is `ask`;
-2. no `⚠` line would print on the approval surface, except adw-core §7's `⚠ spec criteria covered
-   by no unit: none`. An orchestrator above sonnet, or of `unknown` tier, prints its tier `⚠` line
-   (adw-core §8), so it keeps the gate;
+2. no **blocking** `⚠` line would print on the approval surface. Exactly three lines block, matched
+   by their fixed text: `⚠ orchestrator on <tier>` (adw-core §8: above sonnet, or `unknown` tier),
+   `⚠ spec criteria covered by no unit: <list>` with anything but `none` after the colon, and
+   `⚠ no trustworthy gate sees <uN>` (a unit with no gate at all). Every other `⚠` line (a trap, a
+   shared file, a partial gate gap such as "SwiftUI is compile only", a scope note) still prints and
+   does not block: the owner cannot answer it, and `needs you  none` says nothing is theirs to decide;
 3. the intent's base is the default base (`repo-profile §3`): the surface prints no `base` line.
    The `base:` branch waits for the owner (Phase 0.7, adw-core §7 rule 4);
 4. Phase 0.5 matched no live intent: the surface prints no `extends` line. Extension is the owner's
