@@ -123,7 +123,8 @@ An intent is **live** while any adw PR for its slug is open, its spec folder sti
 untracked unit specs, or a **non-default** `base:` is unmerged (adw-core §1.1 — a merged
 folder returns tracked at the next `git pull`, and the default base is never merged, so neither
 bare existence nor a default base ever expires). For each live intent, compare its surface
-against the new issues — same files, same feature directory, same base. On a match, resolve
+against the new issues — same files (a registry path alone is not a match, adw-core §4.1), same
+feature directory, same base. On a match, resolve
 prior state before triage:
 
 - **unit ids**: every id ever used, parsed from PR titles (`[adw <slug> u2+u3]`) plus any

@@ -1141,12 +1141,13 @@ pipeline knows:
   - `verified   <40-char sha>`: written at §3.7 when the PR reaches `ready`, or `blocked` with a
     driver-returned `verified <sha7>`, from `$VSHA`, never from a fresh derivation. §3.7's merge
     gate and its sub-PR procedure compare the head against it.
-  - `merge      merged <merge sha7> · base unmoved` or `· base trial ok at <base sha7>`, or
+  - `merge      merged <merge sha7> · base unmoved`, `· base trial ok at <base sha7>` or `· registry
+    overlap ok at <base sha7>`, or
     `merge      hold <n> — <reason> · at <head sha7>`: written by §3.7's merge gate on an
     independent or final PR. `<n>` is the gate's condition number 1–10, or `call` for a denied or
     failed merge call. §3.7's owner-word merge writes `merge      owner-merged <merge sha7> ·
-    base unmoved`, `· base trial ok at <base sha7>` or `· overlap re-reviewed at <base sha7>`
-    instead: it is not an auto-merge, and `scripts/adw_analyze/metrics.py` must not count it as one
+    base unmoved`, `· base trial ok at <base sha7>`, `· registry overlap ok at <base sha7>` or `·
+    overlap re-reviewed at <base sha7>` instead: it is not an auto-merge, and `scripts/adw_analyze/metrics.py` must not count it as one
     (its `merged` match is anchored at the start of the row). It stays in the denominator of
     `outcome.auto_merged_share`: the gate was reached and the owner merged.
 
@@ -1553,11 +1554,12 @@ Paths, each one quoted, `<x-globs>` the same globs, each written `':!<glob>'`, a
 **The overlap test**, one Bash call, from the main checkout:
 
 ```bash
-git fetch -q origin && F=$(git merge-base "origin/<B>" <head sha>) && { comm -12 <(git diff --no-renames --name-only "$F" "origin/<B>" -- <globs> | sort) <(git diff --no-renames --name-only "$F" <head sha> -- <globs> | sort) | sed 's/^/registry /'; comm -12 <(git diff --no-renames --name-only "$F" "origin/<B>" -- . <x-globs> | sort) <(git diff --no-renames --name-only "$F" <head sha> -- . <x-globs> | sort) | sed 's/^/code /'; } || echo "test failed"
+git fetch -q origin && F=$(git merge-base "origin/<B>" <head sha>) && RB=$(git diff --no-renames --name-only "$F" "origin/<B>" -- <globs>) && RH=$(git diff --no-renames --name-only "$F" <head sha> -- <globs>) && CB=$(git diff --no-renames --name-only "$F" "origin/<B>" -- . <x-globs>) && CH=$(git diff --no-renames --name-only "$F" <head sha> -- . <x-globs>) && { comm -12 <(printf '%s\n' "$RB" | sort) <(printf '%s\n' "$RH" | sort) | sed '/^$/d; s/^/registry /'; comm -12 <(printf '%s\n' "$CB" | sort) <(printf '%s\n' "$CH" | sort) | sed '/^$/d; s/^/code /'; } || echo "test failed"
 ```
 
 No line: the base's new commits share no path with the PR. Only `registry` lines: a registry
-overlap. Any `code` line, or `test failed`: not one.
+overlap. Any `code` line, or `test failed`: not one. Each list is taken before any is compared, so a
+`git diff` that fails (a bad glob, an unfetched sha) prints `test failed`, never a partial list.
 
 **The registry resolution**, one Bash call, in a `<tree>` where a `git merge --no-commit` of
 `origin/<B>` has stopped, with conflicts or without. Regenerate settles the conflicted registry
@@ -1568,6 +1570,7 @@ committed the merge) or `stop <reason>` (it aborted the merge):
 ( T="<tree>"; L="$(mktemp)"
   stop() { git -C "$T" merge --abort 2>/dev/null; echo "stop $*"; exit 1; }
   git -C "$T" rev-parse -q --verify MERGE_HEAD >/dev/null || { echo "stop no merge in progress"; exit 1; }
+  [ -n "$(git -C "$T" ls-files -- <globs>)" ] || stop "no tracked file matches the registry globs"
   X=$(git -C "$T" diff --name-only --diff-filter=U | sort -u | comm -23 - <(git -C "$T" ls-files -- <globs> | sort -u))
   [ -z "$X" ] || stop "conflict outside registry paths: $(echo $X)"
   ( cd "$T" && <Regenerate> ) >"$L" 2>&1 || stop "Regenerate exit $?: $(tail -n 1 "$L")"
@@ -1607,7 +1610,9 @@ committed the merge) or `stop <reason>` (it aborted the merge):
 After `synced`, the head is no longer the `verified` row, and the merge brought code into it: the PR
 runs §3.4 and §3.6 again at the pushed head, with the next `PASS` id and fresh review-cycle and
 boundary counters (`/pr-ready` §6), as §3.8 step 5 does after a smoke fix. Every gate run on that
-head includes §24's Check gate, obligated or not. A `blocked` sub-PR stays `blocked`, with its
+head includes §24's Check gate, obligated or not. A fix cycle on that head first brings the unit's
+worktree to it: `git -C "<unit worktree>" fetch -q origin && git -C "<unit worktree>" merge --ff-only
+origin/<head branch>`, which must print no error (the worktree holds an ancestor of the sync). A `blocked` sub-PR stays `blocked`, with its
 earlier reason, whatever the re-pass returns, and is carried or halts by the rules above. A PR gets
 at most two syncs: count them before each one with `git log --format=%s origin/adw/<slug>..origin/<head
 branch> | grep -c '^chore(registry): sync' || true`, and at `2` the chain halts as on a `stop`.
@@ -1662,7 +1667,7 @@ its next unit. No label is added for a hold.
    discard --checkout "$R" --tree <path>`, in one Bash call. Exit 1 leaves the tree for `/cleanup`;
    print it on a `note` line, and it does not change the result. A later trial of the same PR
    removes a leftover tree that is clean, and holds `0` on one that is not. Gates red → write the row and stop. Green → step 4, and the row will end
-   `· base trial ok at <base sha7>`.
+   `· base trial ok at <base sha7>` (after a registry overlap, `· registry overlap ok at <base sha7>`).
 4. **The merge, three Bash calls.** First, run step 1's check again, exactly as step 1 writes it:
    the trial can take long (a lock wait, a cold build, the gates), and the owner may have turned the
    switch `off`, added `adw:hold` or changed the profile meanwhile (design §4.1: `off` also stops a
@@ -1678,8 +1683,8 @@ its next unit. No label is added for a hold.
    <INTENT_BASE> (auto-merge gate passed)`.
 5. **Confirm**: `gh pr view <N> --json state,mergedAt` must print `MERGED` (`gh pr merge`'s exit
    code is not reliable when a worktree holds the branch). Then `gh pr edit <N> --add-label
-   adw:auto-merged`, and write `merge      merged <merge sha7> · base unmoved` or `· base trial ok at
-   <base sha7>`. The run-report line is `merged` (adw-core §7).
+   adw:auto-merged`, and write `merge      merged <merge sha7> · base unmoved`, `· base trial ok at
+   <base sha7>` or `· registry overlap ok at <base sha7>`, as step 2 or 3 said. The run-report line is `merged` (adw-core §7).
 
 **A denied merge call** on an independent or final PR is a hold, not a block: write `merge      hold
 call — denied · at <head sha7>`, add no `adw:blocked` label, and the run-report line names the
@@ -1735,7 +1740,8 @@ the merge gate above, and every Bash call starts with the first line of the gate
 - **(e)** The merge: the second call of the gate's step 4, without its label test (the owner's word
   is the consent), then its third call, with the `verified` row's sha. Then the confirm of the
   gate's step 5, without its label. Write the `merge` row as that step does, but with `owner-merged`
-  in place of `merged`; after (c) it ends `· overlap re-reviewed at <base sha7>`.
+  in place of `merged`; after (c) it ends `· overlap re-reviewed at <base sha7>`, or `· registry overlap
+  ok at <base sha7>` when no file was left to review.
 - **(f)** No merge. Print `not merged #<N> — <the red gate, or the Blocking with its file:line>;
   default: fix it on <head branch>, then /pr-ready <N>`.
 
