@@ -343,7 +343,10 @@ class Prompt(Base):
 
     def test_a_line_that_only_starts_like_a_word_is_sent(self):
         for line in ("go check PR 12 first", "3 units look fine, keep going", "okay so the base moved",
-                     "2026-11-27 log is in the brief", "building u3 failed, read the PR body"):
+                     "2026-11-27 log is in the brief", "building u3 failed, read the PR body",
+                     "Build u3 after u2 merges", "1. rebase on develop first",
+                     "Detail the failing gate in your report", "Shape is fine, keep going",
+                     "Depth matters less than speed here", "Decide nothing until u2 is green"):
             with self.subTest(line=line):
                 r = self.run_cli("prompt", "w9:p1", line)
                 self.assertEqual(r.returncode, 0, r.stderr)

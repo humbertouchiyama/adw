@@ -143,8 +143,9 @@ stops the merge. It re-reads the base, the head and the `adw:hold` label, refuse
 branch, and only then runs the merge call itself, with no `--auto`, which merges at once on these
 repos regardless. The call's `description` names the base. Then the script reads `gh pr view` to
 confirm `MERGED`: `gh pr merge`'s exit code is not reliable when a worktree holds the branch. The
-`adw-guard` hook in `install/hooks/` denies a `gh pr merge` the model types, so the verdict and the
-merge cannot come apart.
+`adw-guard` hook in `install/hooks/` denies a `gh pr merge` the model types, so in a repo that
+installed it the verdict and the merge cannot come apart. In a repo that did not, the contract text
+is still the only guard against a typed merge.
 
 **When any condition fails:** the PR stays open, exactly as a `ready` PR does today. The run-report
 line names the first condition that failed, and the owner can merge it by hand. A hold is never an

@@ -39,8 +39,9 @@ squashes. `--owner` (the owner said "merge") needs the head to equal --head, and
 it runs no `check`, because the owner's word overrides the flag. Every mode refuses a base that either copy
 of the profile names as the production branch. The merge is `gh pr merge --match-head-commit <head>`, then a
 `gh pr view` that must read MERGED (its exit code is not reliable when a worktree holds the branch); a
-failed call is retried once. It prints `merged <merge sha7>` (exit 0), `hold <n> <reason>` (exit 1), or
-`hold call — <gh error>` (exit 1) when the merge call or its confirm fails.
+failed call is retried once, and a read-back that fails three times is never retried as a merge. It prints
+`merged <merge sha7>` (exit 0), `hold <n> <reason>` (exit 1), or `hold call — <gh error>` (exit 1) when the
+merge call or its read-back fails.
 A gh call that fails, or a bad flag, prints `hold 0 gate error: <message>` and exits 2: the contract
 treats it as a hold. ADW_GATE_POLL_SECONDS (default 30) spaces the re-queries: 5 for an UNKNOWN
 mergeable state, 16 for a pending check, and all polling stops after
@@ -570,7 +571,12 @@ def do_merge(a, flag: str) -> int:
     for _ in range(2):
         p = run_gh(*cmd)
         err = (p.stderr.strip().splitlines() or ["exit %d" % p.returncode])[-1] if p.returncode else ""
-        state = view(a, "state,mergeCommit")
+        state = read_back(a)
+        if state is None:
+            # The merge may have landed: never call it a gate error, and never merge again blind.
+            print("hold call — the merge call %s, and the PR could not be read back: check it before anything else"
+                  % ("exited 0" if not err else "failed (%s)" % err))
+            return 1
         if state.get("state") == "MERGED":
             print("merged %s" % ((state.get("mergeCommit") or {}).get("oid") or "unknown")[:7])
             return 0
@@ -579,6 +585,17 @@ def do_merge(a, flag: str) -> int:
             break
     print("hold call — %s" % err)
     return 1
+
+
+def read_back(a) -> dict | None:
+    """The PR's state after a merge call, or None when gh cannot read it three times."""
+    for n in range(3):
+        try:
+            return view(a, "state,mergeCommit")
+        except (GateError, ValueError):
+            if n < 2:
+                time.sleep(min(POLL, 10))
+    return None
 
 
 def git(checkout: str, *args: str) -> str:

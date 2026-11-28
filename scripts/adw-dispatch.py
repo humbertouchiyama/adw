@@ -246,13 +246,15 @@ def cmd_reply(a):
 
 
 # A line that could pass as an answer to the child's approval surface (adw-core §7, adw-init Phase 2):
-# a gate verb or a delegation as its first words, an answer by number, or a line that is only a yes.
-# Only the owner types those, in the child's pane (adw-dispatch §7). Case-blind, after leading marks.
+# a gate verb in the form the surface takes it, a delegation, an answer by number, or a bare yes. Only
+# the owner types those, in the child's pane (adw-dispatch §7). Case-blind, after leading marks.
 SURFACE_ANSWER = re.compile(
-    r"^(?:approve|build|decide|specs\s+only|re-?cut|regroup|depth|shape|merge\s+(?:auto|hold)|"
-    r"reopen|new\s+intent|detail|(?:you|critically|please)\s+decide|use\s+your\s+judge?ment)\b"
-    r"|^(?:approved|go|go\s+ahead|y|yes|yep|ok|okay|proceed|continue|lgtm|ship\s+it|sounds\s+good)\W*$"
-    r"|^q?\d{1,2}\s*(?:$|[-:.)=,])"
+    r"^(?:approved?|specs\s+only|re-?cut|merge\s+(?:auto|hold)|(?:you|critically|please)\s+decide|"
+    r"use\s+your\s+judge?ment)\b"
+    r"|^(?:build|decide|detail|regroup|new\s+intent|go|go\s+ahead|y|yes|yep|ok|okay|proceed|continue|"
+    r"lgtm|ship\s+it|sounds\s+good)\W*$"
+    r"|^regroup\s+u\d|^depth\s+u\d|^shape\s+[\"'“]?u\d|^reopen\s+q?\d"
+    r"|^q?\d{1,2}\s*(?:$|[-:=,]|\)\s)"
     r"|^q\d+\b",
     re.I)
 

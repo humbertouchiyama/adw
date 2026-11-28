@@ -206,8 +206,9 @@ answer to a surface question **in the child's pane himself**; you do not carry t
 for word. What the owner decided before the dispatch goes in the brief. Any other line the
 owner gives you for the child, you may send word for word, with the pane id `launch` printed:
 `python3 "$DISPATCH" prompt "<child pane id>" "<the line>"`. It types the line and submits it in
-one step, and it refuses (exit 4) a line that could answer the approval surface: a gate verb or a
-delegation as its first words, an answer by number, or a bare yes. A refused line is the owner's
+one step, and it refuses (exit 4) a line that could answer the approval surface: a gate verb in the
+form the surface takes it (`approve`, `specs only`, `re-cut "…"`, `depth u2 D3`, a bare `build`), a
+delegation (`you decide`), an answer by number (`1- …`, `Q3: no`), or a bare yes. A refused line is the owner's
 to type in the child's pane: say so, and never send it another way. Exit 5 means it was not
 delivered: no agent runs in that pane, or the child waits at a dialog (`agent_blocked`). Tell the
 owner, and never type into that pane another way. Never call `herdr agent prompt`, `send-keys`,

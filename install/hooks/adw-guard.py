@@ -7,7 +7,7 @@ every subagent alike. The consuming repo registers it in `.claude/settings.json`
 "Installing it in a repo"), with the matcher `Bash|EnterWorktree`.
 
 It denies:
-- `git stash` in any form (`git -C <path> stash`, `/usr/bin/git stash`, inside `$( )` or `bash -c`):
+- `git stash` (`git -C <path> stash`, `/usr/bin/git stash`, inside `$( )`, `bash -c`, a loop or a branch):
   the stash is shared by every worktree of a repo (adw-build "Never").
 - `gh pr merge`, and `gh api` on a pull request's merge: a model merges through
   `adw-merge-gate.py merge`, which merges only after its own checks (adw-build §3.7). The owner merges
@@ -39,6 +39,8 @@ WORKTREE = ("adw-guard: a subagent does not create its own worktree (adw-build \
             "worktree your brief names. If it names none, say so in your result.")
 
 SHELLS = {"bash", "sh", "zsh", "dash", "ksh"}
+# Reserved words that open or continue a compound command: the command they introduce follows them.
+RESERVED = {"!", "{", "}", "do", "done", "then", "else", "elif", "if", "fi", "while", "until", "esac"}
 # Wrappers that run the rest of the line as a command, with the options each one takes a value for.
 WRAPPERS = {"command": set(), "builtin": set(), "exec": set(), "nohup": set(), "time": set(),
             "env": {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"},
@@ -60,11 +62,37 @@ class Unparsed(Exception):
     pass
 
 
+HEREDOC = re.compile(r"<<(-?)[ \t]*(['\"]?)([A-Za-z0-9_.-]+)\2")
+
+
+def skip_heredoc_bodies(s, i, tags):
+    """From the newline at i, skip each heredoc body in `tags`; return the index after the last one."""
+    i += 1
+    for tag, tabs in tags:
+        while i < len(s):
+            nl = s.find("\n", i)
+            line = s[i:] if nl < 0 else s[i:nl]
+            i = len(s) if nl < 0 else nl + 1
+            if (line.lstrip("\t") if tabs else line) == tag:
+                break
+    return i
+
+
 def closing(s, i, opener, closer):
-    """Index of the `closer` that ends a `$(`…`)` or `` ` ``…`` ` `` opened before i, quotes respected."""
-    depth, q = 1, None
+    """Index of the `closer` that ends a `$(`…`)` or `` ` ``…`` ` `` opened before i, quotes respected
+    and heredoc bodies skipped (an apostrophe in a commit message's heredoc is not a quote)."""
+    depth, q, tags = 1, None, []
     while i < len(s):
         c = s[i]
+        if q is None and opener == "(" and s.startswith("<<", i) and not s.startswith("<<<", i):
+            m = HEREDOC.match(s, i)
+            if m:
+                tags.append((m.group(3), m.group(1) == "-"))
+                i = m.end()
+                continue
+        if q is None and c == "\n" and tags:
+            i, tags = skip_heredoc_bodies(s, i, tags), []
+            continue
         if q == "'":
             if c == "'":
                 q = None
@@ -157,10 +185,10 @@ def lex(s, out, depth=0):
             has_word, i = True, e + 1
             continue
         if s.startswith("<<", i) and not s.startswith("<<<", i):
-            m = re.match(r"<<(-?)[ \t]*(['\"]?)([A-Za-z0-9_.-]+)\2", s[i:])
+            m = HEREDOC.match(s, i)
             if m:
                 heredocs.append((m.group(3), m.group(1) == "-"))
-                i += m.end()
+                i = m.end()
                 continue
         if c == "#" and not has_word:
             while i < len(s) and s[i] != "\n":
@@ -172,15 +200,7 @@ def lex(s, out, depth=0):
             continue
         if c == "\n":
             end_cmd()
-            i += 1
-            for tag, tabs in heredocs:  # skip each body: it is data, not commands
-                while i < len(s):
-                    nl = s.find("\n", i)
-                    line = s[i:] if nl < 0 else s[i:nl]
-                    i = len(s) if nl < 0 else nl + 1
-                    if (line.lstrip("\t") if tabs else line) == tag:
-                        break
-            heredocs = []
+            i, heredocs = skip_heredoc_bodies(s, i, heredocs), []  # a body is data, not commands
             continue
         if c in ";&|()":
             end_cmd()
@@ -207,7 +227,7 @@ def unwrap(argv, found, depth):
     and `eval`, whose commands go to `found` directly."""
     while argv:
         name = os.path.basename(argv[0])
-        if ASSIGN.match(argv[0]):
+        if ASSIGN.match(argv[0]) or argv[0] in RESERVED:
             argv = argv[1:]
         elif name in WRAPPERS:
             rest, takes = argv[1:], WRAPPERS[name]

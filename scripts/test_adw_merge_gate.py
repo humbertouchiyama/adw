@@ -44,8 +44,10 @@ if args[:2] == ["pr", "merge"]:
         open(os.environ["FAKE_GH_FIXTURE"] + ".merged", "w").write("1")
     sys.exit(fx.get("merge_rc", 0))
 if args[:2] == ["pr", "view"]:
-    view = dict(fx["view"])
     merged = os.path.exists(os.environ["FAKE_GH_FIXTURE"] + ".merged")
+    if merged and fx.get("readback_fail"):
+        sys.stderr.write("HTTP 502: Bad Gateway\n"); sys.exit(1)
+    view = dict(fx["view"])
     view["state"] = "MERGED" if merged else "OPEN"
     view["mergeCommit"] = {"oid": "abcdef0" + "1" * 33} if merged else None
     view["mergeable"] = seq("mergeable_seq", view.get("mergeable", "MERGEABLE"))
@@ -890,6 +892,14 @@ class TestMergeGateMode(Merge):
         self.fx["merge_noop"] = True
         rc, out, _ = self.gate()
         self.assertEqual((rc, out), (1, "hold call — the PR is OPEN after the merge call"))
+
+    def test_a_read_back_that_fails_is_a_held_call_not_a_gate_error(self):
+        self.fx["readback_fail"] = True
+        rc, out, _ = self.gate()
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(out, "hold call — the merge call exited 0, and the PR could not be read back: "
+                              "check it before anything else")
+        self.assertEqual(len(self.merges()), 1)
 
     def test_a_non_zero_exit_that_merged_is_merged(self):
         self.fx["merge_rc"] = 1

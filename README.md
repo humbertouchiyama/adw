@@ -103,7 +103,8 @@ any fetch, so a hook that lived in the gitignored cache would be missing on a fr
 ran a revision-old loader for a day: its stubs did not know exit 2 existed, so an unverified cache
 would have run as verified.
 
-`fetch.sh` now compares itself, your stubs and your hooks against the freshly-fetched `install/` on every
+`fetch.sh` now compares itself, your stubs and your hooks against the freshly-fetched `install/` (and
+checks that `.claude/settings.json` runs each hook) on every
 successful fetch and prints one line when they differ. It never rewrites them — diff first, then
 copy. This is a report, not a gate: it is the honest residual of keeping a bootstrap out-of-band.
 

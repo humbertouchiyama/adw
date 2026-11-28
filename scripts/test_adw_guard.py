@@ -20,13 +20,15 @@ DENIED = {
         "zsh -lc \"git stash\"", "rtk git stash", "rtk proxy git stash", "FOO=1 git stash",
         "env -u X GIT_DIR=.git git stash", "sudo -u me git stash", "git -c a=b --no-pager stash",
         "eval git stash", "x=$(echo (a)); git stash", "true | xargs -n 1 git stash",
-        "echo 'unclosed git stash",
+        "echo 'unclosed git stash", "! git stash", "{ git stash; }", "while true; do git stash; break; done",
+        "if git diff --quiet; then git stash; fi", "if true; then :; else git stash; fi",
     ],
     guard.MERGE: [
         "gh pr merge 3 --squash", "gh pr merge 3 --squash --match-head-commit abc", "gh -R o/r pr merge 3",
         "gh pr --repo o/r merge 3", "cd /x && gh pr merge 3", "gh api -X PUT repos/o/r/pulls/3/merge",
         "gh api graphql -f query='mutation { mergePullRequest(input: {}) { clientMutationId } }'",
-        "bash -c 'gh pr merge 3'",
+        "bash -c 'gh pr merge 3'", "for n in 3 4; do gh pr merge $n --squash; done",
+        "gh pr view 3 && { gh pr merge 3; }",
     ],
     guard.HERDR: [
         "herdr agent prompt w1:p2 approve", "herdr agent send-keys w1:p2 Enter",
@@ -45,6 +47,10 @@ ALLOWED = [
     "cat <<-EOF\n\tgit stash\n\tEOF\necho done",
     "git add -A && git commit -m \"$(cat <<'EOF'\nfix: no git stash\nEOF\n)\"",
     "echo 'unclosed", "",
+    "git commit -m \"$(cat <<'EOF'\nDon't run git stash here\nEOF\n)\"",
+    "gh pr edit 12 --body \"$(cat <<'EOF'\nThe PR's base moved.\ndefault: run ! gh pr merge 12 --squash\nEOF\n)\"",
+    "gh pr comment 12 --body \"$(cat <<-EOF\n\tit's fine: herdr agent prompt is denied\n\tEOF\n)\"",
+    "for f in a b; do echo \"$f\"; done", "if [ -f x ]; then cat x; fi",
 ]
 
 

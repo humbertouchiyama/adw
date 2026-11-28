@@ -1516,7 +1516,8 @@ that label alone.
    and the `verified` row both equal `<full sha>`. Then it squash-merges with
    `--match-head-commit <full sha>` and reads the PR back. It prints `merged <sha7>`, `hold <n>
    <reason>` (a provenance mismatch: nothing merged) or `hold call — <gh error>` (the merge call
-   failed twice, or the PR did not read `MERGED`). The row survives a compaction and a new session,
+   failed twice, the PR did not read `MERGED`, or it could not be read back: the PR body names the
+   line, and nobody merges again before reading the PR). The row survives a compaction and a new session,
    so a resumed run merges a `ready` sub-PR, or carries a `blocked` one with a verified head, the
    same way. For a carried `blocked` sub-PR the driver must have returned `verified <sha7>` (a port
    unit that is `port not converged` returns one too). A `blocked` sub-PR whose driver returned no
@@ -1524,8 +1525,10 @@ that label alone.
    a stale-base abort) has no sha to pass: it is not carried, the chain halts `blocked`, never
    merge. Any `hold` line → the chain halts `blocked`, never merge (PR body names the line). The
    call's `description` is `Squash-merge sub-PR #<n> into adw/<slug> (integration branch, not
-   <INTENT_BASE>)`. A permission check reads a chained line as one unit and its denial names no
-   clause: 5 `gh pr merge` calls were denied in twelve days of runs, every one a chained line.
+   <INTENT_BASE>)`. The call has the same shape as the merge gate's `check` call (step 1 below),
+   with every value but `$R` and `$C` written out. Before the script, 5 typed `gh pr merge` calls
+   were denied in twelve days of runs, every one a chained line: a permission check reads a chained
+   line as one unit, and its denial names no clause. A denial of this call is handled below.
 
 **A typed `gh pr merge` is never the merge.** Every merge this file makes goes through the script,
 which runs `gh pr merge` itself after its own checks. Where the consuming repo installed the

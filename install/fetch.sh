@@ -42,6 +42,9 @@ loader_drift() {
     n=$(basename "$h")
     [ -f "$DIR/hooks/$n" ] || { missing="$missing hooks/$n(missing)"; continue; }
     cmp -s "$DIR/hooks/$n" "$h" 2>/dev/null || drift="$drift hooks/$n"
+    # A copy that no settings file runs guards nothing (README, "Installing it in a repo").
+    grep -qs "hooks/$n" "$DIR/../settings.json" "$DIR/../settings.local.json" \
+      || drift="$drift hooks/$n(not-in-settings.json)"
   done
   # A repo with no stub at all is mid-install (the README runs this before the cp): say nothing.
   [ -z "$have" ] || drift="$drift$missing"
