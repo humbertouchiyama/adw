@@ -326,9 +326,25 @@ The orchestrator composes the pass's prompt from this text:
 > `<Q<N> — question — triage's default>`, one per line
 
 **Skip test — after the decide pass, before the first render.** It applies to every intent, a
-`--followup` or not, at any unit count and any depth. The gate is skipped when all four hold:
+`--followup` or not, at any unit count and any depth. **A script runs it, never this session's
+judgement**: the session that would skip the gate is the session that then builds. Make one
+directory, `D="$(mktemp -d)"; echo "$D"`, and write two files in it with the Write tool:
+`decide.txt`, the decide pass's reply verbatim (empty when triage asked no question), and
+`surface.txt`, the approval surface exactly as it would print (adw-core §7), every line above the
+verb menu. Then one Bash call, with `<D>`, the ids and the base written out:
 
-1. no question is `ask`;
+```bash
+R="$(git rev-parse --show-toplevel)"; C="$R/.claude/adw/cache/scripts/adw-gate.py"; test -f "$C" || C="$R/scripts/adw-gate.py"
+python3 "$C" skip --profile "$R/.claude/repo-profile.md" --surface "<D>/surface.txt" --decide "<D>/decide.txt" --questions "<triage's ids: Q1 Q2 …, or none>" --base <the intent's base>
+```
+
+`skip` is the only line that skips the gate. `wait <n> <reason>`, `wait 0 error: …` or no line at
+all → the gate waits: print the surface and end on the verb menu. The script reads the base from the
+profile fresh and ignores lines inside a fenced block (a D0 draft). It checks that all four hold,
+in this order:
+
+1. no question is `ask`: every id has a `Q<N> | decided: <answer>` line (an id the reply omits, or a
+   line that does not parse, is `ask`), and the surface reads `needs you  none`;
 2. no **blocking** `⚠` line would print on the approval surface. Exactly three lines block, matched
    by their fixed text (the tier line by its prefix): `⚠ orchestrator on <tier>` (adw-core §8: above sonnet, or `unknown` tier),
    `⚠ spec criteria covered by no unit: <list>` with anything but `none` after the colon, and
@@ -340,7 +356,7 @@ The orchestrator composes the pass's prompt from this text:
 4. Phase 0.5 matched no live intent: the surface prints no `extends` line. Extension is the owner's
    choice (adw-core §1.1), so extend mode keeps the gate, where `new intent` can drop it.
 
-When all four hold, the gate is skipped:
+When the script prints `skip`, the gate is skipped:
 
 - Render the approval surface exactly (adw-core §7) as for any intent, with the skipped-gate line in
   place of the verb menu. Print it as the text of the message whose tool call starts Phase 3: the
