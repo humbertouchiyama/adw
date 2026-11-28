@@ -135,12 +135,16 @@ the source it names, never from memory.
 10. **The design sign-off** (added 2026-11-20, adw-build §3.2a). A PR whose evidence block's `visual`
    row reads `sign-off pending` waits for the owner's one design sign-off of the run.
 
-**The merge** is `adw-build` §3.7's procedure, three Bash calls with the sha written out. The first
-runs the gate's check again: the base-moved check can take long, and a switch turned `off` or an
-`adw:hold` added meanwhile still stops the merge. The second re-reads the base, the head and the
-`adw:hold` label. The third is the merge call alone, with no `--auto`, which merges at once on these repos regardless. Its
-`description` names the base. Then the run reads `gh pr view --json state,mergedAt` to confirm:
-`gh pr merge`'s exit code is not reliable when a worktree holds the branch.
+**The merge** is `adw-build` §3.7's procedure: one call of the script's `merge`, with the sha written
+out (changed 2026-11-27; until then it was three model-issued Bash calls, and only
+`--match-head-commit` was enforced by a program). The script runs the gate's check again: the
+base-moved check can take long, and a switch turned `off` or an `adw:hold` added meanwhile still
+stops the merge. It re-reads the base, the head and the `adw:hold` label, refuses the production
+branch, and only then runs the merge call itself, with no `--auto`, which merges at once on these
+repos regardless. The call's `description` names the base. Then the script reads `gh pr view` to
+confirm `MERGED`: `gh pr merge`'s exit code is not reliable when a worktree holds the branch. The
+`adw-guard` hook in `install/hooks/` denies a `gh pr merge` the model types, so the verdict and the
+merge cannot come apart.
 
 **When any condition fails:** the PR stays open, exactly as a `ready` PR does today. The run-report
 line names the first condition that failed, and the owner can merge it by hand. A hold is never an

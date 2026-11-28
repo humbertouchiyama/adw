@@ -20,9 +20,9 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 | `commands/code-review.md` | Review a PR against the consuming repo's conventions. |
 | `commands/cleanup.md` | Clear stale worktrees, branches and disposable state. |
 | `commands/adw-dispatch.md` | Hand an intent to a new herdr pane beside the caller, with a brief, a ledger row and an optional one-line reply. |
-| `scripts/adw-dispatch.py` | The mechanics of `adw-dispatch`: pane placement, the reply, the ledger. Run from the fetch cache. |
+| `scripts/adw-dispatch.py` | The mechanics of `adw-dispatch`: pane placement, the reply, the ledger, and `prompt`, which types the owner's line into a child's pane and refuses one that could answer its approval surface. Run from the fetch cache. |
 | `scripts/adw-run-clean.py` | Removes what one `/adw-build` run left on disk (its worktrees, and the Xcode DerivedData they left) and nothing else. Run from the fetch cache at `adw-build` Phase 5. |
-| `scripts/adw-merge-gate.py` | The auto-merge gate: `check` reads every merge condition fresh from GitHub and the profile and prints `pass` or `hold <n> <reason>`; `trial` merges a moved base into the head in a throwaway worktree; `discard` removes it. Run from the fetch cache at `adw-build` §3.7. |
+| `scripts/adw-merge-gate.py` | The auto-merge gate: `check` reads every merge condition fresh from GitHub and the profile and prints `pass` or `hold <n> <reason>`; `trial` merges a moved base into the head in a throwaway worktree; `discard` removes it; `merge` is the only way a run merges: it runs `check` again (or, with `--sub` and `--owner`, the sub-PR's and the owner's checks), refuses the production branch, and then merges. Run from the fetch cache at `adw-build` §3.7 and `code-review` 7a. |
 | `scripts/adw-visual-pack.py` | Builds the design sign-off pack: one HTML page with before, after and goal images for every visual row of a run. Run from the fetch cache at `adw-build` Phase 5. |
 | `scripts/adw-screens.py` | Pushes a walk's screen images to the app repo's `refs/adw-screens` and posts one PR comment with them. Run from the fetch cache at `adw-build` §3.8. |
 | `scripts/adw-analyze.py` | The run analysis: reads PR bodies, session transcripts and `predicts` lines, judges each line against its baseline, and writes a dated report to the owner's private reports repo. Code in `scripts/adw_analyze/`. |
@@ -30,7 +30,7 @@ to no product. Repositories that run ADW fetch it; they do not copy it.
 | `.claude/skills/adw-analyze/` | Runs the weekly analysis by hand. Used in this repo only; it has no loader stub. |
 | `docs/00-design.md` | The design, and a frozen archive of every contract change up to the extraction. |
 | `docs/repo-profile-EXAMPLE.md` | A filled-in `repo-profile.md` from a real repository, to copy and edit. |
-| `install/` | The loader stubs and the fetch script a consuming repo drops in. |
+| `install/` | The loader stubs, the fetch script and the hooks a consuming repo drops in. `install/hooks/adw-guard.py` denies `git stash`, a typed `gh pr merge`, typing into a herdr pane, and a subagent's EnterWorktree. |
 | `.claude/skills/reviewing-contract-prs/` | The skill that reviews a PR to this repo: an anchor checker, three review lanes and one refuter on the first review, then one delta lane, one report. |
 
 ## The split
@@ -56,8 +56,32 @@ curl -fsSL https://raw.githubusercontent.com/humbertouchiyama/adw/main/install/f
   -o .claude/adw/fetch.sh && chmod +x .claude/adw/fetch.sh
 bash .claude/adw/fetch.sh
 cp .claude/adw/cache/install/stubs/*.md .claude/commands/
+mkdir -p .claude/adw/hooks && cp .claude/adw/cache/install/hooks/* .claude/adw/hooks/
 echo '.claude/adw/cache/' >> .gitignore
 ```
+
+Then register the hook in the repo's `.claude/settings.json`. Add the entry to the `hooks` object
+the file already has; do not replace the file:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash|EnterWorktree",
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/adw/hooks/adw-guard.py\"" }] }
+    ]
+  }
+}
+```
+
+The hook enforces with code the Never rules that prompts broke: `git stash` (the stash is shared by
+every worktree), a `gh pr merge` the model types (every run merge goes through `adw-merge-gate.py
+merge`, which checks first), typing into a herdr pane (a line for a child goes through
+`adw-dispatch.py prompt`), and EnterWorktree from a subagent. It binds the main session and every
+subagent. The owner's own `! <command>` lines never reach it. `/adw-dispatch` often runs from a
+global command (`~/.claude/commands/`), in a session that has no repo settings: to cover those
+sessions, register the same entry in `~/.claude/settings.json`, with the absolute path of a copy
+of the hook.
 
 **If `.claude/commands/` already holds real command files, diff before you overwrite.** The `cp`
 above replaces them. A repo that had customised one of these — a `code-review.md` carrying its own
@@ -73,12 +97,13 @@ and `adw-core.md` §4.1 (§24) say what the absence does.
 
 ### The loader is a copy, and copies drift
 
-`fetch.sh` and the stubs are the one part of ADW that is **not** fetched — they are tracked files in
-your repo mirroring `install/` here. So they drift exactly the way the contract used to. AXCMedApp
+`fetch.sh`, the stubs and the hooks are the one part of ADW that is **not** fetched — they are tracked
+files in your repo mirroring `install/` here. The hooks have to be: `settings.json` runs them before
+any fetch, so a hook that lived in the gitignored cache would be missing on a fresh clone. So they drift exactly the way the contract used to. AXCMedApp
 ran a revision-old loader for a day: its stubs did not know exit 2 existed, so an unverified cache
 would have run as verified.
 
-`fetch.sh` now compares itself and your stubs against the freshly-fetched `install/` on every
+`fetch.sh` now compares itself, your stubs and your hooks against the freshly-fetched `install/` on every
 successful fetch and prints one line when they differ. It never rewrites them — diff first, then
 copy. This is a report, not a gate: it is the honest residual of keeping a bootstrap out-of-band.
 

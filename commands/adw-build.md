@@ -88,7 +88,10 @@ runs that compacted mid-run never read this file again (2026-09-20 to 10-01).
 review-ineligible) · merge into the production branch (`repo-profile §3`), or into the default
 base without §3.7's merge gate · resolve a sync conflict unattended (one confined to registry
 paths is not judgement work: §3.7's registry resolution settles it) · edit a
-gate file to get green · let a subagent create its own worktree.
+gate file to get green · let a subagent create its own worktree. Where the consuming repo installed
+the `adw-guard` hook (README, "Installing it in a repo"), it denies `git stash`, a typed `gh pr
+merge` and a subagent's EnterWorktree for the main session and every subagent alike; the brief floor
+still carries the reason. A denied call is never re-shaped to get it through.
 
 ## Phase 0 — resolve the contract
 
@@ -1495,33 +1498,42 @@ consent — and adds:
 were reported `blocked` with no label (2026-09-20 to 10-01), and Phase 4 finds a carried block by
 that label alone.
 
-**Sub-PR merge procedure (adw-core §6 carve-out).** Step 0, then two Bash calls, never one:
+**Sub-PR merge procedure (adw-core §6 carve-out).** Step 0, then one Bash call:
 
 0. Where the profile has `repo-profile §24`: the overlap test (the registry sync, below), with
    `<B>` = `adw/<slug>` and the `verified` row's sha. Only `registry` lines → the registry sync of a
    sub-PR first, then this procedure from step 0 again, at the `verified` row its re-pass wrote. No
    line, a `code` line or `test failed` → step 1: Phase 1 serialized siblings that share code, so a
-   `code` line is a miss, and a conflict it causes fails step 2's merge as any conflict does.
-1. Re-assert provenance: `gh pr view <n> --json baseRefName,headRefOid,body` must show base still
-   `adw/<slug>` and head equal to the expected sha: the evidence block's `verified` row (§3.4),
-   which a run wrote from `$VSHA`. The row survives a compaction and a new session, so a resumed
-   run merges a `ready` sub-PR, or carries a `blocked` one with a verified head, the same way. For a
-   carried `blocked` sub-PR the driver must have returned `verified <sha7>`
-   (a port unit that is `port not converged` returns one too). A `blocked` sub-PR whose driver
-   returned no `verified <sha7>` (a void such as `REVIEW NOT COMPLETE`, a driver that returned without its log, a stale-base abort) has no sha to compare: it is not carried, the chain
-   halts `blocked`, never merge. Any mismatch → the chain halts `blocked`, never merge.
-2. The merge, alone in its own Bash call, with the sha written out as a literal:
-   `gh pr merge <n> --squash --match-head-commit <full sha>`. No `cd`, no `&&`, no `;`, no pipe,
-   no loop, no variable; when the session's cwd is not the repo, add `-R <owner>/<repo>` instead
-   of a `cd`. The call's `description` is `Squash-merge sub-PR #<n> into adw/<slug> (integration
-   branch, not <INTENT_BASE>)`. A permission check reads a chained line as one unit and its
-   denial names no clause: 5 `gh pr merge` calls were denied in twelve days of runs, every one a
-   chained line.
+   `code` line is a miss, and a conflict it causes fails step 1's merge (`hold call`) as any conflict does.
+1. The merge, by the merge gate script (`scripts/adw-merge-gate.py` in the contract cache), alone in
+   its own Bash call, with the sha written out as a literal: the evidence block's `verified` row
+   (§3.4), which a run wrote from `$VSHA`.
+   ```bash
+   R="$(git rev-parse --show-toplevel)"; C="$R/.claude/adw/cache/scripts/adw-merge-gate.py"; test -f "$C" || C="$R/scripts/adw-merge-gate.py"
+   python3 "$C" merge --sub --repo "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" --pr <n> --slug <slug> --head <full sha>
+   ```
+   The script re-asserts provenance before it merges: the base is still `adw/<slug>`, and the head
+   and the `verified` row both equal `<full sha>`. Then it squash-merges with
+   `--match-head-commit <full sha>` and reads the PR back. It prints `merged <sha7>`, `hold <n>
+   <reason>` (a provenance mismatch: nothing merged) or `hold call — <gh error>` (the merge call
+   failed twice, or the PR did not read `MERGED`). The row survives a compaction and a new session,
+   so a resumed run merges a `ready` sub-PR, or carries a `blocked` one with a verified head, the
+   same way. For a carried `blocked` sub-PR the driver must have returned `verified <sha7>` (a port
+   unit that is `port not converged` returns one too). A `blocked` sub-PR whose driver returned no
+   `verified <sha7>` (a void such as `REVIEW NOT COMPLETE`, a driver that returned without its log,
+   a stale-base abort) has no sha to pass: it is not carried, the chain halts `blocked`, never
+   merge. Any `hold` line → the chain halts `blocked`, never merge (PR body names the line). The
+   call's `description` is `Squash-merge sub-PR #<n> into adw/<slug> (integration branch, not
+   <INTENT_BASE>)`. A permission check reads a chained line as one unit and its denial names no
+   clause: 5 `gh pr merge` calls were denied in twelve days of runs, every one a chained line.
 
-A permission denial of the merge call in that bare form → the chain halts `blocked` with
-`default: run ! gh pr merge <n> --squash --match-head-commit <full sha>, then re-run /adw-build
-<slug>`. Never re-shape the command to get a denied merge through. Transient `gh pr merge`
-failure → retry once, then the chain halts `blocked` (PR body names the gh error). After the merge,
+**A typed `gh pr merge` is never the merge.** Every merge this file makes goes through the script,
+which runs `gh pr merge` itself after its own checks. Where the consuming repo installed the
+`adw-guard` hook (README, "Installing it in a repo"), a `gh pr merge` the model types is denied, and
+that denial is not a merge failure: run the script instead. A permission denial of the script call
+→ the chain halts `blocked` with `default: run ! gh pr merge <n> --squash --match-head-commit <full
+sha>, then re-run /adw-build <slug>`. Never re-shape the command to get a denied merge through.
+After the merge,
 `git fetch origin` — the chain continues from `origin/adw/<slug>` (the merge advanced origin
 only; the local ref is never a source of truth). Squash (or `repo-profile §3`'s merge
 convention) keeps the integration branch linear (Phase 4's ≤5-commit rebase rule counts
@@ -1670,30 +1682,34 @@ its next unit. No label is added for a hold.
    print it on a `note` line, and it does not change the result. A later trial of the same PR
    removes a leftover tree that is clean, and holds `0` on one that is not. Gates red → write the row and stop. Green → step 4, and the row will end
    `· base trial ok at <base sha7>` (after a registry overlap, `· registry overlap ok at <base sha7>`).
-4. **The merge, three Bash calls.** First, run step 1's check again, exactly as step 1 writes it:
-   the trial can take long (a lock wait, a cold build, the gates), and the owner may have turned the
-   switch `off`, added `adw:hold` or changed the profile meanwhile (design §4.1: `off` also stops a
-   run already in flight). `pass` → go on. `hold <n> <reason>` → write the row as step 1 says and
-   stop. Second: `gh pr view <N> --json baseRefName,headRefOid,labels`
-   must show the base equal to `<INTENT_BASE>`, the head equal to the `verified` row, and no
-   `adw:hold` label. Any mismatch → `hold 2 base changed`, `hold 3 head moved` or `hold 1
-   adw:hold`, and stop. Third,
-   alone in its own Bash call, the sha written out as a literal: `gh pr merge <N> <flag>
-   --match-head-commit <full sha>`, where `<flag>` is `repo-profile §3`'s merge convention
-   (`squash` → `--squash`, `merge` → `--merge`, `rebase` → `--rebase`). No `--auto`, no
-   `--delete-branch`, no `cd`, `&&`, `;`, pipe or variable. Its `description` is `Merge #<N> into
-   <INTENT_BASE> (auto-merge gate passed)`.
-5. **Confirm**: `gh pr view <N> --json state,mergedAt` must print `MERGED` (`gh pr merge`'s exit
-   code is not reliable when a worktree holds the branch). Then `gh pr edit <N> --add-label
-   adw:auto-merged`, and write `merge      merged <merge sha7> · base unmoved`, `· base trial ok at
-   <base sha7>` or `· registry overlap ok at <base sha7>`, as step 2 or 3 said. The run-report line is `merged` (adw-core §7).
+4. **The merge, one Bash call**: step 1's first line, then the script's `merge`, alone, with the sha
+   written out as a literal (the `verified` row's):
+   ```bash
+   python3 "$C" merge --repo "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" --pr <N> --head <full sha> --base <INTENT_BASE> --profile "$R/.claude/repo-profile.md" --spec-path <spec path> [--spec-path <spec path> …]
+   ```
+   with `timeout: 600000`, and the same `--spec-path` list as step 1. The script runs step 1's check
+   again first: the trial can take long (a lock wait, a cold build, the gates), and the owner may
+   have turned the switch `off`, added `adw:hold` or changed the profile meanwhile (design §4.1:
+   `off` also stops a run already in flight). Then it re-reads the PR: the base must equal
+   `<INTENT_BASE>` and must not be the production branch, the head must equal `<full sha>`, and no
+   `adw:hold` label (`hold 2 base changed`, `hold 3 head moved`, `hold 1 the PR has the adw:hold
+   label`). Only then does it run `gh pr merge <N> <flag> --match-head-commit <full sha>`, where
+   `<flag>` is `repo-profile §3`'s merge convention (`squash` → `--squash`, `merge` → `--merge`,
+   `rebase` → `--rebase`), with no `--auto` and no `--delete-branch`, and read the PR back: it
+   must be `MERGED` (`gh pr merge`'s exit code is not reliable when a worktree holds the branch). A
+   failed call is retried once. Its `description` is `Merge #<N> into <INTENT_BASE> (auto-merge
+   gate passed)`. One line comes back: `merged <merge sha7>` → step 5. `hold <n> <reason>` → write
+   the row as step 1 says and stop. `hold call — <the gh error>` → write `merge      hold call —
+   <the gh error> · at <head sha7>` and stop.
+5. **After `merged`**: `gh pr edit <N> --add-label adw:auto-merged`, and write `merge      merged
+   <merge sha7> · base unmoved`, `· base trial ok at <base sha7>` or `· registry overlap ok at <base
+   sha7>`, as step 2 or 3 said. The run-report line is `merged` (adw-core §7).
 
 **A denied merge call** on an independent or final PR is a hold, not a block: write `merge      hold
 call — denied · at <head sha7>`, add no `adw:blocked` label, and the run-report line names the
 command for the owner to run: `held call: run ! gh pr merge <N> <flag> --match-head-commit <full
-sha>`. A `gh pr merge` that fails for another reason, or a confirm that does not print `MERGED`, is
-`hold call — <the gh error>`. Never re-shape a denied merge call. Sub-PR denial text is unchanged
-(above).
+sha>`. The denied call is the script's. Never re-shape a denied merge call, and never type `gh pr
+merge` in its place (above). Sub-PR denial text is unchanged (above).
 
 **The owner's word on a base that moved.** When the owner says "merge" for an independent or final
 PR that has a `verified` row (a `merge: hold` PR, or one the gate held), the head stays the verified
@@ -1739,11 +1755,15 @@ the merge gate above, and every Bash call starts with the first line of the gate
   in the conflict is a registry path (`repo-profile §24`), the default names the mechanical fix:
   `default: merge <INTENT_BASE> into <head branch> and run repo-profile §24's Regenerate, then
   /pr-ready <N>`.
-- **(e)** The merge: the second call of the gate's step 4, without its label test (the owner's word
-  is the consent), then its third call, with the `verified` row's sha. Then the confirm of the
-  gate's step 5, without its label. Write the `merge` row as that step does, but with `owner-merged`
-  in place of `merged`; after (c) it ends `· overlap re-reviewed at <base sha7>`, or `· registry overlap
-  ok at <base sha7>` when no file was left to review.
+- **(e)** The merge: the gate's step 4 call with `--owner` in place of the check's inputs, and the
+  `verified` row's sha, alone in its own Bash call:
+  `python3 "$C" merge --owner --repo "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" --pr <N> --head <full sha> --base <INTENT_BASE> --profile "$R/.claude/repo-profile.md"`.
+  It runs no check and no label test (the owner's word is the consent), and it still refuses the
+  production branch, a moved base and a moved head. `merged <sha7>` → write the `merge` row as the
+  gate's step 5 does, without its label, and with `owner-merged` in place of `merged`; after (c) it
+  ends `· overlap re-reviewed at <base sha7>`, or `· registry overlap ok at <base sha7>` when no
+  file was left to review. Any other line → print `not merged #<N> — <the line>; default: say merge
+  again when the cause is gone, or /pr-ready <N>`.
 - **(f)** No merge. Print `not merged #<N> — <the red gate, or the Blocking with its file:line>;
   default: fix it on <head branch>, then /pr-ready <N>`.
 

@@ -322,6 +322,47 @@ class Reply(Base):
         self.assertIn("reply skipped", r.stdout)
 
 
+class Prompt(Base):
+    def test_an_ordinary_line_is_typed_and_submitted(self):
+        r = self.run_cli("prompt", "w9:p1", "rebase on develop\nthen re-run the gates")
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, "prompted"), r.stderr)
+        self.assertEqual(self.calls(), [
+            ["agent", "get", "w9:p1"],
+            ["agent", "prompt", "w9:p1", "rebase on develop then re-run the gates"]])
+
+    def test_a_surface_answer_is_refused_and_nothing_is_typed(self):
+        for line in ("approve", "Approve.", "specs only", "merge auto", "re-cut \"split u2\"",
+                     "regroup u2+u3", "depth u1 D2", "shape \"u4→port\"", "reopen Q2", "decide",
+                     "you decide", "critically decide", "use your judgment", "1- yes", "Q3: no",
+                     "q2", "3", "2) pick-lists", "yes", "ok!", "go", "go ahead", "note\napprove"):
+            with self.subTest(line=line):
+                r = self.run_cli("prompt", "w9:p1", line)
+                self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+                self.assertIn("refused", r.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_a_line_that_only_starts_like_a_word_is_sent(self):
+        for line in ("go check PR 12 first", "3 units look fine, keep going", "okay so the base moved",
+                     "2026-11-27 log is in the brief", "building u3 failed, read the PR body"):
+            with self.subTest(line=line):
+                r = self.run_cli("prompt", "w9:p1", line)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_a_pane_with_no_agent_gets_nothing_typed_into_its_shell(self):
+        r = self.run_cli("prompt", "w9:p1", "rebase", FAKE_STATUS="unknown")
+        self.assertEqual(r.returncode, 5)
+        self.assertEqual(self.calls(), [["agent", "get", "w9:p1"]])
+
+    def test_a_refused_delivery_exits_5(self):
+        r = self.run_cli("prompt", "w9:p1", "rebase", FAKE_SEND_FAIL="1")
+        self.assertEqual(r.returncode, 5)
+        self.assertIn("not delivered", r.stderr)
+
+    def test_outside_herdr_it_exits_1(self):
+        r = self.run_cli("prompt", "w9:p1", "rebase", HERDR_ENV="0")
+        self.assertEqual(r.returncode, 1)
+
+
 class FinishAndStatus(Base):
     def test_finish_appends_a_row_that_keeps_the_dispatch_fields(self):
         self.launch()
