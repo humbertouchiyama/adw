@@ -90,7 +90,9 @@ cache. **The fetch happens before the contract is read.** A run pins one commit 
 finishes on it; the cache is not re-fetched mid-run.
 
 `fetch.sh` exits **0** when it fetched, **2** when the fetch failed and it fell back to an existing
-cache of unknown age, and **1** when there is no usable contract at all. The stub branches on all
+cache of unknown age, and **1** when there is no usable contract at all. A fetch lock another run
+still holds after 60 seconds is exit 2 with a cache and exit 1 without one, never a fetch without the
+lock; a lock older than 10 minutes is a killed run's, and the next fetch removes it. The stub branches on all
 three: exit 2 proceeds but must carry `⚠ contract from cache, not verified against origin` onto
 every surface the run prints; exit 1 stops. `ADW_REPO` and `ADW_REF` are honoured on every run, not
 only the first clone.

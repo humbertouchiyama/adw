@@ -220,7 +220,11 @@ What the owner runs by hand, and what the weekly job runs (§5.5):
 3. **Leak scan** of the final `report.md` and `metrics.json`: key and token patterns, plus no
    line of 40 characters or more that also appears in a scanned transcript. A hit stops the
    run before anything is committed. The scan is the reader's own `--scan` mode, so the §8 leak
-   test covers it.
+   test covers it. *(Added 2026-11-27.)* The critical pass's file is scanned on its own first,
+   before it joins the report: a span the pass quoted used to drop the whole report, the reader's
+   metrics and verdicts with it. A hit there reruns the pass once, told the hit lines as
+   `file:line kind` (never the text). A second hit drops the pass (`critical pass: dropped — leak
+   scan hit`), and the rest is committed. A hit in the reader's own output still stops the run.
 4. Commit the dated report to the reports repo's `main` and push. No report PR: an unmerged one
    would make the next run re-measure the same window, and nobody edits a report. *(Designer's
    call, from the critical review.)*

@@ -471,8 +471,9 @@ So every dispatcher below the top level — a driver, a verifier, a lane — doe
    `NOT RUN — no report after 4 h`.
 5. **A `NOT RUN` agent stops the run.** An agent recorded `NOT RUN`, or one whose hand-back is an
    error and not a report, never counts as "no findings". Do not triage, apply, push, post a comment
-   or print a merge invite. Return only `REVIEW NOT COMPLETE — <agent> NOT RUN — no report after
-   <time>`, then the reports the other agents did return. Print no `clean`, `no issues` or `ready`
+   or print a merge invite. Return only `REVIEW NOT COMPLETE — <agent> NOT RUN — <why: no report
+   after <time>, an error, or findings block unparseable>`, then the reports the other agents did
+   return. Print no `clean`, `no issues` or `ready`
    anywhere in it.
 
 Never wait with `echo`, `true`, a bare `sleep` or `Monitor`.

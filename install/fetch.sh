@@ -3,7 +3,8 @@
 #
 # Exit codes are the contract with the caller (see install/stubs/*.md):
 #   0  fetched from origin — the cache is current
-#   2  fetch FAILED, an existing cache was reused — age unknown, must be reported
+#   2  fetch FAILED (or the fetch lock stayed held for 60 s), an existing cache was reused —
+#      age unknown, must be reported
 #   1  no usable contract — the caller must stop
 #
 # Everything under cache/ is discarded on the next successful fetch: `reset --hard`.
@@ -46,13 +47,43 @@ loader_drift() {
 
 # Serialize concurrent runs in the same repo: two sessions resetting one cache can
 # leave a reader mid-checkout. mkdir is atomic on every filesystem that matters.
+# A lock older than 10 minutes whose owner is gone was left by a killed run: remove it. The owner's
+# pid is in the lock, so a fetch that is only slow keeps its lock.
+if [ -d "$LOCK" ] && [ -n "$(find "$LOCK" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
+  owner="$(cat "$LOCK/pid" 2>/dev/null)"
+  if [ -z "$owner" ] || ! kill -0 "$owner" 2>/dev/null; then
+    rm -f "$LOCK/pid"
+    rmdir "$LOCK" 2>/dev/null && echo "adw: removed a stale fetch lock (older than 10 min, owner gone): $LOCK" >&2
+  fi
+fi
+locked=""
 for _ in $(seq 1 60); do
   if mkdir "$LOCK" 2>/dev/null; then
-    trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT INT TERM
+    echo "$$" > "$LOCK/pid"
+    trap 'rm -f "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null || true' EXIT INT TERM
+    locked=1
     break
   fi
   sleep 1
 done
+# Still held after 60 s: never fetch unlocked, which is the race the lock exists for. Say so, and
+# reuse the cache as an unverified one (exit 2), or stop when there is none.
+if [ -z "$locked" ]; then
+  # GNU stat first: on GNU, `stat -f` is file-system mode and prints no mtime. Anything not a number
+  # is an unknown age, never an arithmetic error that would end the script before its exit code.
+  mtime="$(stat -c %Y "$LOCK" 2>/dev/null || stat -f %m "$LOCK" 2>/dev/null)"
+  case "$mtime" in
+    ''|*[!0-9]*) held="age unknown" ;;
+    *) held="$(( $(date +%s) - mtime ))s old" ;;
+  esac
+  echo "adw: fetch lock held by another run (or stale: $held) at $LOCK" >&2
+  if [ -d "$CACHE/.git" ]; then
+    echo "adw contract $(stamp)  ($REF, CACHED — NOT VERIFIED)"
+    exit 2
+  fi
+  echo "STOP. No cache to fall back on. If no other run is fetching, remove the lock and retry:  rmdir '$LOCK'" >&2
+  exit 1
+fi
 
 if [ -d "$CACHE" ] && [ ! -d "$CACHE/.git" ]; then
   echo "adw: $CACHE exists but is not a git clone." >&2

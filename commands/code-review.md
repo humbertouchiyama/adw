@@ -288,6 +288,16 @@ wave, so `<N>` is 2):
 
 The parent skill extracts the fenced JSON block via `awk '/^```json$/,/^```$/'` (or equivalent) and parses it into `findings[]`.
 
+**A findings block that does not parse is a failed lane, never zero findings.** The lane is told to
+return `[]` when it finds nothing, so a missing block is not an empty result. No fenced ```` ```json ````
+block, two of them, or JSON that is not an array of objects each with `file`, `line`,
+`description` and `severity` (`Blocking` or `Warning`) → dispatch that lane once more, as its own
+wave (review-core §10), with its brief unchanged and this line added at the end: `Your last return
+had no parseable findings block: <the parse error, one line>. End with exactly one fenced json
+block, [] when you found nothing.` A second failure is `NOT RUN — findings block unparseable`, and
+review-core §10 step 5 applies: the review stops `REVIEW NOT COMPLETE`. 4a-panel Step 4 and 5.2 apply
+this rule to each lane they parse.
+
 The lane **does not post a PR comment**. Comment (if any) is posted by Phase 7.
 
 ### 4a-panel — Panel path (3 lanes, parallel)
@@ -404,7 +414,8 @@ bounded` / `should not ship as is`. B — `sound` / `has a gap` / `unsafe`. C �
 
 #### Step 4 — Parse
 
-- Extract each lane's fenced JSON and concatenate into `findings[]`. **Dedupe on `(file, line,
+- Extract each lane's fenced JSON from its `FINDINGS:` block (4a's rule for a block that does not
+  parse: one re-dispatch with the parse error, then `NOT RUN`) and concatenate into `findings[]`. **Dedupe on `(file, line,
   rule-class)` with the HIGHER severity winning** — the same rule Phase 5.2 states for its own
   dedupe. The lanes overlap at the edges by design, so this is exactly the case it exists for: in
   concatenation order, angle A's `Warning` on a line would otherwise silently drop angle B's
@@ -467,7 +478,8 @@ gate that does not exist.
 
 Spawn 1 Haiku agent (`subagent_type: general-purpose`, `model: haiku`; wait by `review-core.md` §10). Hand it: worktree path, `changedFiles[]`, and **`repo-profile §16.1`–`§16.3`
 verbatim** — the repo's rule tables. The agent runs each check against changed files only and
-returns findings `{file, line, description, severity}` where severity ∈ `Blocking|Warning`.
+returns findings `{file, line, description, severity}` where severity ∈ `Blocking|Warning`, as one
+fenced ```` ```json ```` block (`[]` when none). A block that does not parse → 4a's rule.
 
 Append to `findings[]`. **Dedupe across all sources** (audit first, then the Phase 4 lanes + this phase): drop later entries where `(file, line, rule-class)` collides with an earlier entry.
 **Audit goes first, and on a collision the HIGHER severity wins** — audit findings are always
