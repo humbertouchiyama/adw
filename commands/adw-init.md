@@ -1,5 +1,6 @@
 ---
-description: "ADW entry point: intent (or a Trello/Linear card ref) → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init [--hold] [--followup <slug>] <intent>"
+description: "ADW entry point: intent (or a Trello/Linear card ref) → triage → human-approved unit cut → per-unit specs/plans → builds them. `approve` at the gate runs /adw-build in the same session; `specs only` stops after the specs. Usage: /adw-init [--hold] [--followup <slug>] [--design <path-or-url>] [--force-closed] <intent | card ref>"
+argument-hint: "[--hold] [--followup <slug>] [--design <path-or-url>] [--force-closed] <intent | card ref>"
 ---
 
 # /adw-init — from intent to contract, and on into the build

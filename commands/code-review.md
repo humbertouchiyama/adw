@@ -1,5 +1,6 @@
 ---
-description: "Code review PR against project conventions. Usage: /code-review <PR_NUMBER> [light|full|panel] [apply] [interactive]"
+description: "Code review PR against project conventions. Usage: /code-review <PR_NUMBER> [light|full|panel] [apply] [interactive] [since:<sha>]"
+argument-hint: "<PR> [light|full|panel] [apply] [interactive] [since:<sha>]"
 ---
 
 # Code Review

@@ -1,5 +1,6 @@
 ---
 description: "Hand an intent to a new herdr pane beside this one, record it in the ledger, and optionally get one line back. Usage: /adw-dispatch <intent> | /adw-dispatch status"
+argument-hint: "<intent> | status"
 ---
 
 # adw-dispatch
