@@ -1,5 +1,6 @@
 ---
 description: Safely clear stale git worktrees + local branches under .claude/worktrees/, plus whatever disposable state repo-profile §18 declares (servers, ephemeral databases, caches, daemons). Dry-run → confirm.
+argument-hint: "[force]"
 ---
 
 # Cleanup

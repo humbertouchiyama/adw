@@ -1,6 +1,7 @@
 ---
 name: reviewing-contract-prs
-description: Use when reviewing, critiquing, refuting or approving a pull request to the adw repository (commands/*.md, install/, docs/), or before merging any change to the ADW prose contract.
+description: Use when reviewing, critiquing, refuting or approving a pull request to the adw repository (commands/*.md, install/, docs/), or before merging any change to the ADW prose contract. Use this, not /code-review or code-review:code-review, for adw PRs; for a PR in a consuming repo use /code-review.
+argument-hint: "<PR number or URL>"
 ---
 
 # Reviewing contract PRs
