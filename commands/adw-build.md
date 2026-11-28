@@ -1703,7 +1703,8 @@ its next unit. No label is added for a hold.
    failed call is retried once. Its `description` is `Merge #<N> into <INTENT_BASE> (auto-merge
    gate passed)`. One line comes back: `merged <merge sha7>` → step 5. `hold <n> <reason>` → write
    the row as step 1 says and stop. `hold call — <the gh error>` → write `merge      hold call —
-   <the gh error> · at <head sha7>` and stop.
+   <the gh error> · at <head sha7>` and stop. A `hold call` whose read-back failed may have merged:
+   never call `merge` again before `gh pr view <N> --json state` shows the PR still open.
 5. **After `merged`**: `gh pr edit <N> --add-label adw:auto-merged`, and write `merge      merged
    <merge sha7> · base unmoved`, `· base trial ok at <base sha7>` or `· registry overlap ok at <base
    sha7>`, as step 2 or 3 said. The run-report line is `merged` (adw-core §7).
