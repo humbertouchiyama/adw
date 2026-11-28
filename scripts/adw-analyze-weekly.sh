@@ -79,8 +79,17 @@ worktree() {
 # and the app transcript dirs (the leak scan covers the same dirs), no MCP servers, a hard timeout.
 # Read rules also scope Grep and Glob; `//` starts an absolute path in a rule. Exit 124 is the timeout.
 critical_pass() {
-  local prompt d dirs=() reads=("Read(./**)")
+  local prompt d dirs=() reads=("Read(./**)") hits="${1:-}"
   prompt="$(sed -e "s#{DATE}#$D#g" "$WT/.claude/skills/adw-analyze/critical-pass.md")"
+  if [ -n "$hits" ]; then
+    prompt="$prompt
+
+Your last findings were dropped before anyone read them: the leak scan matched these lines of
+$D/critical-pass.md against the raw data (file:line kind):
+$hits
+Write the file again from scratch. Quote nothing from the raw data: cite only metric ids, PR numbers
+and the first 8 characters of session ids."
+  fi
   while IFS= read -r d; do
     [ -n "$d" ] && dirs+=(--add-dir "$d") && reads+=("Read(/$d/**)")
   done < <(python3 "$WT/scripts/adw-analyze.py" --reports "$R" --transcript-dirs)
@@ -91,6 +100,22 @@ critical_pass() {
      claude -p "$prompt" --model sonnet --permission-mode dontAsk --strict-mcp-config \
      --tools Read Grep Glob Edit Write ${dirs[@]+"${dirs[@]}"} \
      --allowedTools "${reads[@]}" "Edit($D/critical-pass.md)" --disallowedTools Bash WebFetch WebSearch Agent) >&2
+}
+
+# Sets HITS to the leak scan's hits in the critical pass's own file, as `critical-pass.md:<line> <kind>`
+# lines (never the text). Not run in a subshell: a scan that could not run fails the run at the leak
+# scan step, as the final scan would.
+HITS=""
+pass_hits() {
+  local out rc=0
+  out="$(python3 "$WT/scripts/adw-analyze.py" --reports "$R" --scan --date "$D")" || rc=$?
+  case "$rc" in 0|4) ;; *) STEP="leak scan"; exit 1 ;; esac
+  HITS="$(printf '%s\n' "$out" | grep '^critical-pass\.md:' || true)"
+}
+
+# The pass's status from its exit code and its file: a pass cut off mid-write is not a finished pass.
+pass_status() {
+  if [ "$1" -eq 124 ]; then echo "timed out"; elif [ -s "$2" ]; then echo ok; else echo missing; fi
 }
 
 run() {
@@ -115,12 +140,24 @@ run() {
   D="$(basename "$out")"   # the folder the reader wrote: its UTC date can differ from ours across midnight
 
   STEP="critical pass"
-  local findings="$R/$D/critical-pass.md" status=missing pass=0
+  local findings="$R/$D/critical-pass.md" status pass=0
   critical_pass || pass=$?
-  if [ "$pass" -eq 124 ]; then
-    status="timed out"   # a pass cut off mid-write is not a finished pass
-  elif [ -s "$findings" ]; then
-    status=ok
+  status="$(pass_status "$pass" "$findings")"
+  # Scan the pass's text on its own before it joins the report: a span it quoted would otherwise make
+  # the final scan drop the whole report, the reader's metrics and verdicts with it. One rerun is told
+  # which lines hit; a second hit drops the pass and keeps the rest.
+  if [ "$status" = ok ]; then
+    pass_hits
+    if [ -n "$HITS" ]; then
+      rm -f "$findings"
+      pass=0
+      critical_pass "$HITS" || pass=$?
+      status="$(pass_status "$pass" "$findings")"
+      if [ "$status" = ok ]; then
+        pass_hits
+        [ -z "$HITS" ] || status="dropped — leak scan hit"
+      fi
+    fi
   fi
   if [ "$status" = ok ]; then
     replace_line "$R/$D/report.md" "critical pass: pending" "$findings"

@@ -8,7 +8,8 @@ description: Use when the owner asks to run the ADW run analysis now, check whet
 The weekly launchd job runs this every Monday. Run it by hand when the owner asks for a report now.
 
 1. From this repo, run `bash scripts/adw-analyze-weekly.sh run` in the background and wait for it
-   to exit: the critical pass alone may take 30 minutes, longer than a foreground command may run.
+   to exit: the critical pass alone may take 30 minutes (60 when a leak scan hit reruns it), longer
+   than a foreground command may run.
    It refreshes a dedicated adw worktree to `origin/main`, runs `scripts/adw-analyze.py`, the
    critical pass, the leak scan, commits
    the dated folder to the private reports repo (`$ADW_ANALYSIS_DIR`), pushes, and opens an issue there.

@@ -17,7 +17,18 @@ echo "python3 $*" >> "$STUB_LOG"
 reports=""; prev=""
 for a in "$@"; do [ "$prev" = "--reports" ] && reports="$a"; prev="$a"; done
 case " $* " in
-  *" --scan "*) echo "leak scan: stub"; exit "${FAKE_SCAN_EXIT:-0}";;
+  *" --scan "*)
+    # FAKE_SCAN_SEQ=cp,clean: per scan call, a hit in critical-pass.md, in report.md, or none.
+    if [ -n "${FAKE_SCAN_SEQ:-}" ]; then
+      n=$(cat "$STUB_LOG.scans" 2>/dev/null || echo 0); echo $((n + 1)) > "$STUB_LOG.scans"
+      IFS=, read -ra seq <<< "$FAKE_SCAN_SEQ"; i=$(( n < ${#seq[@]} ? n : ${#seq[@]} - 1 ))
+      case "${seq[$i]}" in
+        cp) echo "critical-pass.md:1 transcript"; echo "leak scan: 1 hit(s)"; exit 4;;
+        report) echo "report.md:3 secret"; echo "leak scan: 1 hit(s)"; exit 4;;
+        *) echo "leak scan: clean"; exit 0;;
+      esac
+    fi
+    echo "leak scan: stub"; exit "${FAKE_SCAN_EXIT:-0}";;
   *" --transcript-dirs "*) echo "$FAKE_TDIR"; exit 0;;
 esac
 [ "${FAKE_READER_EXIT:-0}" = 0 ] || exit "$FAKE_READER_EXIT"
@@ -205,6 +216,40 @@ class Weekly(TmpCase):
     def test_scan_hit_deletes_folder_and_opens_failure_issue(self):
         r = self.run_wrapper(FAKE_SCAN_EXIT="4")
         self.assertEqual(r.returncode, 1)
+        self.assertFalse(os.path.exists(os.path.join(self.reports, self.date)))
+        self.assertEqual(self.issues(), [f"ADW analysis {self.date} failed at leak scan"])
+        self.assertEqual(self.pushed(), "init")
+
+    def stub_log(self):
+        with open(os.path.join(self.tmp, "stub.log")) as f:
+            return f.read()
+
+    def test_a_pass_that_hits_is_rerun_once_with_the_hits(self):
+        r = self.run_wrapper(FAKE_SCAN_SEQ="cp,clean")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        log = self.stub_log()
+        self.assertEqual(log.count("claude -p "), 2)
+        second = log[log.rindex("claude -p "):]
+        self.assertIn("critical-pass.md:1 transcript", second)
+        self.assertIn("Quote nothing from the raw data", second)
+        self.assertIn("fewer intents", self.report())
+        self.assertEqual(self.pushed(), f"report {self.date}")
+
+    def test_a_pass_that_hits_twice_is_dropped_and_the_rest_is_committed(self):
+        r = self.run_wrapper(FAKE_SCAN_SEQ="cp,cp,clean")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.stub_log().count("claude -p "), 2)
+        self.assertIn("critical pass: dropped — leak scan hit", self.report())
+        self.assertNotIn("fewer intents", self.report())
+        self.assertFalse(os.path.exists(os.path.join(self.reports, self.date, "critical-pass.md")))
+        with open(os.path.join(self.reports, self.date, "issue.md")) as f:
+            self.assertIn("critical pass: dropped — leak scan hit", f.read())
+        self.assertEqual(self.pushed(), f"report {self.date}")
+
+    def test_a_hit_in_the_readers_own_output_still_drops_the_report(self):
+        r = self.run_wrapper(FAKE_SCAN_SEQ="report")
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(self.stub_log().count("claude -p "), 1)
         self.assertFalse(os.path.exists(os.path.join(self.reports, self.date)))
         self.assertEqual(self.issues(), [f"ADW analysis {self.date} failed at leak scan"])
         self.assertEqual(self.pushed(), "init")

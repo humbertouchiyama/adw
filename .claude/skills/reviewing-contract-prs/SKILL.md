@@ -100,8 +100,10 @@ that proves nothing. Each brief is this text, with the lane's question from the 
 | **C — claims and context** | (1) Match the PR body to the diff, per commit (`git log --stat origin/<base>..pr/<N>`): work in the diff the body never names, and body claims the diff does not make. (2) Mark every number and every "X does not work" or "X is ignored" claim as re-derived (show how) or unverified. (3) List repo-specific values a run would consume, added to `commands/`: repo names, paths, branch names, stack nouns. They belong in `repo-profile`. A PR number or repo name cited as the evidence for a rule is provenance, not a value (`README.md`, "The split"): leave it out. (4) For every other open PR `<M>`: `git merge-tree --write-tree pr/<N> pr/<M>` (two branches only; exit 1 is a conflict, report it), then read both diffs. Does one reintroduce what the other removes, or depend on text the other changes? (5) Is `docs/00-design.md` now wrong? (6) If the diff touches `commands/` or `scripts/`, does the body carry `predicts` lines in README's grammar ("Changing the contract"), one per fix it bundles, or `predicts  none — <reason>`? A missing or malformed line is a Warning. Before your `VERDICT:` line, write two lines: `PRS CHECKED: <the #M whose merge-tree ran>` and `UNVERIFIED: <the body claims you marked unverified, or none>`. |
 
 A lane that errors, returns no `VERDICT:` line (for lane C and a delta lane, also no `PRS CHECKED:` line), or
-returns `does not hold` with no claim line is dispatched once more. If it fails again, Coverage
-says `failed` for it.
+returns `does not hold` with no claim line is dispatched once more, with its brief unchanged and one
+line added at the end that names what was wrong: `Your last return <had no VERDICT: line | had no
+PRS CHECKED: line | said VERDICT: does not hold with no claim line | ended in an error: <the
+error>>. End your report as the brief says.` If it fails again, Coverage says `failed` for it.
 
 **3. Refute.** After all lanes have reported, number every claim: `P1`, `P2`, … for defects and
 `N1`, … for assurances. Merge duplicates across lanes first. **Never hand over the lane's
