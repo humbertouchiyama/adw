@@ -84,11 +84,11 @@ critical_pass() {
   if [ -n "$hits" ]; then
     prompt="$prompt
 
-Your last findings were dropped before anyone read them: the leak scan matched these lines of
-$D/critical-pass.md against the raw data (file:line kind):
+Your last findings were held back: the leak scan matched these lines of $D/critical-pass.md against
+the raw data (file:line kind):
 $hits
-Write the file again from scratch. Quote nothing from the raw data: cite only metric ids, PR numbers
-and the first 8 characters of session ids."
+Read those lines, then write the whole file again without any text copied from the raw data: cite
+only metric ids, PR numbers and the first 8 characters of session ids."
   fi
   while IFS= read -r d; do
     [ -n "$d" ] && dirs+=(--add-dir "$d") && reads+=("Read(/$d/**)")
@@ -139,6 +139,11 @@ run() {
   out="$(python3 "$WT/scripts/adw-analyze.py" --reports "$R" --adw "$WT")"
   D="$(basename "$out")"   # the folder the reader wrote: its UTC date can differ from ours across midnight
 
+  # The reader's own output first: a hit there stops the run now, before a 30-minute pass, and it
+  # means every later hit is the pass's (the scanner credits a shared span to the first file).
+  STEP="leak scan"
+  python3 "$WT/scripts/adw-analyze.py" --reports "$R" --scan --date "$D" >&2 || exit 1
+
   STEP="critical pass"
   local findings="$R/$D/critical-pass.md" status pass=0
   critical_pass || pass=$?
@@ -149,7 +154,7 @@ run() {
   if [ "$status" = ok ]; then
     pass_hits
     if [ -n "$HITS" ]; then
-      rm -f "$findings"
+      # The file stays for the rerun to read and overwrite; the second scan judges what it left.
       pass=0
       critical_pass "$HITS" || pass=$?
       status="$(pass_status "$pass" "$findings")"

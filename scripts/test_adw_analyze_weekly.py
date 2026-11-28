@@ -225,18 +225,18 @@ class Weekly(TmpCase):
             return f.read()
 
     def test_a_pass_that_hits_is_rerun_once_with_the_hits(self):
-        r = self.run_wrapper(FAKE_SCAN_SEQ="cp,clean")
+        r = self.run_wrapper(FAKE_SCAN_SEQ="clean,cp,clean")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         log = self.stub_log()
         self.assertEqual(log.count("claude -p "), 2)
         second = log[log.rindex("claude -p "):]
         self.assertIn("critical-pass.md:1 transcript", second)
-        self.assertIn("Quote nothing from the raw data", second)
+        self.assertIn("without any text copied from the raw data", second)
         self.assertIn("fewer intents", self.report())
         self.assertEqual(self.pushed(), f"report {self.date}")
 
     def test_a_pass_that_hits_twice_is_dropped_and_the_rest_is_committed(self):
-        r = self.run_wrapper(FAKE_SCAN_SEQ="cp,cp,clean")
+        r = self.run_wrapper(FAKE_SCAN_SEQ="clean,cp,cp,clean")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(self.stub_log().count("claude -p "), 2)
         self.assertIn("critical pass: dropped — leak scan hit", self.report())
@@ -249,7 +249,7 @@ class Weekly(TmpCase):
     def test_a_hit_in_the_readers_own_output_still_drops_the_report(self):
         r = self.run_wrapper(FAKE_SCAN_SEQ="report")
         self.assertEqual(r.returncode, 1)
-        self.assertEqual(self.stub_log().count("claude -p "), 1)
+        self.assertEqual(self.stub_log().count("claude -p "), 0)  # stopped before the pass
         self.assertFalse(os.path.exists(os.path.join(self.reports, self.date)))
         self.assertEqual(self.issues(), [f"ADW analysis {self.date} failed at leak scan"])
         self.assertEqual(self.pushed(), "init")
