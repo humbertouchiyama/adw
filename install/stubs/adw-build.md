@@ -1,6 +1,6 @@
 ---
 description: "ADW do side: consume approved specs/plans → worktrees → gates → independent verification → PRs → /code-review loop → ready|blocked|failed. An unknown slug routes to /adw-init first. Usage: /adw-build <intent-slug>"
-argument-hint: "<intent-slug>"
+argument-hint: "[<intent-slug>]"
 ---
 
 # adw-build — loader
