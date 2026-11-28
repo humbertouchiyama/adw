@@ -19,9 +19,9 @@ LOCK="$DIR/.fetch.lock"
 
 stamp() { git -C "$CACHE" log -1 --format='%h' 2>/dev/null; }
 
-# The loader is the one part of ADW that is still a COPY. This script and the stubs in
-# .claude/commands/ are tracked files mirroring install/ upstream, so they drift exactly the way
-# the contract used to — and nothing else in the system will ever tell you. AXCMedApp ran a
+# The loader is the one part of ADW that is still a COPY. This script, the stubs in
+# .claude/commands/ and the hooks in .claude/adw/hooks/ are tracked files mirroring install/
+# upstream, so they drift exactly the way the contract used to — and nothing else in the system will ever tell you. AXCMedApp ran a
 # revision-old loader for a day: its stubs did not know exit 2 existed, so an unverified cache
 # would have run as verified, and a human code review is what caught it.
 # Report only. Never rewrite a tracked file behind the author's back.
@@ -36,12 +36,22 @@ loader_drift() {
     have=1
     cmp -s "$cmds/$n" "$s" 2>/dev/null || drift="$drift commands/$n"
   done
+  # The hooks are copies too (.claude/adw/hooks/): settings.json runs them before any fetch.
+  for h in "$up"/hooks/*; do
+    [ -f "$h" ] || continue
+    n=$(basename "$h")
+    [ -f "$DIR/hooks/$n" ] || { missing="$missing hooks/$n(missing)"; continue; }
+    cmp -s "$DIR/hooks/$n" "$h" 2>/dev/null || drift="$drift hooks/$n"
+    # A copy that no settings file runs guards nothing (README, "Installing it in a repo").
+    grep -qs "hooks/$n" "$DIR/../settings.json" "$DIR/../settings.local.json" \
+      || drift="$drift hooks/$n(not-in-settings.json)"
+  done
   # A repo with no stub at all is mid-install (the README runs this before the cp): say nothing.
   [ -z "$have" ] || drift="$drift$missing"
   [ -n "$drift" ] || return 0
   echo "adw: the LOADER is behind $REPO —$drift" >&2
   echo "adw: these are copies, not fetched, so nothing else reports this. Diff before overwriting:" >&2
-  echo "adw:   cp '$up/fetch.sh' '$DIR/fetch.sh' && cp '$up'/stubs/*.md '$cmds'/" >&2
+  echo "adw:   cp '$up/fetch.sh' '$DIR/fetch.sh' && cp '$up'/stubs/*.md '$cmds'/ && mkdir -p '$DIR/hooks' && cp '$up'/hooks/* '$DIR/hooks'/" >&2
 }
 
 # Serialize concurrent runs in the same repo: two sessions resetting one cache can

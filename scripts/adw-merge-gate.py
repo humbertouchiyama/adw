@@ -24,6 +24,24 @@ in a detached worktree `.claude/worktrees/adw-trial-<slug>-pr<N>` and prints `tr
 or aborts, removes the tree and prints `hold 6 conflict: <files>` (exit 1). The PR head never moves, so
 `ready`, the walk and the screenshots still hold. The caller runs the gates in the tree, then `discard`
 removes it, never with --force: a tree with any change past the merge stays, and discard exits 1.
+The merge itself is the script's too, so no merge into a base runs without the gate:
+
+  python3 adw-merge-gate.py merge --repo <owner/repo> --pr <N> --head <full sha> --base <branch>
+      --profile <local repo-profile.md> --spec-path <repo path> [--spec-path ...] [--flag squash|merge|rebase]
+  python3 adw-merge-gate.py merge --sub --repo <owner/repo> --pr <N> --head <full sha> --slug <slug>
+  python3 adw-merge-gate.py merge --owner --repo <owner/repo> --pr <N> --head <full sha>
+      --profile <local repo-profile.md> [--base <branch>] [--flag squash|merge|rebase] [--delete-branch]
+
+The gate mode (independent and final PRs, adw-build §3.7) runs `check` again, then needs the base to equal
+--base, the head to equal --head and no `adw:hold` label. `--sub` (a sub-PR into its integration branch)
+needs the base `adw/<slug>` and the evidence block's `verified` row to equal the head and --head; it always
+squashes. `--owner` (the owner said "merge") needs the head to equal --head, and --base when it is given;
+it runs no `check`, because the owner's word overrides the flag. Every mode refuses a base that either copy
+of the profile names as the production branch. The merge is `gh pr merge --match-head-commit <head>`, then a
+`gh pr view` that must read MERGED (its exit code is not reliable when a worktree holds the branch); a
+failed call is retried once, and a read-back that fails three times is never retried as a merge. It prints
+`merged <merge sha7>` (exit 0), `hold <n> <reason>` (exit 1), or `hold call — <gh error>` (exit 1) when the
+merge call or its read-back fails.
 A gh call that fails, or a bad flag, prints `hold 0 gate error: <message>` and exits 2: the contract
 treats it as a hold. ADW_GATE_POLL_SECONDS (default 30) spaces the re-queries: 5 for an UNKNOWN
 mergeable state, 16 for a pending check, and all polling stops after
@@ -132,6 +150,8 @@ class Profile:
         # §3 test sources: their added lines are no money lines. No row, or no glob in it, exempts nothing.
         self.tests = [glob_re(g) for g in ticks(s3.get("test sources", ""))]
         self.production = (ticks(s3.get("production branch", "")) or [None])[0]
+        convention = s3.get("merge convention", "").replace("`", "").strip().lower().split()
+        self.convention = convention[0] if convention else None
         self.default_base = (ticks(s3.get("default base", "")) or [None])[0]
         self.excluded = [glob_re(g) for g in re.findall(r"':!([^']+)'", self.sections.get("2", {}).get("artifact exclusion pathspec", ""))]
         money = self.sections.get("11", {}).get("money", "")
@@ -486,6 +506,98 @@ def check(a) -> None:
         raise Hold(9, "the body has neither ## Smoke cases nor a Smoke: none line")
 
 
+FLAGS = {"squash": "--squash", "merge": "--merge", "rebase": "--rebase"}
+
+
+def merge_flag(a, prof: Profile) -> str:
+    word = a.flag or prof.convention
+    if word not in FLAGS:
+        raise GateError("no merge convention: pass --flag, or give repo-profile §3 a merge convention row")
+    return FLAGS[word]
+
+
+def view(a, fields: str) -> dict:
+    return json.loads(gh("pr", "view", str(a.pr), "--repo", a.repo, "--json", fields))
+
+
+def needs(a, *names: str) -> None:
+    missing = ["--" + n.replace("_", "-") for n in names if not getattr(a, n)]
+    if missing:
+        raise GateError("merge%s needs %s" % (" --sub" if a.sub else " --owner" if a.owner else "", " ".join(missing)))
+
+
+def merge(a) -> int:
+    if not re.fullmatch(r"[0-9a-f]{40}", a.head or ""):
+        raise GateError("--head must be a full 40-character sha")
+    if a.sub:
+        needs(a, "slug")
+        pr = view(a, "baseRefName,headRefOid,body")
+        if pr["baseRefName"] != "adw/%s" % a.slug:
+            raise Hold(2, "the sub-PR's base %s is not adw/%s" % (pr["baseRefName"], a.slug))
+        if pr["headRefOid"] != a.head:
+            raise Hold(3, "head moved: %s is not %s" % (pr["headRefOid"][:7], a.head[:7]))
+        m = re.search(r"^[ \t]*verified[ \t]+([0-9a-f]{40})\b", pr["body"], re.M)
+        if not m:
+            raise Hold(3, "the evidence block has no verified row")
+        if m.group(1) != a.head:
+            raise Hold(3, "verified %s is not the head %s" % (m.group(1)[:7], a.head[:7]))
+        return do_merge(a, "--squash")
+    needs(a, "profile") if a.owner else needs(a, "profile", "spec_path", "base")
+    with open(a.profile, encoding="utf-8") as f:
+        local = Profile(f.read())
+    if not a.owner:
+        check(a)
+    pr = view(a, "baseRefName,headRefOid,labels")
+    basep = base_profile(a, pr)
+    production = {prof.production for prof in (local, basep) if prof is not None and prof.production}
+    if not production:
+        raise Hold(2, "no copy of the profile names the production branch, so the base cannot be cleared")
+    if pr["baseRefName"] in production:
+        raise Hold(2, "the PR's base %s is the production branch" % pr["baseRefName"])
+    if a.base and pr["baseRefName"] != a.base:
+        raise Hold(2, "base changed: %s is not %s" % (pr["baseRefName"], a.base))
+    if pr["headRefOid"] != a.head:
+        raise Hold(3, "head moved: %s is not %s" % (pr["headRefOid"][:7], a.head[:7]))
+    if not a.owner and "adw:hold" in {l["name"] for l in pr["labels"]}:
+        raise Hold(1, "the PR has the adw:hold label")
+    return do_merge(a, merge_flag(a, local))
+
+
+def do_merge(a, flag: str) -> int:
+    cmd = ["pr", "merge", str(a.pr), "--repo", a.repo, flag, "--match-head-commit", a.head]
+    if a.owner and a.delete_branch:
+        cmd.append("--delete-branch")
+    err = ""
+    for _ in range(2):
+        p = run_gh(*cmd)
+        err = (p.stderr.strip().splitlines() or ["exit %d" % p.returncode])[-1] if p.returncode else ""
+        state = read_back(a)
+        if state is None:
+            # The merge may have landed: never call it a gate error, and never merge again blind.
+            print("hold call — the merge call %s, and the PR could not be read back: check it before anything else"
+                  % ("exited 0" if not err else "failed (%s)" % err))
+            return 1
+        if state.get("state") == "MERGED":
+            print("merged %s" % ((state.get("mergeCommit") or {}).get("oid") or "unknown")[:7])
+            return 0
+        if not err:
+            err = "the PR is %s after the merge call" % state.get("state")
+            break
+    print("hold call — %s" % err)
+    return 1
+
+
+def read_back(a) -> dict | None:
+    """The PR's state after a merge call, or None when gh cannot read it three times."""
+    for n in range(3):
+        try:
+            return view(a, "state,mergeCommit")
+        except (GateError, ValueError):
+            if n < 2:
+                time.sleep(min(POLL, 10))
+    return None
+
+
 def git(checkout: str, *args: str) -> str:
     p = subprocess.run(["git", "-C", checkout, *args], capture_output=True, text=True)
     if p.returncode != 0:
@@ -562,8 +674,23 @@ def main(argv: list[str]) -> int:
     d = sub.add_parser("discard")
     d.add_argument("--checkout", required=True)
     d.add_argument("--tree", required=True)
+    m = sub.add_parser("merge")
+    mode = m.add_mutually_exclusive_group()
+    mode.add_argument("--sub", action="store_true")
+    mode.add_argument("--owner", action="store_true")
+    m.add_argument("--repo", required=True)
+    m.add_argument("--pr", type=int, required=True)
+    m.add_argument("--head", required=True)
+    m.add_argument("--base")
+    m.add_argument("--slug")
+    m.add_argument("--profile")
+    m.add_argument("--spec-path", action="append")
+    m.add_argument("--flag", choices=sorted(FLAGS))
+    m.add_argument("--delete-branch", action="store_true")
     a = p.parse_args(argv)
     try:
+        if a.cmd == "merge":
+            return merge(a)
         if a.cmd == "trial":
             return trial(a)
         if a.cmd == "discard":

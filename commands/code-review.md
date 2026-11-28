@@ -107,7 +107,7 @@ Phases 1–8 in this window.
 **The merge gate belongs to the caller, always.** Under a dispatch the driver ends at its report.
 The report's `Next:` line invites "merge", and the user replies to the **caller**, which by then has
 no driver, no worktree and no state. So the caller owns 7a steps 6–7 — CI check, merge convention,
-mergeability, `gh pr merge` — which need none of that state, and the report says so:
+mergeability, the merge — which need none of that state, and the report says so:
 `merge gate is mine, not the driver's`.
 
 **Two properties hold whatever the caller is.**
@@ -710,7 +710,12 @@ Phase 7 always runs.
 7. **Confirm + merge → escalation surface per review-core §5.** The merge confirmation is an escalation of the "ship it?" decision — and **it is the report's `Next:` line, not a second block.** Do not print a separate "Ready to merge" panel restating what the buckets already show; that duplication is the verbosity the Output contract exists to kill.
    - **Default (no `interactive`)** → the `Next:` line carries the whole gate, in one sentence, naming any caveat: `Next: nothing — <N> fixes pushed, gates green. Say "merge" to squash into <base>.` / `Next: say "merge" to ship (visual QA not run — no browser; eyeball <flow> first).`
    - **`interactive` set** → surface via `AskUserQuestion` (recommended default first-listed).
-   On confirm: `gh pr merge <PR_NUMBER> $MERGE_FLAG --delete-branch`. Never force-merge, never bypass branch protection.
+   On confirm, one Bash call, the reviewed head's full sha written out as a literal (the head this report reviewed; `$MERGE_FLAG`'s word from step 6):
+   ```bash
+   R="$(git rev-parse --show-toplevel)"; C="$R/.claude/adw/cache/scripts/adw-merge-gate.py"; test -f "$C" || C="$R/scripts/adw-merge-gate.py"
+   python3 "$C" merge --owner --repo "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" --pr <PR_NUMBER> --head <reviewed head sha> --base <baseRefName> --profile "$R/.claude/repo-profile.md" --flag <squash|merge|rebase> --delete-branch
+   ```
+   The script refuses the production branch (`repo-profile §3`), a moved base and a head that moved since the review, then runs `gh pr merge --match-head-commit` and reads the PR back. `merged <sha7>` is the merge. Any `hold …` line is no merge: print it as the `Next:` line with its default (a moved head → re-run the review). Never type `gh pr merge` in its place: where the repo installed the `adw-guard` hook (README, "Installing it in a repo") it is denied, and an owner who wants it anyway types `! gh pr merge …` at the prompt. Never force-merge, never bypass branch protection.
 
 **Safety stops (apply branch) → review-core §7.** Two tiers:
 - **Stops the push** (fall back to "post review comment + leave PR open", nothing committed): unfixable Blocking, failed §4 verification, undeclared skipped browser check, blast-radius path touched, `--force-with-lease` rejected.

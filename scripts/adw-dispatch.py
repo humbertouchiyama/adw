@@ -6,12 +6,14 @@ must be identical every time: place the pane beside the caller, carry PATH, subm
 keep the ledger.
 
 Exit codes: 0 ok · 1 not inside herdr, or a bad path or name · 2 bad flag or value (argparse) ·
-3 the launch failed (the `failed` ledger row and the message say why).
+3 the launch failed (the `failed` ledger row and the message say why) · 4 `prompt` refused a line that
+could answer the child's approval surface · 5 `prompt` was not delivered (herdr's message says why).
 """
 import argparse
 import datetime
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -243,6 +245,46 @@ def cmd_reply(a):
     print("replied")
 
 
+# A line that could pass as an answer to the child's approval surface (adw-core §7, adw-init Phase 2):
+# a gate verb in the form the surface takes it, a delegation, an answer by number, or a bare yes. Only
+# the owner types those, in the child's pane (adw-dispatch §7). Case-blind, after leading marks.
+SURFACE_ANSWER = re.compile(
+    r"^(?:approved?|specs\s+only|re-?cut|merge\s+(?:auto|hold)|(?:you|critically|please)\s+decide|"
+    r"use\s+your\s+judge?ment)\b"
+    r"|^(?:build|decide|detail|regroup|new\s+intent|go|go\s+ahead|y|yes|yep|ok|okay|proceed|continue|"
+    r"lgtm|ship\s+it|sounds\s+good)\W*$"
+    r"|^regroup\s+u\d|^depth\s+u\d|^shape\s+[\"'“]?u\d|^reopen\s+q?\d"
+    r"|^q?\d{1,2}\s*(?:$|[-:=,]|\)\s)"
+    r"|^q\d+\b",
+    re.I)
+
+
+def surface_answer(text):
+    for line in text.splitlines() or [""]:
+        bare = line.strip().lstrip("\"'`>*-•· ").strip()
+        if SURFACE_ANSWER.search(bare):
+            return line.strip()
+    return None
+
+
+def cmd_prompt(a):
+    """Type one line of the owner's into a child's pane and submit it, unless it answers the surface."""
+    need_herdr()
+    hit = surface_answer(a.text)
+    if hit is not None:
+        die(f"refused: `{hit[:80]}` could answer the child's approval surface. The owner types "
+            f"that in the child's pane ({a.pane}).", code=4)
+    # A pane whose agent has exited is a bare shell: typing there would RUN the line.
+    ok, data, raw = herdr("agent", "get", a.pane)
+    status = dig(data, "result", "agent", "agent_status") if ok else None
+    if status in (None, "unknown"):
+        die(f"not delivered: no agent in {a.pane} ({raw[:120]})", code=5)
+    ok, _, raw = herdr("agent", "prompt", a.pane, a.text.replace("\n", " "))
+    if not ok:
+        die(f"not delivered to {a.pane}: {raw[:200]}", code=5)
+    print("prompted")
+
+
 def cmd_finish(a):
     last = None
     for r in read_rows():
@@ -310,6 +352,11 @@ def main(argv=None):
     s.add_argument("pane")
     s.add_argument("text")
     s.set_defaults(fn=cmd_reply)
+
+    s = sub.add_parser("prompt")
+    s.add_argument("pane")
+    s.add_argument("text")
+    s.set_defaults(fn=cmd_prompt)
 
     s = sub.add_parser("finish")
     s.add_argument("name")

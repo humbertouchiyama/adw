@@ -37,8 +37,19 @@ def seq(key, default):
     return items[min(count(key), len(items) - 1)]
 if fx.get("fail_all"):
     sys.stderr.write("HTTP 502: Bad Gateway\n"); sys.exit(1)
+if args[:2] == ["pr", "merge"]:
+    if count("merge") < fx.get("merge_fail", 0):
+        sys.stderr.write("GraphQL: Head branch was modified. Review and try the merge again.\n"); sys.exit(1)
+    if not fx.get("merge_noop"):
+        open(os.environ["FAKE_GH_FIXTURE"] + ".merged", "w").write("1")
+    sys.exit(fx.get("merge_rc", 0))
 if args[:2] == ["pr", "view"]:
+    merged = os.path.exists(os.environ["FAKE_GH_FIXTURE"] + ".merged")
+    if merged and fx.get("readback_fail"):
+        sys.stderr.write("HTTP 502: Bad Gateway\n"); sys.exit(1)
     view = dict(fx["view"])
+    view["state"] = "MERGED" if merged else "OPEN"
+    view["mergeCommit"] = {"oid": "abcdef0" + "1" * 33} if merged else None
     view["mergeable"] = seq("mergeable_seq", view.get("mergeable", "MERGEABLE"))
     print(json.dumps(view)); sys.exit(0)
 if args[:2] == ["pr", "diff"]:
@@ -788,3 +799,192 @@ class TestErrors(Gate):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Merge(Gate):
+    """`merge`: the gate, a sub-PR and the owner's word each merge only on their own checks."""
+
+    def merge(self, *extra):
+        with open(self.env["FAKE_GH_FIXTURE"], "w") as f:
+            json.dump(self.fx, f)
+        with open(self.local_profile, "w") as f:
+            f.write(self.local)
+        args = [sys.executable, SCRIPT, "merge", "--repo", "o/r", "--pr", "7", "--head", HEAD, *extra]
+        p = subprocess.run(args, env=self.env, capture_output=True, text=True)
+        return p.returncode, p.stdout.strip(), p.stderr
+
+    def gh_calls(self):
+        if not os.path.exists(self.env["FAKE_GH_LOG"]):
+            return []
+        with open(self.env["FAKE_GH_LOG"]) as f:
+            return [json.loads(l) for l in f]
+
+    def merges(self):
+        return [c for c in self.gh_calls() if c[:2] == ["pr", "merge"]]
+
+    def gate(self, *extra):
+        return self.merge("--base", "develop", "--profile", self.local_profile, "--spec-path", SPEC, *extra)
+
+    def owner(self, *extra):
+        return self.merge("--owner", "--profile", self.local_profile, *extra)
+
+    def sub(self, *extra):
+        self.fx["view"]["baseRefName"] = "adw/x"
+        return self.merge("--sub", "--slug", "x", *extra)
+
+
+class TestMergeGateMode(Merge):
+    def test_pass_merges_with_the_convention_and_the_head(self):
+        rc, out, err = self.gate()
+        self.assertEqual((rc, out), (0, "merged abcdef0"), err)
+        self.assertEqual(self.merges(), [["pr", "merge", "7", "--repo", "o/r", "--squash", "--match-head-commit", HEAD]])
+
+    def test_a_hold_never_merges(self):
+        self.fx["view"]["labels"] = [{"name": "adw:hold"}]
+        rc, out, _ = self.gate()
+        self.assertEqual(rc, 1)
+        self.assertTrue(out.startswith("hold 1 "), out)
+        self.assertEqual(self.merges(), [])
+
+    def test_base_other_than_the_intent_holds(self):
+        rc, out, _ = self.merge("--base", "feature/x", "--profile", self.local_profile, "--spec-path", SPEC)
+        self.assertTrue(out.startswith("hold 2 base changed"), out)
+        self.assertEqual(self.merges(), [])
+
+    def test_head_other_than_the_given_sha_holds(self):
+        with open(self.env["FAKE_GH_FIXTURE"], "w") as f:
+            json.dump(self.fx, f)
+        with open(self.local_profile, "w") as f:
+            f.write(self.local)
+        p = subprocess.run([sys.executable, SCRIPT, "merge", "--repo", "o/r", "--pr", "7", "--head", OLD,
+                            "--base", "develop", "--profile", self.local_profile, "--spec-path", SPEC],
+                           env=self.env, capture_output=True, text=True)
+        self.assertTrue(p.stdout.startswith("hold 3 head moved"), p.stdout)
+        self.assertEqual(self.merges(), [])
+
+    def test_flag_overrides_the_convention(self):
+        rc, out, _ = self.gate("--flag", "merge")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("--merge", self.merges()[0])
+
+    def test_missing_spec_path_is_a_gate_error(self):
+        rc, out, _ = self.merge("--base", "develop", "--profile", self.local_profile)
+        self.assertEqual((rc, out), (2, "hold 0 gate error: merge needs --spec-path"))
+
+    def test_short_head_is_a_gate_error(self):
+        p = subprocess.run([sys.executable, SCRIPT, "merge", "--repo", "o/r", "--pr", "7", "--head", "0123456"],
+                           env=self.env, capture_output=True, text=True)
+        self.assertEqual((p.returncode, p.stdout.strip()), (2, "hold 0 gate error: --head must be a full 40-character sha"))
+
+    def test_failed_call_is_retried_once(self):
+        self.fx["merge_fail"] = 1
+        rc, out, err = self.gate()
+        self.assertEqual((rc, out), (0, "merged abcdef0"), err)
+        self.assertEqual(len(self.merges()), 2)
+
+    def test_two_failed_calls_are_a_held_call(self):
+        self.fx["merge_fail"] = 2
+        rc, out, _ = self.gate()
+        self.assertEqual(rc, 1)
+        self.assertEqual(out, "hold call — GraphQL: Head branch was modified. Review and try the merge again.")
+
+    def test_a_zero_exit_without_merged_is_a_held_call(self):
+        self.fx["merge_noop"] = True
+        rc, out, _ = self.gate()
+        self.assertEqual((rc, out), (1, "hold call — the PR is OPEN after the merge call"))
+
+    def test_a_read_back_that_fails_is_a_held_call_not_a_gate_error(self):
+        self.fx["readback_fail"] = True
+        rc, out, _ = self.gate()
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(out, "hold call — the merge call exited 0, and the PR could not be read back: "
+                              "check it before anything else")
+        self.assertEqual(len(self.merges()), 1)
+
+    def test_a_non_zero_exit_that_merged_is_merged(self):
+        self.fx["merge_rc"] = 1
+        rc, out, _ = self.gate()
+        self.assertEqual((rc, out), (0, "merged abcdef0"))
+        self.assertEqual(len(self.merges()), 1)
+
+
+class TestMergeSubMode(Merge):
+    def test_verified_head_merges_with_squash(self):
+        self.local = profile().replace("| **merge convention** | squash |", "| **merge convention** | merge |")
+        rc, out, err = self.sub()
+        self.assertEqual((rc, out), (0, "merged abcdef0"), err)
+        self.assertIn("--squash", self.merges()[0])
+
+    def test_base_other_than_the_integration_branch_holds(self):
+        rc, out, _ = self.merge("--sub", "--slug", "x")
+        self.assertTrue(out.startswith("hold 2 the sub-PR's base develop is not adw/x"), out)
+        self.assertEqual(self.merges(), [])
+
+    def test_stale_verified_row_holds(self):
+        self.fx["view"]["body"] = body(evidence=EVIDENCE.replace(HEAD, OLD))
+        rc, out, _ = self.sub()
+        self.assertTrue(out.startswith("hold 3 verified ffffff"), out)
+        self.assertEqual(self.merges(), [])
+
+    def test_no_verified_row_holds(self):
+        self.fx["view"]["body"] = "no evidence"
+        rc, out, _ = self.sub()
+        self.assertEqual(out, "hold 3 the evidence block has no verified row")
+
+    def test_a_blocked_sub_pr_is_carried(self):
+        self.fx["view"]["labels"] = [{"name": "adw:blocked"}]
+        rc, out, _ = self.sub()
+        self.assertEqual((rc, out), (0, "merged abcdef0"))
+
+    def test_missing_slug_is_a_gate_error(self):
+        rc, out, _ = self.merge("--sub")
+        self.assertEqual((rc, out), (2, "hold 0 gate error: merge --sub needs --slug"))
+
+
+class TestMergeOwnerMode(Merge):
+    def test_owner_merges_without_the_flag(self):
+        self.fx["contents"][SPEC + "?ref=" + HEAD] = spec(merge="hold")
+        self.fx["view"]["labels"] = [{"name": "adw:hold"}]
+        rc, out, err = self.owner("--delete-branch")
+        self.assertEqual((rc, out), (0, "merged abcdef0"), err)
+        self.assertEqual(self.merges()[0][-1], "--delete-branch")
+
+    def test_production_base_is_refused(self):
+        self.fx["view"]["baseRefName"] = "main"
+        self.fx["contents"][".claude/repo-profile.md?ref=main"] = profile()
+        rc, out, _ = self.owner()
+        self.assertEqual(out, "hold 2 the PR's base main is the production branch")
+        self.assertEqual(self.merges(), [])
+
+    def test_production_named_only_by_the_base_copy_is_refused(self):
+        self.local = profile().replace("| **production branch** | `main` |\n", "")
+        self.fx["view"]["baseRefName"] = "main"
+        self.fx["contents"][".claude/repo-profile.md?ref=main"] = profile()
+        rc, out, _ = self.owner()
+        self.assertTrue(out.startswith("hold 2 the PR's base main"), out)
+
+    def test_no_production_row_anywhere_holds(self):
+        self.local = profile().replace("| **production branch** | `main` |\n", "")
+        self.fx["contents"][".claude/repo-profile.md?ref=develop"] = self.local
+        rc, out, _ = self.owner()
+        self.assertTrue(out.startswith("hold 2 no copy of the profile"), out)
+
+    def test_moved_head_holds(self):
+        self.fx["view"]["headRefOid"] = OLD
+        rc, out, _ = self.owner()
+        self.assertTrue(out.startswith("hold 3 head moved"), out)
+        self.assertEqual(self.merges(), [])
+
+    def test_given_base_must_match(self):
+        rc, out, _ = self.owner("--base", "feature/x")
+        self.assertTrue(out.startswith("hold 2 base changed"), out)
+
+    def test_delete_branch_is_owner_only(self):
+        rc, out, _ = self.gate("--delete-branch")
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("--delete-branch", self.merges()[0])
+
+    def test_sub_and_owner_together_is_a_bad_flag(self):
+        rc, out, _ = self.merge("--sub", "--owner", "--slug", "x")
+        self.assertEqual(rc, 2)
+        self.assertTrue(out.startswith("hold 0 gate error:"), out)

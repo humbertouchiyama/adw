@@ -205,9 +205,15 @@ is not him. This holds in every reply mode. The owner types `approve`, `specs on
 answer to a surface question **in the child's pane himself**; you do not carry them, even word
 for word. What the owner decided before the dispatch goes in the brief. Any other line the
 owner gives you for the child, you may send word for word, with the pane id `launch` printed:
-`herdr agent prompt "<child pane id>" "<the line>"`. It types the line and submits it in one
-step. If it fails with `agent_blocked`, the child waits at a dialog: tell the owner, and never
-type into that pane another way. Do not use `reply` for this: it marks the line as a report.
+`python3 "$DISPATCH" prompt "<child pane id>" "<the line>"`. It types the line and submits it in
+one step, and it refuses (exit 4) a line that could answer the approval surface: a gate verb in the
+form the surface takes it (`approve`, `specs only`, `re-cut "…"`, `depth u2 D3`, a bare `build`), a
+delegation (`you decide`), an answer by number (`1- …`, `Q3: no`), or a bare yes. A refused line is the owner's
+to type in the child's pane: say so, and never send it another way. Exit 5 means it was not
+delivered: no agent runs in that pane, or the child waits at a dialog (`agent_blocked`). Tell the
+owner, and never type into that pane another way. Never call `herdr agent prompt`, `send-keys`,
+`send-text` or `pane run` yourself: where the `adw-guard` hook is installed (README, "Installing it
+in a repo") they are denied. Do not use `reply` for this: it marks the line as a report.
 
 ## 8. Report
 
